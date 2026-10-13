@@ -10,6 +10,7 @@ import { SongScreen } from "./ui/song";
 import { MixerScreen } from "./ui/mixer";
 import { bindTopbar } from "./ui/topbar";
 import { bindRightClick } from "./ui/rightclick";
+import { Scope } from "./ui/scope";
 
 const root = document.getElementById("app")!;
 const app = new App(root);
@@ -23,6 +24,8 @@ app.openSystemMenu = () => systemMenu(app, () => { app.engine.stop(); app.show("
 app.songSettings = () => songSettings(app);
 app.onTimeUp = () => timeUpDialog(app);
 app.openShortcut = () => openShortcut(app);
+const scope = new Scope(app);
+app.toggleScope = () => scope.toggle();
 app.stuck = () => phraseGridDialog(app, { sceneId: app.currentSceneId(), onDone: () => app.refresh() });
 
 await app.boot(App.savedSong() ?? newSong());

@@ -610,6 +610,7 @@ export class App {
   openSystemMenu?: () => void;
   openShortcut?: () => void;
   stuck?: () => void;
+  toggleScope?: () => void;
   songSettings?: () => void;
 
   addTrackOf(kind: Track["kind"], preset: number): Track | null {

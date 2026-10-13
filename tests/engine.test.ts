@@ -226,3 +226,10 @@ Deno.test("phrase grid: deterministic, in key, sane lengths", () => {
     }
   }
 });
+
+Deno.test("rolls give a band of 2-4 tracks, never the whole catalogue", () => {
+  for (let seed = 1; seed < 2000; seed++) {
+    const s = roll(null, NO_LOCKS, seed);
+    assert(s.lineup.length >= 2 && s.lineup.length <= 4, `seed ${seed}: ${s.lineup.length} tracks`);
+  }
+});

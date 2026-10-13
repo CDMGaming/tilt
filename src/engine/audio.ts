@@ -109,6 +109,34 @@ export class AudioEngine {
 
   get analyser() { return this.master.analyser; }
 
+  private scope: { source: number | null; split: ChannelSplitterNode; l: AnalyserNode; r: AnalyserNode; from: AudioNode } | null = null;
+
+  /**
+   * Stereo taps for the oscilloscope: `trackId` or null for the master.
+   * Only one source is tapped at a time; switching moves the tap.
+   */
+  scopeTap(trackId: number | null): { l: AnalyserNode; r: AnalyserNode } | null {
+    if (this.scope && this.scope.source === trackId) return this.scope;
+    this.scopeOff();
+    const from = trackId === null ? this.master.analyser : this.tracks.get(trackId)?.gain;
+    if (!from) return null;
+    const split = this.ctx.createChannelSplitter(2);
+    const l = this.ctx.createAnalyser(), r = this.ctx.createAnalyser();
+    l.fftSize = r.fftSize = 2048;
+    from.connect(split);
+    split.connect(l, 0);
+    split.connect(r, 1);
+    this.scope = { source: trackId, split, l, r, from };
+    return this.scope;
+  }
+
+  scopeOff() {
+    if (!this.scope) return;
+    try { this.scope.from.disconnect(this.scope.split); } catch { /* already gone */ }
+    this.scope.split.disconnect();
+    this.scope = null;
+  }
+
   private dispose(tn: TrackNodes) {
     this.post(tn, { t: "stop" });
     tn.node.disconnect();

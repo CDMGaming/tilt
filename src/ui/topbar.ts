@@ -38,6 +38,7 @@ export function bindTopbar(app: App, el: HTMLElement) {
       h("button", { class: "chip-btn" + (app.screenName === "edit" ? " on" : ""), onclick: () => app.show("edit"), disabled: !s.tracks.length }, "Edit"),
       h("button", { class: "chip-btn" + (app.screenName === "mix" ? " on" : ""), onclick: () => app.show("mix"), disabled: !s.tracks.length, title: "Mixer (F4)" }, "Mix"),
       h("button", { class: "chip-btn", onclick: () => exportDialog(app), title: "Export WAV, stems or MIDI" }, "⬇ Export"),
+      h("button", { class: "chip-btn", onclick: () => app.toggleScope?.(), title: "Oscilloscope" }, "∿"),
       h("button", { class: "chip-btn", onclick: () => settingsDialog(app), title: "Settings" }, "⚙"),
     );
     updateTimer();

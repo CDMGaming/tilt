@@ -49,10 +49,12 @@ export function roll(prev: Setup | null, locks: Locks, seed: number = randomSeed
   let kinds: InstrumentKind[];
   if (keep("lineup")) kinds = prev!.lineup.map((l) => l.kind);
   else {
-    // Usually one of each, sometimes a doubled instrument or a missing one.
-    kinds = [...DICE_KINDS];
-    if (r.chance(0.35)) kinds.push(r.pick(DICE_KINDS));
-    if (r.chance(0.15)) kinds.splice(r.int(1, kinds.length - 1), 1);
+    // A band, not the whole catalogue: one drums, one bass, one harmony
+    // instrument; sometimes a 4th (lead or another synth), occasionally only 2.
+    const of = (g: string) => DICE_KINDS.filter((k) => INSTRUMENTS[k].group === g);
+    kinds = [r.pick(of("drums")), r.pick(of("bass")), r.pick(of("harmony"))];
+    if (r.chance(0.35)) kinds.push(r.pick([...of("lead"), ...of("harmony"), ...of("lead")]));
+    else if (r.chance(0.12)) kinds.splice(r.int(1, 2), 1);
     if (r.chance(0.2)) kinds.sort(() => r.next() - 0.5);
   }
   // Each track gets its own sound: the same instrument twice never repeats a preset.

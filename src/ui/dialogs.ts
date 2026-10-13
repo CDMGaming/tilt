@@ -255,6 +255,7 @@ export function systemMenu(app: App, newJam: () => void) {
     { label: "Play mode: whole song", checked: app.songMode === "song", run: () => { app.songMode = "song"; app.renderHeader(); } },
     { label: "Auto-arrange (one-scene songs)", disabled: !canArrange(app.song), run: () => app.edit("Auto-arrange", () => autoArrange(app.song)) },
     { label: app.learning ? "MIDI learn: finish" : "MIDI learn…", run: () => app.setLearning(!app.learning) },
+    { label: "Oscilloscope", run: () => app.toggleScope?.() },
     { label: "Settings…", run: () => settingsDialog(app) },
     { label: "Controls…", run: () => helpDialog(app) },
   ]);

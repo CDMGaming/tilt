@@ -364,3 +364,10 @@ button.on { background: var(--accent); color: var(--accent-ink); border-color: v
 .cards { display: flex; flex-direction: column; gap: 4px; }
 .card { background: #00000040; border-radius: 8px; padding: 4px 8px; font-size: 13px; }
 .dice-grid .die:nth-child(7) { grid-column: span 4; min-height: 0; }
+
+/* oscilloscope */
+.scope { position: fixed; right: 16px; bottom: 16px; z-index: 70; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px; box-shadow: 0 12px 40px #000a; cursor: move; }
+.scope-bar { display: flex; gap: 4px; align-items: center; margin-bottom: 4px; }
+.scope-title { margin-right: auto; font-size: 12px; color: #6fdc8c; }
+.scope-src { font: inherit; font-size: 12px; background: var(--raise); color: var(--ink); border: 1px solid var(--line); border-radius: 5px; }
+.scope-canvas { display: block; border-radius: 8px; width: 360px; height: 220px; }
