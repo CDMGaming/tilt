@@ -1,4 +1,12 @@
+/* Display face: until a bundled font is added (public/fonts + an @font-face for
+   "Rollbox Display" here), --font-display falls back to Bahnschrift, built into Windows. */
+
 :root {
+  /* ---- type ---- */
+  --font-ui: "Segoe UI", system-ui, sans-serif;
+  --font-display: "Rollbox Display", "Bahnschrift", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", var(--font-mono);
+
   /* ---- foundation: deep navy / blue-grey ramp ---- */
   --bg: #0d1220;          /* app background */
   --panel: #151c2e;       /* surfaces: bars, cells, strips, dialogs */
@@ -73,7 +81,7 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.35 "Segoe UI", system-ui, sans-serif; overflow: hidden; user-select: none; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.35 var(--font-ui); overflow: hidden; user-select: none; }
 button { font: inherit; color: inherit; background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-m); padding: 6px 10px; cursor: pointer;
   box-shadow: inset 0 1px 0 var(--bevel-hi), 0 2px 0 var(--bevel-lo);
   transition: background-color var(--t-fast), border-color var(--t-fast), transform var(--t-fast), box-shadow var(--t-fast), color var(--t-fast); }
@@ -103,7 +111,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .tp-btn.rec.on { background: var(--rec); color: var(--white); border-color: var(--rec); animation: pulse 1s infinite; }
 .tp-btn.mode { min-width: 86px; font-size: 13px; }
 .spacer { flex: 1; }
-.timer { font: 700 20px ui-monospace, Consolas, monospace; min-width: 0; padding: 2px 10px; border-radius: 8px; }
+.timer { font: 700 20px var(--font-mono); min-width: 0; padding: 2px 10px; border-radius: 8px; }
 .timer.on { background: var(--well); }
 .timer.hurry { color: var(--rec); animation: pulse .8s infinite; }
 .timer.done { color: var(--rec); }
@@ -137,11 +145,11 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .note.big { font-size: 16px; color: var(--ink); }
 .status { color: var(--accent); }
 .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--dim); margin-top: 6px; }
-.monitor { background: var(--well); border-radius: 8px; padding: 8px; height: 320px; overflow: auto; font: 12px/1.4 ui-monospace, Consolas, monospace; margin: 0; user-select: text; }
+.monitor { background: var(--well); border-radius: 8px; padding: 8px; height: 320px; overflow: auto; font: 12px/1.4 var(--font-mono); margin: 0; user-select: text; }
 .help { border-collapse: collapse; width: 100%; }
 .help td, .help th { padding: 4px 8px; text-align: left; vertical-align: top; }
 .help th { color: var(--accent); padding-top: 10px; }
-.help td:first-child { color: var(--accent); white-space: nowrap; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+.help td:first-child { color: var(--accent); white-space: nowrap; font-family: var(--font-mono); font-size: 12px; }
 .toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: var(--scrim-strong); border: 1px solid var(--line); color: var(--ink); padding: 9px 18px; border-radius: var(--r-m); z-index: 100; transition: opacity .4s; pointer-events: none; }
 .toast.out { opacity: 0; }
 
@@ -185,7 +193,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .seg-btn { padding: 7px 13px; background: transparent; border-color: transparent; box-shadow: none; }
 .seg-btn:hover:not(:disabled):not(.on) { background: var(--raise); }
 .dice-foot { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
-.dice-foot code { font: 700 18px ui-monospace, Consolas, monospace; color: var(--accent); user-select: text; }
+.dice-foot code { font: 700 18px var(--font-mono); color: var(--accent); user-select: text; }
 .small-btn { font-size: 13px; }
 
 /* ---------------------------------------------------------------- song screen */
@@ -195,7 +203,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .song-grid .cursor { outline: 2px solid var(--focus); outline-offset: 2px; box-shadow: 0 0 0 5px color-mix(in srgb, var(--focus) 22%, transparent); }
 .corner { padding: 8px 10px; background: var(--panel); }
 .song-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.corner-sub { color: var(--dim); font-size: 11px; font-family: ui-monospace, Consolas, monospace; }
+.corner-sub { color: var(--dim); font-size: 11px; font-family: var(--font-mono); }
 .track-head { background: var(--panel); border-top: 4px solid var(--track); padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; }
 .track-head.muted { opacity: .55; border-top-color: var(--line-strong); }
 .track-head { transition: opacity var(--t-med); }
@@ -278,7 +286,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .knob.turning .knob-cap { fill: var(--raise-hi); }
 .knob.turning .knob-value { color: var(--knob, var(--accent)); opacity: 1; }
 .knob-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; opacity: .8; text-align: center; }
-.knob-value { font: 600 11px ui-monospace, Consolas, monospace; opacity: .9; }
+.knob-value { font: 600 11px var(--font-mono); opacity: .9; }
 .switch { display: flex; flex-direction: column; align-items: center; min-width: 62px; padding: 6px 8px; border-radius: var(--r-m); position: relative; }
 .switch::before { content: ""; position: absolute; top: 5px; right: 6px; width: 5px; height: 5px; border-radius: 50%; background: var(--well); box-shadow: inset 0 0 0 1px var(--line); }
 .switch.on::before { background: currentColor; box-shadow: 0 0 6px currentColor; }
@@ -337,7 +345,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 
 /* recording count-in */
 .count-in { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 90; pointer-events: none;
-  font: 900 160px/1 "Segoe UI", system-ui, sans-serif; color: var(--rec); text-shadow: 0 6px 40px var(--shadow); }
+  font: 900 160px/1 var(--font-display); color: var(--rec); text-shadow: 0 6px 40px var(--shadow); }
 .count-in.pop { animation: countpop .35s ease-out; }
 @keyframes countpop { from { transform: translate(-50%, -50%) scale(1.35); opacity: .4; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
 
@@ -360,7 +368,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .pg-cell { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left; min-height: 62px; padding: 8px; }
 .pg-cell.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .pg-name { font-weight: 700; font-size: 13px; }
-.pg-dots { font-family: ui-monospace, Consolas, monospace; font-size: 8px; letter-spacing: 0; opacity: .7; max-width: 100%; overflow: hidden; white-space: nowrap; }
+.pg-dots { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0; opacity: .7; max-width: 100%; overflow: hidden; white-space: nowrap; }
 .pg-cell { overflow: hidden; min-width: 0; }
 .pg-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .dialog.wide:has(.phrase-grid) { width: min(900px, 96vw); }
@@ -436,3 +444,20 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .panel.kind-lead .inst-name { font-style: italic; }
 .panel.kind-wobble .inst-name { text-shadow: 0 0 10px color-mix(in srgb, var(--track) 60%, transparent); }
 .panel.kind-acid .knob-value { color: var(--track); }
+
+/* ---------------------------------------------------------------- typography
+   Display face for identity and headings; fixed-width digits for anything that changes. */
+.brand, .logo, .inst-name, .die-value, .th-name, .sh-name, .strip-name, .pick-name, .song-title,
+.go-btn, .roll-btn, .module-title, .pg-role, .count-in, .timer, .tb-trackname, .lib-title {
+  font-family: var(--font-display);
+}
+.brand, .logo { letter-spacing: .12em; text-transform: uppercase; }
+.inst-name { letter-spacing: .06em; text-transform: uppercase; }
+.menu-title, .dialog-title, .section-title, .die-label, .knob-label, .switch-label, .tb-label, .fx-num, .pad-num {
+  font-family: var(--font-display); letter-spacing: .1em;
+}
+.timer { font-weight: 700; letter-spacing: .04em; }
+.timer, .knob-value, .tb-value, .stepper-value, .die-value, .cell-bars, .switch-value, .sh-meta, .chip-btn, .lib-date {
+  font-variant-numeric: tabular-nums;
+}
+.inst-role { text-transform: none; letter-spacing: 0; font-family: var(--font-ui); }
