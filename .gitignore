@@ -1,0 +1,5 @@
+node_modules/
+dist/
+*.log
+# Third-party manuals (Korg copyright): kept locally, not versioned
+docs/reference/
