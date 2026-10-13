@@ -10,10 +10,10 @@
 // 57 pink (+1/+2 dimmer), 1 dark, 2 grey, 3 white.
 
 import { DRUM_BASE_NOTE, INSTRUMENTS, drumCount, drumPartName, formatParam, fromUnit, isDrumKind, presetParams, toUnit } from "../engine/instruments";
-import { MAX_BARS, TICKS_PER_BAR, type Track } from "../engine/model";
+import { MAX_BARS, MAX_SCENES, TICKS_PER_BAR, type Scene, type Track } from "../engine/model";
 import { NOTE_NAMES, inScale, scaleById } from "../engine/music";
 import { getParam, paramInfo } from "../engine/params";
-import { addNote, duplicateClip, ensureClip, quantizeClip, setClipBars } from "../engine/songops";
+import { addNote, addScene, duplicateClip, duplicateScene, ensureClip, quantizeClip, setClipBars } from "../engine/songops";
 import type { App } from "./app";
 import { fmtTime } from "./dom";
 import { trackColor } from "./theme";
@@ -175,7 +175,14 @@ export class Push1Surface {
     }
     // Second row: Device / Mixer / FX.
     if (cc >= 102 && cc <= 109) { if (pressed && cc - 102 < PAGES.length) this.page = PAGES[cc - 102]; return; }
-    if (cc >= 36 && cc <= 43) { if (pressed) this.launchScene(this.sceneOffset + (43 - cc)); return; }
+    if (cc >= 36 && cc <= 43) {
+      if (!pressed) return;
+      const i = this.sceneOffset + (43 - cc);
+      // The (dim) button just below the last scene adds a new one.
+      if (i === this.app.song.scenes.length) this.newScene(false);
+      else this.launchScene(i);
+      return;
+    }
     if (!pressed && cc !== BTN.shift && cc !== BTN.del) return;
     const app = this.app;
     switch (cc) {
@@ -191,7 +198,8 @@ export class Push1Surface {
       case BTN.undo: if (this.shift) app.redo(); else app.undo(); break;
       case BTN.shift: this.shift = pressed; break;
       case BTN.del: this.del = pressed; break;
-      case BTN.double: case BTN.duplicate: { const t = this.track(); if (t) app.edit("Duplicate clip", () => duplicateClip(app.song, ensureClip(app.song, t, this.sceneId()))); break; }
+      case BTN.duplicate: if (this.shift) { this.newScene(true); break; } // falls through
+      case BTN.double: { const t = this.track(); if (t) app.edit("Duplicate clip", () => duplicateClip(app.song, ensureClip(app.song, t, this.sceneId()))); break; }
       case BTN.quantize: { const c = this.track()?.clips[this.sceneId()]; if (c) app.edit("Quantize", () => quantizeClip(c, c.notes, this.stepLen())); break; }
       case BTN.mute: { const t = this.track(); if (t) app.edit("Mute", () => (t.mute = !t.mute)); break; }
       case BTN.solo: { const t = this.track(); if (t) app.edit("Solo", () => (t.solo = !t.solo)); break; }
@@ -232,6 +240,22 @@ export class Push1Surface {
     this.selPitch = null;
     this.stepPage = 0;
     this.devPage = Math.min(this.devPage, this.devPages().length - 1);
+  }
+
+  /** Add a blank scene at the end, or (copy) duplicate the selected scene right after it. */
+  private newScene(copy: boolean) {
+    const app = this.app, song = app.song;
+    if (song.scenes.length >= MAX_SCENES) { app.overlays.toast(`${MAX_SCENES} scenes max`); return; }
+    const i = song.scenes.findIndex((x) => x.id === this.sceneId());
+    let s = null as Scene | null;
+    app.edit(copy ? "Duplicate scene" : "Add scene", () => { s = copy ? duplicateScene(song, i) : addScene(song); });
+    if (!s) return;
+    const si = song.scenes.indexOf(s);
+    app.ed.sceneId = s.id;
+    app.songCur.row = si;
+    this.sceneOffset = Math.max(this.sceneOffset, si - 7);
+    app.overlays.toast(`Added ${s.name}`, 1200);
+    app.refresh();
   }
 
   private changeBars(d: number) {
@@ -491,7 +515,8 @@ export class Push1Surface {
     for (let i = 0; i < 8; i++) this.led("c", 102 + i, i >= PAGES.length ? 0 : PAGES[i] === this.page ? pushColor("#4fd8ff", 0) : pushColor("#4fd8ff", 2));
     for (let k = 0; k < 8; k++) {
       const s = app.song.scenes[this.sceneOffset + k];
-      this.led("c", 43 - k, !s ? 0 : pos?.sceneId === s.id ? 22 : s.id === app.ed.sceneId ? 16 : 13); // green playing, yellow selected
+      if (!s) { this.led("c", 43 - k, this.sceneOffset + k === app.song.scenes.length ? 19 : 0); continue; } // dim green: "add a scene"
+      this.led("c", 43 - k, pos?.sceneId === s.id ? 22 : s.id === app.ed.sceneId ? 16 : 13); // green playing, yellow selected
     }
     const single = (cc: number, on: boolean) => this.led("c", cc, on ? 4 : 1);
     single(BTN.play, app.engine.playing);
