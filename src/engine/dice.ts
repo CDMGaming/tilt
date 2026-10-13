@@ -5,6 +5,7 @@ import { INSTRUMENTS } from "./instruments";
 import { newSong, type InstrumentKind, type Song } from "./model";
 import { SCALES } from "./music";
 import { Rng, randomSeed } from "./rng";
+import { CHALLENGES, dealChallenges } from "./challenges";
 import { addTrack, ensureClip } from "./songops";
 
 export interface Setup {
@@ -13,11 +14,12 @@ export interface Setup {
   tempo: number;
   swing: number;
   lineup: { kind: InstrumentKind; preset: number }[];
+  cards?: string[]; // challenge card ids
 }
 
-export type LockKey = "key" | "scale" | "tempo" | "swing" | "lineup" | "presets";
+export type LockKey = "key" | "scale" | "tempo" | "swing" | "lineup" | "presets" | "cards";
 export type Locks = Record<LockKey, boolean>;
-export const NO_LOCKS: Locks = { key: false, scale: false, tempo: false, swing: false, lineup: false, presets: false };
+export const NO_LOCKS: Locks = { key: false, scale: false, tempo: false, swing: false, lineup: false, presets: false, cards: false };
 
 // Instruments the dice may pick. Grows as later phases add instruments.
 export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "poly", "pad", "lead"];
@@ -36,7 +38,7 @@ const TEMPO_BANDS: [[number, number, number], number][] = [
   [[151, 175, 0.1], 1], // dnb-ish
 ];
 
-export function roll(prev: Setup | null, locks: Locks, seed: number = randomSeed()): Setup {
+export function roll(prev: Setup | null, locks: Locks, seed: number = randomSeed(), cardCount = 0): Setup {
   const r = new Rng(seed);
   const keep = (k: LockKey) => prev !== null && locks[k];
   const [lo, hi, swingChance] = r.weighted(TEMPO_BANDS);
@@ -63,7 +65,8 @@ export function roll(prev: Setup | null, locks: Locks, seed: number = randomSeed
     used.push({ kind, preset });
     return { kind, preset };
   });
-  return { key, scale, tempo, swing, lineup };
+  const cards = keep("cards") && prev?.cards ? prev.cards : cardCount ? dealChallenges(cardCount, seed) : undefined;
+  return cards?.length ? { key, scale, tempo, swing, lineup, cards } : { key, scale, tempo, swing, lineup };
 }
 
 /** A random preset index for `kind`, avoiding `avoid` while there are others left. */
@@ -96,6 +99,8 @@ export function encodeSetup(s: Setup): string {
     Math.max(0, Math.min(100, Math.round(s.swing))),
     s.lineup.length,
     ...s.lineup.map((l) => (KIND_CODE.indexOf(l.kind) << 4) | (l.preset & 15)),
+    // Optional tail: challenge cards (count, then indexes into CHALLENGES, which is append-only).
+    ...(s.cards?.length ? [s.cards.length, ...s.cards.map((c) => Math.max(0, CHALLENGES.findIndex((x) => x.id === c)))] : []),
   ];
   let bits = "";
   for (const b of bytes) bits += b.toString(2).padStart(8, "0");
@@ -122,7 +127,13 @@ export function decodeSetup(code: string): Setup | null {
   if (!scale) return null;
   const lineup = bytes.slice(5, 5 + n).map((b) => ({ kind: KIND_CODE[b >> 4], preset: b & 15 }));
   if (lineup.some((l) => !l.kind)) return null;
-  return { key: bytes[1] & 15, scale: scale.id, tempo: bytes[2] + 40, swing: bytes[3], lineup };
+  const setup: Setup = { key: bytes[1] & 15, scale: scale.id, tempo: bytes[2] + 40, swing: bytes[3], lineup };
+  const nc = bytes[5 + n] ?? 0;
+  if (nc > 0 && nc <= 5 && bytes.length >= 6 + n + nc) {
+    const cards = bytes.slice(6 + n, 6 + n + nc).map((i) => CHALLENGES[i]?.id).filter((x): x is string => !!x);
+    if (cards.length) setup.cards = cards;
+  }
+  return setup;
 }
 
 /** A new song from a setup: one scene, one empty one-bar clip per track. */
@@ -133,6 +144,7 @@ export function songFromSetup(s: Setup): Song {
   song.tempo = s.tempo;
   song.swing = s.swing;
   song.setupCode = encodeSetup(s);
+  if (s.cards?.length) song.challenges = [...s.cards];
   for (const l of s.lineup) {
     const t = addTrack(song, l.kind, l.preset);
     if (t) ensureClip(song, t, song.scenes[0].id);

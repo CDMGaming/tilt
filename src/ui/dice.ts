@@ -9,6 +9,7 @@ import type { Action } from "./actions";
 import { App, type Screen } from "./app";
 import { h } from "./dom";
 import { SpatialNav } from "./nav";
+import { challengeById } from "../engine/challenges";
 import { libraryDialog } from "./library";
 import { phraseGridDialog } from "./phrasegrid";
 
@@ -46,12 +47,16 @@ export class DiceScreen implements Screen {
         item("swing", "Swing", s.swing ? `${s.swing}%` : "straight"),
         item("lineup", "Lineup", `${s.lineup.length} tracks`, h("div", { class: "lineup" }, s.lineup.map((l) => h("span", { class: `chip kind-${l.kind}` }, INSTRUMENTS[l.kind].name)))),
         item("presets", "Sounds", "", h("div", { class: "lineup" }, s.lineup.map((l) => h("span", { class: "chip" }, INSTRUMENTS[l.kind].presets[l.preset]?.name ?? "")))),
+        item("cards", "Challenge cards", s.cards?.length ? "" : "none", h("div", { class: "cards" }, (s.cards ?? []).map((c) => h("div", { class: "card" }, "🃏 " + (challengeById(c)?.text ?? c))))),
       ),
       h("div", { class: "dice-actions" },
         h("button", { class: "roll-btn", "data-nav": "roll", onclick: () => this.roll() }, "🎲 ROLL", h("small", null, "Y / Space")),
         h("div", { class: "timer-pick" },
           h("div", { class: "die-label" }, "Timer"),
           h("div", { class: "seg" }, TIMERS.map((m) => h("button", { class: "seg-btn" + (d.minutes === m ? " on" : ""), "data-nav": `t${m}`, onclick: () => { d.minutes = m; this.render(); } }, m ? `${m} min` : "Off")))),
+        h("div", { class: "timer-pick" },
+          h("div", { class: "die-label" }, "Challenges"),
+          h("div", { class: "seg" }, [0, 1, 2, 3].map((n) => h("button", { class: "seg-btn" + (d.cards === n ? " on" : ""), "data-nav": `cards${n}`, onclick: () => { d.cards = n; d.locks.cards = false; this.roll(); } }, n ? String(n) : "Off")))),
         h("button", { class: "go-btn", "data-nav": "go", onclick: () => this.start() }, "START ▶"),
       ),
       h("div", { class: "dice-foot" },
@@ -80,13 +85,13 @@ export class DiceScreen implements Screen {
 
   roll() {
     const d = this.app.dice;
-    const target = roll(d.setup, d.locks, randomSeed());
+    const target = roll(d.setup, d.locks, randomSeed(), d.cards);
     d.setup = target;
     // A short tumble: unlocked dice flicker through random values, then land.
     this.rolling = 8;
     const tick = () => {
       if (--this.rolling <= 0) { this.rolling = 0; this.shown = target; this.render(); return; }
-      this.shown = roll(target, d.locks, randomSeed());
+      this.shown = roll(target, d.locks, randomSeed(), d.cards);
       this.render();
       setTimeout(tick, 45 + (8 - this.rolling) * 12);
     };
@@ -120,15 +125,15 @@ export class DiceScreen implements Screen {
     app.ed.trackId = song.tracks[0]?.id ?? 0;
     app.ed.sceneId = song.scenes[0].id;
     app.ed.focus = "roll";
-    app.show("song");
-    // Offer the phrase grid first; the timer starts when it closes, so browsing it is free.
-    phraseGridDialog(app, {
-      onDone: () => {
-        app.startTimer(app.dice.minutes);
-        app.show(app.song.tracks.some((t) => t.clips[app.song.scenes[0].id]?.notes.length) ? "song" : "edit");
-        app.overlays.toast(app.dice.minutes ? `${app.dice.minutes} minutes. Go!` : "Go!");
-      },
-    });
+    const go = () => {
+      app.startTimer(app.dice.minutes);
+      app.show(app.song.tracks.some((t) => t.clips[app.song.scenes[0].id]?.notes.length) ? "song" : "edit");
+      app.overlays.toast(app.dice.minutes ? `${app.dice.minutes} minutes. Go! (Stuck? hit 💡)` : "Go! (Stuck? hit 💡)");
+    };
+    // Start from a blank page; the phrase grid waits behind the 💡 Stuck? button
+    // (or opens here first if the player turned that on in Settings).
+    if (app.settings.gridAtStart) { app.show("song"); phraseGridDialog(app, { onDone: go }); }
+    else go();
   }
 
   private continueSaved() {

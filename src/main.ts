@@ -5,6 +5,7 @@ import { DiceScreen } from "./ui/dice";
 import { helpDialog, songSettings, systemMenu, timeUpDialog } from "./ui/dialogs";
 import { EditorScreen } from "./ui/editor";
 import { openShortcut } from "./ui/shortcut";
+import { phraseGridDialog } from "./ui/phrasegrid";
 import { SongScreen } from "./ui/song";
 import { MixerScreen } from "./ui/mixer";
 import { bindTopbar } from "./ui/topbar";
@@ -22,6 +23,7 @@ app.openSystemMenu = () => systemMenu(app, () => { app.engine.stop(); app.show("
 app.songSettings = () => songSettings(app);
 app.onTimeUp = () => timeUpDialog(app);
 app.openShortcut = () => openShortcut(app);
+app.stuck = () => phraseGridDialog(app, { sceneId: app.currentSceneId(), onDone: () => app.refresh() });
 
 await app.boot(App.savedSong() ?? newSong());
 app.show("dice");

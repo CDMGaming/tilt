@@ -1,6 +1,7 @@
 // Top bar: song, key/tempo, transport, play mode, timer, screens, menu.
 
 import { NOTE_NAMES, scaleById } from "../engine/music";
+import { challengeStatus } from "../engine/challenges";
 import type { App } from "./app";
 import { exportDialog, settingsDialog, songSettings } from "./dialogs";
 import { fmtTime, h } from "./dom";
@@ -24,6 +25,13 @@ export function bindTopbar(app: App, el: HTMLElement) {
           app.songMode === "scene" ? "⟳ Scene" : s.songLoop ? "⟳ Song" : "→ Song"),
         h("button", { class: "tp-btn" + (s.metronome ? " on" : ""), onclick: () => app.edit("Metronome", () => (s.metronome = !s.metronome)), title: "Metronome" }, "♩")),
       timerEl,
+      s.challenges?.length ? (() => {
+        const st = challengeStatus(s);
+        return h("button", { class: "chip-btn", title: st.map((c) => `${c.met ? "✓" : "○"} ${c.text}`).join("\n"), onclick: () => app.overlays.dialog("Challenge cards", (close) => h("div", { class: "form" },
+          st.map((c) => h("p", { class: "note big" }, `${c.met ? "✅" : "⬜"} ${c.text}`)),
+          h("button", { class: "row-btn primary", "data-nav": "ok", onclick: close }, "Back to it"))) }, `🃏 ${st.filter((c) => c.met).length}/${st.length}`);
+      })() : "",
+      h("button", { class: "chip-btn stuck", onclick: () => app.stuck?.(), disabled: app.locked, title: "Stuck? Open the phrase grid of ideas for this scene" }, "💡 Stuck?"),
       app.locked ? h("span", { class: "locked-badge" }, "LOCKED") : "",
       h("div", { class: "spacer" }),
       h("button", { class: "chip-btn" + (app.screenName === "song" ? " on" : ""), onclick: () => app.show("song") }, "Song"),

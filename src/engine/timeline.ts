@@ -4,7 +4,7 @@
 
 import { PPQ, sceneTempo, sceneTicks, type Song, type Track } from "./model";
 import { scaleChord } from "./music";
-import { fromUnit } from "./instruments";
+import { INSTRUMENTS, fromUnit } from "./instruments";
 import { getParam, paramInfo } from "./params";
 import { laneValue } from "./songops";
 
@@ -106,6 +106,7 @@ export function eventsInWindow(song: Song, inst: SceneInstance, t0: number, t1: 
     if (!clip || clip.muted || !clip.notes.length) continue;
     const clipTicks = clip.bars * PPQ * 4;
     const loops = Math.ceil(inst.ticks / clipTicks);
+    const tr = INSTRUMENTS[track.kind].drumParts ? 0 : song.scenes.find((s) => s.id === inst.sceneId)?.transpose ?? 0;
     for (let k = 0; k < loops; k++) {
       for (const n of clip.notes) {
         const startTick = k * clipTicks + swingTicks(n.start, song.swing);
@@ -114,7 +115,8 @@ export function eventsInWindow(song: Song, inst: SceneInstance, t0: number, t1: 
         if (time < t0 || time >= t1) continue;
         const endTick = Math.min(k * clipTicks + n.start + n.len, inst.ticks);
         const offTime = inst.startTime + endTick * inst.secPerTick - 0.0005;
-        for (const p of expandPitch(song, track, n.pitch)) {
+        for (const p0 of expandPitch(song, track, n.pitch)) {
+          const p = p0 + tr;
           out.push({ time, trackId: track.id, type: "on", pitch: p, vel: n.vel });
           out.push({ time: Math.max(time + 0.001, offTime), trackId: track.id, type: "off", pitch: p, vel: 0 });
         }

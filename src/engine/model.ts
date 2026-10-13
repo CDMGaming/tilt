@@ -67,6 +67,7 @@ export interface Scene {
   tempo: number | null; // null = song tempo
   fadeIn: boolean;
   fadeOut: boolean;
+  transpose?: number; // semitones for every non-drum track in this scene (a key change)
 }
 
 export interface Song {
@@ -83,6 +84,7 @@ export interface Song {
   master: Master;
   nextId: number;
   setupCode?: string; // DICE share code this song was started from
+  challenges?: string[]; // challenge card ids dealt at START
   libId?: string; // id in the song library (set on first save)
   /** MIDI learn: hardware CC -> a parameter of a track. */
   midiMap?: MidiBinding[];

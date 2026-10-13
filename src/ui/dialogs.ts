@@ -10,6 +10,7 @@ import { encodeWav, peakDb } from "../engine/wav";
 import type { App } from "./app";
 import { download, h } from "./dom";
 import { libraryDialog, safeName } from "./library";
+import { challengeStatus } from "../engine/challenges";
 import { phraseGridDialog } from "./phrasegrid";
 import { exportMidi } from "../engine/smf";
 import { zip } from "../engine/zip";
@@ -187,6 +188,7 @@ export function settingsDialog(app: App) {
       toggle("lock", "Scale lock", st.scaleLock, () => { st.scaleLock = !st.scaleLock; app.saveSettings(); rerender(); app.refresh(); }),
       toggle("rq", "Quantize while recording", st.recQuantize, () => { st.recQuantize = !st.recQuantize; app.saveSettings(); rerender(); }),
       toggle("ci", "Count-in (1 bar) before recording", st.countIn, () => { st.countIn = !st.countIn; app.saveSettings(); rerender(); }),
+      toggle("gas", "Show the phrase grid right after START", st.gridAtStart, () => { st.gridAtStart = !st.gridAtStart; app.saveSettings(); rerender(); }),
       h("button", { class: "row-btn primary", "data-nav": "done", onclick: close }, "Done"),
     );
   }, { wide: true });
@@ -219,6 +221,7 @@ export function timeUpDialog(app: App) {
   const arrange = canArrange(app.song);
   app.overlays.dialog("⏰ Time's up!", (close) => h("div", { class: "form" },
     h("p", { class: "note big" }, "Editing is locked. Finish it:"),
+    ...challengeStatus(app.song).map((c) => h("p", { class: "note" }, `${c.met ? "✅" : "⬜"} ${c.text}`)),
     arrange ? h("button", {
       class: "row-btn primary", "data-nav": "finish",
       onclick: () => {
@@ -243,7 +246,7 @@ export function systemMenu(app: App, newJam: () => void) {
   app.overlays.menu("Rollbox", () => [
     { label: "New jam (dice)…", run: newJam },
     { label: "Songs (library)…", run: () => libraryDialog(app, { onOpen: () => app.show("song") }) },
-    { label: "Phrase grid (fill this scene)…", disabled: app.locked, run: () => phraseGridDialog(app, { sceneId: app.currentSceneId(), onDone: () => app.refresh() }) },
+    { label: "💡 Stuck? Phrase grid for this scene…", disabled: app.locked, run: () => phraseGridDialog(app, { sceneId: app.currentSceneId(), onDone: () => app.refresh() }) },
     { label: "Song settings…", run: () => songSettings(app) },
     { label: "Export (WAV, stems, MIDI)…", run: () => exportDialog(app) },
     { label: "Song screen", hint: "F2", run: () => app.show("song") },

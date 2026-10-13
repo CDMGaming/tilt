@@ -61,6 +61,7 @@ function apply(song: Song, sceneId: number, chosen: (Phrase | null)[]) {
 export function phraseGridDialog(app: App, opts: { sceneId?: number; onDone: () => void }) {
   const song = app.song;
   const sceneId = opts.sceneId ?? song.scenes[0].id;
+  const sceneName = song.scenes.find((s) => s.id === sceneId)?.name ?? "the scene";
   const grid = makeGrid(song.key, song.scale, song.tempo, seedFrom(song.setupCode ?? `${song.title}${song.key}${song.scale}${song.tempo}`));
   const chosen: (number | null)[] = [null, null, null, null, null];
   let previewing = false;
@@ -87,13 +88,13 @@ export function phraseGridDialog(app: App, opts: { sceneId?: number; onDone: () 
       stopPreview();
       if (load && chosen.some((c) => c !== null)) {
         app.edit("Phrase grid", () => apply(app.song, sceneId, phrases()));
-        app.overlays.toast(`Loaded ${chosen.filter((c) => c !== null).length} phrase${chosen.filter((c) => c !== null).length === 1 ? "" : "s"} into the first scene`);
+        app.overlays.toast(`Loaded ${chosen.filter((c) => c !== null).length} phrase${chosen.filter((c) => c !== null).length === 1 ? "" : "s"} into ${sceneName}`);
       }
       close();
       opts.onDone();
     };
     return h("div", { class: "form phrase-grid" },
-      h("p", { class: "note" }, "Pick up to one phrase per column (they all share one chord progression, so anything fits). Y / Space previews."),
+      h("p", { class: "note" }, `Stuck? Grab an idea or two. Pick up to one phrase per column (they all share one chord progression, so anything fits); loading replaces those tracks' clips in ${sceneName}. Y / Space previews.`),
       h("div", { class: "pg-grid" },
         ROLES.map((role) => {
           const t = targets[role];
@@ -111,7 +112,7 @@ export function phraseGridDialog(app: App, opts: { sceneId?: number; onDone: () 
         h("button", { class: "row-btn", "data-nav": "preview", onclick: () => { if (previewing) stopPreview(); else { previewing = true; preview(); } rerender(); } }, previewing ? "■ Stop preview" : "▶ Preview"),
         h("button", { class: "row-btn", "data-nav": "clear", onclick: () => { chosen.fill(null); preview(); rerender(); } }, "Clear picks"),
         h("button", { class: "row-btn", "data-nav": "skip", onclick: () => finish(false) }, "Skip (start blank)"),
-        h("button", { class: "row-btn primary", "data-nav": "load", disabled: !chosen.some((c) => c !== null), onclick: () => finish(true) }, "Load into scene 1")),
+        h("button", { class: "row-btn primary", "data-nav": "load", disabled: !chosen.some((c) => c !== null), onclick: () => finish(true) }, `Load into ${sceneName}`)),
     );
   }, { wide: true, onClose: () => { if (previewing) stopPreview(); } });
 

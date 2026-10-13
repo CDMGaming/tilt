@@ -57,6 +57,7 @@ export interface Settings {
   scaleLock: boolean;
   fold: boolean; // hide out-of-key rows in the piano roll
   countIn: boolean; // one bar of clicks before recording starts from stopped
+  gridAtStart: boolean; // open the phrase grid right after START (else it waits behind 💡 Stuck?)
   recQuantize: boolean;
   padLayout: "auto" | "xbox" | "nintendo";
   transport: { play?: { ch: number; cc: number }; record?: { ch: number; cc: number } };
@@ -84,8 +85,8 @@ export class App {
     stepInput: false, stepTick: 0, sel: new Set(), selAnchor: null, placing: null, grabbing: false, clipboard: [],
     octave: 3, drumPart: 0, topPitch: 72,
   };
-  settings: Settings = { notePreview: true, scaleLock: true, fold: false, countIn: true, recQuantize: true, padLayout: "auto", outputDevice: "", transport: {} };
-  dice: { setup: Setup; locks: Locks; minutes: number } = { setup: roll(null, NO_LOCKS), locks: { ...NO_LOCKS }, minutes: 20 };
+  settings: Settings = { notePreview: true, scaleLock: true, fold: false, countIn: true, gridAtStart: false, recQuantize: true, padLayout: "auto", outputDevice: "", transport: {} };
+  dice: { setup: Setup; locks: Locks; minutes: number; cards: number } = { setup: roll(null, NO_LOCKS), locks: { ...NO_LOCKS }, minutes: 20, cards: 0 };
   timer = { total: 0, endsAt: 0, running: false, done: false };
   locked = false;
   recording = false;
@@ -608,6 +609,7 @@ export class App {
 
   openSystemMenu?: () => void;
   openShortcut?: () => void;
+  stuck?: () => void;
   songSettings?: () => void;
 
   addTrackOf(kind: Track["kind"], preset: number): Track | null {

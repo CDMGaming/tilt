@@ -63,12 +63,13 @@ export function exportMidi(song: Song): Uint8Array<ArrayBuffer> {
       if (!clip || clip.muted) return;
       const ch = INSTRUMENTS[t.kind].drumParts ? 9 : [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15][ti % 15];
       const clipTicks = clip.bars * TICKS_PER_BAR;
+      const tr = INSTRUMENTS[t.kind].drumParts ? 0 : song.scenes.find((x) => x.id === inst!.sceneId)?.transpose ?? 0;
       for (let k = 0; k * clipTicks < inst!.ticks; k++) {
         for (const n of clip.notes) {
           const start = k * clipTicks + swingTicks(n.start, song.swing);
           if (start >= inst!.ticks) continue;
           const end = Math.min(k * clipTicks + n.start + n.len, inst!.ticks);
-          const pitches = INSTRUMENTS[t.kind].drumParts ? [gmDrum(t, n.pitch)] : expandPitch(song, t, n.pitch);
+          const pitches = INSTRUMENTS[t.kind].drumParts ? [gmDrum(t, n.pitch)] : expandPitch(song, t, n.pitch).map((p) => p + tr);
           for (const p of pitches) {
             perTrack.get(t.id)!.push({ tick: offset + start, bytes: [0x90 | ch, p & 127, Math.max(1, n.vel)] });
             perTrack.get(t.id)!.push({ tick: offset + Math.max(start + 1, end), bytes: [0x80 | ch, p & 127, 0] });

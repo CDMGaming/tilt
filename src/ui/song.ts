@@ -80,7 +80,7 @@ export class SongScreen implements Screen {
       h("div", { class: "sh-text" },
         h("div", { class: "sh-name" }, `${r + 1} ${s.name}`),
         h("div", { class: "sh-meta" },
-          s.repeat > 1 ? `×${s.repeat} ` : "", s.tempo ? `${s.tempo} bpm ` : "", s.fadeIn ? "◢ " : "", s.fadeOut ? "◣" : "")),
+          s.repeat > 1 ? `×${s.repeat} ` : "", s.tempo ? `${s.tempo} bpm ` : "", s.transpose ? `key ${s.transpose > 0 ? "+" : ""}${s.transpose} ` : "", s.fadeIn ? "◢ " : "", s.fadeOut ? "◣" : "")),
       h("div", { class: "sh-progress" }));
   }
 
@@ -321,6 +321,7 @@ export class SongScreen implements Screen {
         { label: "Song tempo", checked: s.tempo === null, run: () => setTempo(null) },
         ...[-20, -10, -5, 5, 10, 20].map((d) => ({ label: `${d > 0 ? "+" : ""}${d} → ${cur + d}`, run: () => setTempo(Math.max(40, Math.min(250, cur + d))) })),
       ] },
+      { label: `Key change: ${s.transpose ? (s.transpose > 0 ? "+" : "") + s.transpose + " st" : "none"}`, sub: () => [0, 1, 2, 3, 5, 7, -1, -2, -3, -5].map((d) => ({ label: d === 0 ? "None" : `${d > 0 ? "+" : ""}${d} semitone${Math.abs(d) > 1 ? "s" : ""}`, checked: (s.transpose ?? 0) === d, run: () => app.edit("Key change", () => (s.transpose = d || undefined)) })) },
       { label: "Fade in", checked: s.fadeIn, keepOpen: true, run: () => app.edit("Fade in", () => (s.fadeIn = !s.fadeIn)) },
       { label: "Fade out", checked: s.fadeOut, keepOpen: true, run: () => app.edit("Fade out", () => (s.fadeOut = !s.fadeOut)) },
       { label: "Add scene at end", run: () => app.edit("Add scene", () => addScene(song)) },
