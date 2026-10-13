@@ -1,2 +1,2 @@
-Put the display font here as display.woff2 (regular/semibold) and display-bold.woff2.
-Recommended: Chakra Petch (SIL Open Font License). Without these files the UI falls back to Bahnschrift.
+Chakra Petch (Latin subset, weights 600 and 700) from @fontsource/chakra-petch v5,
+used as the "Rollbox Display" face. SIL Open Font License 1.1: see LICENSE-ChakraPetch.txt.

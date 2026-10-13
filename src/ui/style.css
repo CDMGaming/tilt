@@ -1,5 +1,7 @@
-/* Display face: until a bundled font is added (public/fonts + an @font-face for
-   "Rollbox Display" here), --font-display falls back to Bahnschrift, built into Windows. */
+/* Display face: Chakra Petch (SIL OFL 1.1, public/fonts/LICENSE-ChakraPetch.txt), bundled so it works offline.
+   If the files are missing, --font-display falls back to Bahnschrift (built into Windows). */
+@font-face { font-family: "Rollbox Display"; src: url("/fonts/display.woff2") format("woff2"); font-weight: 400 600; font-display: swap; }
+@font-face { font-family: "Rollbox Display"; src: url("/fonts/display-bold.woff2") format("woff2"); font-weight: 700 900; font-display: swap; }
 
 :root {
   /* ---- type ---- */
