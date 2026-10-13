@@ -267,7 +267,7 @@ export function helpDialog(app: App) {
       row("B", "Back"),
       row("X", "Context menu"),
       row("Y", "Play / stop. Hold: record"),
-      row("Right stick", "Turn knob. In the roll: length (←→), velocity (↑↓), or draw the automation lane (↑↓) when one is open"),
+      row("Right stick", "Turn knob. In the roll: length (←→), velocity (↑↓), or draw the automation lane (↑↓) when one is open. Delete removes the lane point at the cursor"),
       row("LT / ZL (hold)", "Fine adjust"),
       row("RT / ZR (hold) + move", "Select a range"),
       row("RB / R", "Switch piano roll ↔ instrument panel"),

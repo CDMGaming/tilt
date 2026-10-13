@@ -379,8 +379,16 @@ export class EditorScreen implements Screen {
         if (!clip) return true;
         const sel = this.roll.selectedNotes();
         const hit = noteAt(clip, ed.tick, ed.pitch);
+        const lane = ed.autoKey ? clip.auto?.[ed.autoKey] : undefined;
         if (sel.length) app.edit("Delete notes", () => { clip.notes = clip.notes.filter((n) => !ed.sel.has(n.id)); ed.sel.clear(); });
         else if (hit) app.edit("Delete note", () => { clip.notes = clip.notes.filter((n) => n !== hit); });
+        else if (lane?.length) {
+          // With a lane open and no note under the cursor: delete the lane point in the cursor's grid step.
+          const g = app.grid();
+          const i = lane.findIndex((p) => p.tick >= ed.tick && p.tick < ed.tick + g);
+          if (i >= 0) app.edit("Delete point", () => lane.splice(i, 1));
+          else app.overlays.toast("No automation point at the cursor", 900);
+        }
         break;
       }
       case "selectAll": if (clip) { ed.sel = new Set(clip.notes.map((n) => n.id)); } break;
@@ -467,6 +475,8 @@ export class EditorScreen implements Screen {
         { label: "Quantize notes", run: () => this.quantize() },
         { label: "Transpose", disabled: isDrumKind(track.kind), sub: () => [12, 1, -1, -12].map((d) => ({ label: d > 0 ? `+${d}` : String(d), run: () => this.transpose(d) })) },
         { label: "Clear clip", disabled: !clip?.notes.length, run: () => app.edit("Clear clip", () => { clip!.notes = []; ed.sel.clear(); }) },
+        { label: ed.autoKey ? `Clear lane: ${paramInfo(track, ed.autoKey)?.label ?? ed.autoKey}` : "Clear lane (open one first)", disabled: !ed.autoKey || !clip?.auto?.[ed.autoKey]?.length, run: () => app.edit("Clear lane", () => { delete clip!.auto![ed.autoKey!]; }) },
+        { label: "Clear all automation in this clip", disabled: !Object.values(clip?.auto ?? {}).some((l) => l.length), run: () => app.edit("Clear automation", () => { clip!.auto = {}; }) },
         { label: app.learning ? "MIDI learn: finish" : "MIDI learn…", run: () => app.setLearning(!app.learning) },
         { label: "Undo", disabled: !app.history.canUndo, run: () => app.undo(), hint: app.history.undoLabel ?? "" },
         { label: "Redo", disabled: !app.history.canRedo, run: () => app.redo() },

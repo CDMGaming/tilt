@@ -343,6 +343,7 @@ export class SongScreen implements Screen {
       { label: "Copy clip", disabled: !clip, run: () => { this.clipboard = JSON.parse(JSON.stringify(clip)); } },
       { label: "Paste clip", disabled: !this.clipboard, run: () => this.pasteClip() },
       { label: "Clear clip", disabled: !clip, run: () => this.deleteAtCursor() },
+      { label: "Clear automation", disabled: !Object.values(clip?.auto ?? {}).some((l) => l.length), run: () => app.edit("Clear automation", () => { clip!.auto = {}; }) },
     ];
   }
 }

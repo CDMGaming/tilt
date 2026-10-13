@@ -18,6 +18,12 @@ export function bindRightClick(app: App) {
   });
 }
 
+/** Automation lanes of the clip being edited (or the song-screen cursor's scene) for a track. */
+function clipLane(app: App, trackId: number) {
+  const t = app.song.tracks.find((x) => x.id === trackId);
+  return t?.clips[app.screenName === "edit" ? app.ed.sceneId : app.currentSceneId()]?.auto;
+}
+
 function paramMenu(app: App, ctl: HTMLElement, at: { x: number; y: number }) {
   const key = ctl.dataset.param!;
   const redraw = () => (ctl as HTMLElement & { redraw?: () => void }).redraw?.();
@@ -42,6 +48,7 @@ function paramMenu(app: App, ctl: HTMLElement, at: { x: number; y: number }) {
       app.refresh();
     } },
     { label: bound ? `MIDI learn (now CC ${bound.cc})` : "MIDI learn this control", run: () => { app.setLearning(true); app.noteLearnTarget(track.id, key); } },
+    { label: "Clear its automation (this clip)", disabled: !clipLane(app, track.id)?.[key]?.length, run: () => app.edit("Clear lane", () => { delete clipLane(app, track.id)![key]; }) },
     { label: "Remove MIDI binding", disabled: !bound, run: () => app.edit("Remove MIDI binding", () => { app.song.midiMap = app.song.midiMap!.filter((m) => m !== bound); }) },
   ], at);
 }
