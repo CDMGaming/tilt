@@ -3,7 +3,7 @@
 import { NOTE_NAMES, scaleById } from "../engine/music";
 import { challengeStatus } from "../engine/challenges";
 import type { App } from "./app";
-import { exportDialog, settingsDialog, songSettings } from "./dialogs";
+import { exportDialog, playTogetherDialog, settingsDialog, songSettings } from "./dialogs";
 import { fmtTime, h } from "./dom";
 
 export function bindTopbar(app: App, el: HTMLElement) {
@@ -36,9 +36,14 @@ export function bindTopbar(app: App, el: HTMLElement) {
       h("button", { class: "chip-btn stuck", onclick: () => app.stuck?.(), disabled: app.locked, title: "Stuck? Open the phrase grid of ideas for this scene" }, "💡 Stuck?"),
       app.locked ? h("span", { class: "locked-badge" }, "LOCKED") : "",
       h("div", { class: "spacer" }),
-      h("button", { class: "chip-btn" + (app.screenName === "song" ? " on" : ""), onclick: () => app.show("song") }, "Song"),
-      h("button", { class: "chip-btn" + (app.screenName === "edit" ? " on" : ""), onclick: () => app.show("edit"), disabled: !s.tracks.length }, "Edit"),
-      h("button", { class: "chip-btn" + (app.screenName === "mix" ? " on" : ""), onclick: () => app.show("mix"), disabled: !s.tracks.length, title: "Mixer (F4)" }, "Mix"),
+      ...(app.couch ? [
+        h("span", { class: "chip-btn on couch-chip" }, `🛋 Couch · ${app.couch.seats.length} player${app.couch.seats.length === 1 ? "" : "s"}`),
+      ] : [
+        h("button", { class: "chip-btn", onclick: () => playTogetherDialog(app), disabled: !s.tracks.length, title: "Couch mode (and online, soon)" }, "👥 Together"),
+        h("button", { class: "chip-btn" + (app.screenName === "song" ? " on" : ""), onclick: () => app.show("song") }, "Song"),
+        h("button", { class: "chip-btn" + (app.screenName === "edit" ? " on" : ""), onclick: () => app.show("edit"), disabled: !s.tracks.length }, "Edit"),
+        h("button", { class: "chip-btn" + (app.screenName === "mix" ? " on" : ""), onclick: () => app.show("mix"), disabled: !s.tracks.length, title: "Mixer (F4)" }, "Mix"),
+      ]),
       h("button", { class: "chip-btn", onclick: () => exportDialog(app), title: "Export WAV, stems or MIDI" }, "⬇ Export"),
       h("button", { class: "chip-btn", onclick: () => app.toggleScope?.(), title: "Oscilloscope" }, "∿"),
       h("button", { class: "chip-btn", onclick: () => settingsDialog(app), title: "Settings" }, "⚙"),

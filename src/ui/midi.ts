@@ -73,6 +73,8 @@ export class Midi {
   private pushName = "";
 
   get pushConnected() { return !!this.pushHandler; }
+  /** The port the message being handled came from (couch mode: which player). */
+  lastInput = "";
 
   outputs(): MIDIOutput[] {
     const out: MIDIOutput[] = [];
@@ -125,6 +127,7 @@ export class Midi {
     if (!d || d.length < 1) return;
     const status = d[0] & 0xf0, ch = d[0] & 0x0f;
     const name = input.name ?? "MIDI";
+    this.lastInput = name;
     const mini = this.isMiniLab(name);
     if (d[0] >= 0xf8) { if (d[0] !== 0xf8) this.log(name, `${d[0].toString(16)}  ${({ 0xfa: "start", 0xfb: "continue", 0xfc: "stop" } as Record<number, string>)[d[0]] ?? "realtime"}`); this.sink.onRealtime(d[0], e.timeStamp); return; }
     if (status === 0xf0) return; // sysex

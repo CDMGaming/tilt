@@ -147,7 +147,7 @@ export class PianoRoll {
     ed.viewBars = next;
     ed.scrollTick = this.clampScroll(Math.round((anchor - before * this.viewTicks()) / PPQ) * PPQ);
     this.invalidate();
-    const label = document.querySelector(".zoom-value");
+    const label = (this.canvas.closest(".editor") ?? document).querySelector(".zoom-value");
     if (label) label.textContent = this.zoomLabel();
   }
 

@@ -2,7 +2,7 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { NO_LOCKS, decodeSetup, encodeSetup, roll, songFromSetup } from "../src/engine/dice.ts";
 import { scaleChord, snapToScale, inScale } from "../src/engine/music.ts";
-import { eventsInWindow, firstInstance, nextInstance, wholeSong, swingTicks } from "../src/engine/timeline.ts";
+import { barCut, eventsInWindow, firstInstance, nextInstance, wholeSong, swingTicks } from "../src/engine/timeline.ts";
 import { PPQ, TICKS_PER_BAR } from "../src/engine/model.ts";
 import { addNote, duplicateClip, duplicateScene, ensureClip } from "../src/engine/songops.ts";
 import { autoArrange, canArrange } from "../src/engine/arranger.ts";
@@ -273,4 +273,12 @@ Deno.test("Push palette mapping", () => {
   assertEquals(pushColor("#2040ff"), 45); // blue
   assertEquals(pushColor("#c3cbe0"), 3); // steel -> white
   assertEquals(pushColor("#ff2020", 2), 7); // dimmer red
+});
+
+Deno.test("a scene change at the next bar cuts the playing scene at the bar line", () => {
+  const bar = TICKS_PER_BAR;
+  assertEquals(barCut(8 * bar, 0.2 * bar), bar);
+  assertEquals(barCut(8 * bar, 2 * bar), 2 * bar, "exactly on a bar line: change there");
+  assertEquals(barCut(8 * bar, 7.5 * bar), 8 * bar, "the last bar: the scene ends anyway");
+  assertEquals(barCut(4 * bar, 0), 4 * bar, "not started yet: nothing to cut");
 });

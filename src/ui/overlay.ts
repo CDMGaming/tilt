@@ -8,6 +8,8 @@ export interface Overlay {
   el: HTMLElement;
   handle(a: Action): boolean;
   onClose?(): void;
+  /** Couch mode: the seat that opened it (only their controller drives it). */
+  owner?: string | null;
 }
 
 export interface MenuItem {
@@ -27,18 +29,38 @@ export class OverlayHost {
   private stack: Overlay[] = [];
   constructor(private root: HTMLElement) {}
 
-  get top(): Overlay | undefined { return this.stack[this.stack.length - 1]; }
-  get open(): boolean { return this.stack.length > 0; }
+  /** Couch mode hooks: who is acting, where their quarter is, where their toasts go. */
+  owner: () => string | null = () => null;
+  area: (owner: string) => DOMRect | null = () => null;
+  toastHost: () => HTMLElement | null = () => null;
+  onOwnerPointer: (owner: string) => void = () => {};
+
+  /** The acting seat's top overlay (solo: the top one). Other seats' menus don't block them. */
+  get top(): Overlay | undefined {
+    const who = this.owner();
+    for (let i = this.stack.length - 1; i >= 0; i--) if (who === null || (this.stack[i].owner ?? null) === who) return this.stack[i];
+    return undefined;
+  }
+  get open(): boolean { return !!this.top; }
+
+  /** The acting seat's quarter (couch mode), for placing menus and dialogs inside it. */
+  private rect(): DOMRect | null { const who = this.owner(); return who ? this.area(who) : null; }
 
   push(o: Overlay) {
+    o.owner = this.owner();
+    const r = this.rect();
+    if (r) {
+      Object.assign(o.el.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`, right: "auto", bottom: "auto" });
+      const who = o.owner!;
+      o.el.addEventListener("pointerdown", () => this.onOwnerPointer(who), true);
+    }
     this.stack.push(o);
     this.root.appendChild(o.el);
   }
 
   pop() {
-    const o = this.stack.pop();
-    o?.el.remove();
-    o?.onClose?.();
+    const o = this.top;
+    if (o) this.remove(o);
   }
 
   remove(o: Overlay) {
@@ -49,7 +71,7 @@ export class OverlayHost {
     o.onClose?.();
   }
 
-  closeAll() { while (this.stack.length) this.pop(); }
+  closeAll() { while (this.top) this.pop(); }
 
   handle(a: Action): boolean {
     const t = this.top;
@@ -115,8 +137,9 @@ export class OverlayHost {
           host.push(build(get, depth, at, idx));
         }
       };
+      const area = host.rect();
       requestAnimationFrame(() => {
-        place(box, at);
+        place(box, at, area);
         nav.focusId(`m${focus}`);
         nav.paint();
       });
@@ -161,20 +184,23 @@ export class OverlayHost {
   }
 
   toast(text: string, ms = 2200) {
-    const t = h("div", { class: "toast" }, text);
-    document.body.appendChild(t);
+    const inQuad = this.toastHost();
+    const t = h("div", { class: "toast" + (inQuad ? " in-quad" : "") }, text);
+    (inQuad ?? document.body).appendChild(t);
     setTimeout(() => t.classList.add("out"), ms);
     setTimeout(() => t.remove(), ms + 400);
   }
 }
 
-function place(box: HTMLElement, at?: { x: number; y: number }) {
+/** Position a menu at `at`, kept inside `area` (a couch quarter) or the window. */
+function place(box: HTMLElement, at?: { x: number; y: number }, area?: DOMRect | null) {
+  if (area) box.style.maxHeight = `${area.height - 16}px`; // a couch menu stays in its quarter
   const r = box.getBoundingClientRect();
-  const vw = window.innerWidth, vh = window.innerHeight;
-  const x = at ? Math.min(at.x, vw - r.width - 8) : (vw - r.width) / 2;
-  const y = at ? Math.min(at.y, vh - r.height - 8) : (vh - r.height) / 2;
-  box.style.left = `${Math.max(8, x)}px`;
-  box.style.top = `${Math.max(8, y)}px`;
+  const a = area ?? new DOMRect(0, 0, window.innerWidth, window.innerHeight);
+  const x = at ? Math.min(at.x, a.right - r.width - 8) : a.left + (a.width - r.width) / 2;
+  const y = at ? Math.min(at.y, a.bottom - r.height - 8) : a.top + (a.height - r.height) / 2;
+  box.style.left = `${Math.max(a.left + 8, x)}px`;
+  box.style.top = `${Math.max(a.top + 8, y)}px`;
 }
 
 /** A focusable stepper row for dialogs: label, value, - / + with left/right. */

@@ -125,7 +125,8 @@ export class GamepadInput {
   private knobAcc = 0;
   private knobAccY = 0;
 
-  constructor(private sink: InputSink) {
+  /** `index`: read that browser gamepad slot only (couch mode: one reader per player). Default: the first connected pad. */
+  constructor(private sink: InputSink, readonly index?: number) {
     window.addEventListener("gamepadconnected", (e) => (this.connected = (e as GamepadEvent).gamepad.id));
     window.addEventListener("gamepaddisconnected", () => (this.connected = ""));
   }
@@ -137,8 +138,9 @@ export class GamepadInput {
 
   /** Call every animation frame. */
   poll(now: number) {
-    const pad = [...(navigator.getGamepads?.() ?? [])].find((p) => p && p.connected);
-    if (!pad) return;
+    const pads = [...(navigator.getGamepads?.() ?? [])];
+    const pad = this.index === undefined ? pads.find((p) => p && p.connected) : pads[this.index];
+    if (!pad || !pad.connected) return;
     this.connected = pad.id;
     const nin = this.isNintendo(pad);
     // Nintendo pads report by position: the right face button (labelled A) is
@@ -200,4 +202,9 @@ export class GamepadInput {
 function dead(v: number): number {
   const d = 0.18;
   return Math.abs(v) < d ? 0 : (v - Math.sign(v) * d) / (1 - d);
+}
+
+/** Browser slots of the gamepads plugged in right now. */
+export function connectedPads(): number[] {
+  return [...(navigator.getGamepads?.() ?? [])].flatMap((p, i) => (p && p.connected ? [i] : []));
 }

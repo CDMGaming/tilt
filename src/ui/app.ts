@@ -3,7 +3,7 @@
 
 import { AudioEngine } from "../engine/audio";
 import { History } from "../engine/history";
-import { Ownership, applyPatches, invert, type Patch } from "../engine/patches";
+import { Ownership, applyPatches, invert, scopeOf, type Patch } from "../engine/patches";
 import { INSTRUMENTS, drumCount, fromUnit, isDrumKind, paramDef, toUnit } from "../engine/instruments";
 import { getParam, paramInfo, setParamValue } from "../engine/params";
 import { AUTO_STEP } from "../engine/timeline";
@@ -14,13 +14,14 @@ import { addNote, addTrack, clearAutoRange, ensureClip, quantizeNotes, setAutoPo
 import { NO_LOCKS, roll, type Locks, type Setup } from "../engine/dice";
 import { mods, type Action } from "./actions";
 import { h } from "./dom";
-import { GamepadInput, bindKeyboard, type MusicKey } from "./input";
+import { GamepadInput, bindKeyboard, connectedPads, type MusicKey } from "./input";
+import { Couch, type Device, type Seat } from "./seats";
 import { Midi } from "./midi";
 import { MidiClock, type SyncMode } from "./clock";
 import { Push1Surface } from "./push1";
 import { OverlayHost } from "./overlay";
 
-export type ScreenName = "dice" | "song" | "edit" | "mix";
+export type ScreenName = "dice" | "song" | "edit" | "mix" | "couch";
 
 export interface Screen {
   el: HTMLElement;
@@ -36,7 +37,7 @@ export interface Screen {
 export interface EditorState {
   trackId: number;
   sceneId: number;
-  focus: "roll" | "panel";
+  focus: "roll" | "panel" | "mix"; // mix: couch mode's per-player volume / FX view
   tick: number;
   pitch: number;
   grid: number; // 24 = 16th, 48 = 8th (before triplet)
@@ -56,6 +57,17 @@ export interface EditorState {
   drumPart: number;
   topPitch: number; // highest visible row
 }
+
+/** Per-player input state that isn't editor state: notes being recorded, held step chords, held keys. */
+export interface Scratch {
+  recPending: Map<number, { sceneId: number; tick: number; vel: number }>;
+  stepHeld: number;
+  stepChordTick: number;
+  musicKeyPitch: Map<string, number>;
+  midiHeld: Map<number, number>;
+}
+
+export const newScratch = (): Scratch => ({ recPending: new Map(), stepHeld: 0, stepChordTick: 0, musicKeyPitch: new Map(), midiHeld: new Map() });
 
 export interface Settings {
   notePreview: boolean;
@@ -118,9 +130,7 @@ export class App {
   locked = false;
   recording = false;
   shortcutOpen = false;
-  private recPending = new Map<number, { sceneId: number; tick: number; vel: number }>();
-  private stepHeld = 0;
-  private stepChordTick = 0;
+  scratch: Scratch = newScratch();
   private saveTimer: number | undefined;
   private lastParam = { key: "", time: 0 };
   private header: HTMLElement;
@@ -135,24 +145,25 @@ export class App {
     root.append(this.header, this.main, layer);
     this.overlays = new OverlayHost(layer);
     this.midi = new Midi({
-      onKey: (p, v, on, t) => this.midiKey(p, v, on, t),
-      onPad: (i, v, on, t) => this.midiPad(i, v, on, t),
-      onMacro: (i, v) => this.macro(i, v),
-      onTrackVolume: (i, v) => this.trackVolume(i, v),
+      onKey: (p, v, on, t) => this.input(this.midiDevice(), () => this.midiKey(p, v, on, t)),
+      onPad: (i, v, on, t) => this.input(this.midiDevice(), () => this.midiPad(i, v, on, t)),
+      onMacro: (i, v) => this.input(this.midiDevice(), () => this.macro(i, v)),
+      onTrackVolume: (i, v) => this.input(this.midiDevice(), () => this.trackVolume(i, v)),
       onTransport: () => this.togglePlay(),
       onDevicesChanged: () => this.renderHeader(),
-      onCC: (ch, cc, raw, v) => this.onCC(ch, cc, raw, v),
+      onCC: (ch, cc, raw, v) => this.input(this.midiDevice(), () => this.onCC(ch, cc, raw, v)) ?? false,
       onRealtime: (b, t) => this.clock.onRealtime(b, t),
       onPush: (port) => {
         this.push?.destroy();
-        this.push = port ? new Push1Surface(this, port.out, port.sysex) : null;
+        this.push = port ? new Push1Surface(this, port.out, port.sysex, (fn) => this.input({ kind: "push" }, fn, false)) : null;
         if (port) this.overlays.toast(port.sysex ? "Push 1 connected" : "Push 1 connected (no SysEx permission: its display stays blank)");
-        return this.push ? (d, t) => this.push!.onMessage(d, t) : null;
+        return this.push ? (d, t) => this.input({ kind: "push" }, () => this.push!.onMessage(d, t)) : null;
       },
     });
     this.clock = new MidiClock(this);
     this.pad = new GamepadInput({ action: (a) => this.dispatch(a), musicKey: () => {} });
-    bindKeyboard({ action: (a) => this.dispatch(a), musicKey: (k, on) => this.musicKey(k, on) }, () => {
+    const keys: Device = { kind: "keys" };
+    bindKeyboard({ action: (a) => this.input(keys, () => this.dispatch(a)), musicKey: (k, on) => this.input(keys, () => this.musicKey(k, on)) }, () => {
       const el = document.activeElement;
       return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT");
     });
@@ -175,8 +186,19 @@ export class App {
     window.addEventListener("keydown", resume);
     void this.midi.enable();
     const loop = (now: number) => {
-      this.pad.nintendoLayout = this.settings.padLayout === "auto" ? null : this.settings.padLayout === "nintendo";
-      this.pad.poll(now);
+      const nin = this.settings.padLayout === "auto" ? null : this.settings.padLayout === "nintendo";
+      if (this.couch) {
+        // Every gamepad is its own player (or a player waiting to join).
+        for (const i of connectedPads()) {
+          let gp = this.pads.get(i);
+          if (!gp) this.pads.set(i, (gp = new GamepadInput({ action: (a) => this.dispatch(a), musicKey: () => {} }, i)));
+          gp.nintendoLayout = nin;
+          this.input({ kind: "pad", index: i }, () => gp!.poll(now));
+        }
+      } else {
+        this.pad.nintendoLayout = nin;
+        this.pad.poll(now);
+      }
       for (const f of this.frameHooks) f(now);
       this.clock.tick();
       this.screens[this.screenName]?.frame?.(now);
@@ -186,6 +208,100 @@ export class App {
     // The countdown runs on its own timer: animation frames pause when the window is hidden.
     setInterval(() => this.tickTimer(), 250);
   }
+
+  // ------------------------------------------------------------ couch mode / seats
+
+  couch: Couch | null = null;
+  private pads = new Map<number, GamepadInput>();
+  /** The seat whose controller is acting right now (couch mode), or null (solo). */
+  actor: Seat | null = null;
+  /** The device whose input is being handled. */
+  inputDevice: Device = { kind: "keys" };
+  private ownersOff = false;
+
+  /** Load a seat's editor, input state and held buttons, saving the current one's. */
+  private switchTo(seat: Seat | null) {
+    if (seat === this.actor) return;
+    if (this.actor) Object.assign(this.actor.mods, mods);
+    this.actor = seat;
+    if (!seat) return;
+    this.ed = seat.ed;
+    this.scratch = seat.scratch;
+    Object.assign(mods, seat.mods);
+    if (seat.id !== "lobby") this.history.player = seat.id;
+  }
+
+  /** Run `fn` as this seat, then go back to whoever was acting. */
+  as<T>(seat: Seat | null, fn: () => T): T {
+    if (!seat || seat === this.actor) return fn();
+    const prev = this.actor;
+    this.switchTo(seat);
+    try { return fn(); } finally { this.switchTo(prev); }
+  }
+
+  /** Mouse and touch: stay with this seat until another controller does something. */
+  focusSeat(seat: Seat) { this.switchTo(seat); }
+
+  /** Input from a device: in couch mode, handled as the seat that device belongs to. */
+  input<T>(device: Device, fn: () => T, interactive = true): T | undefined {
+    if (interactive) this.inputDevice = device;
+    if (!this.couch) return fn();
+    const seat = this.couch.seatFor(device) ?? this.couch.lobby;
+    if (seat === this.couch.lobby) this.couch.lobby.device = device;
+    return this.as(seat, fn);
+  }
+
+  private midiDevice(): Device { return { kind: "midi", name: this.midi.lastInput }; }
+
+  /** In the lobby (a device nobody has claimed): a press joins the game. */
+  private get inLobby() { return !!this.couch && this.actor === this.couch.lobby; }
+
+  private lobbyJoin() {
+    const c = this.couch!, d = c.lobby.device;
+    const seat = c.join(d);
+    if (!seat) return;
+    this.overlays.toast(`${seat.id.toUpperCase()} joined (${INSTRUMENTS[this.song.tracks.find((t) => t.id === seat.trackId)!.kind].name})`);
+    this.refresh();
+  }
+
+  /** A change the app makes for the room (not any one player's): skips ownership, in nobody's undo. */
+  systemEdit(label: string, fn: () => void) {
+    const p = this.history.player;
+    this.ownersOff = true;
+    this.history.player = "system";
+    try { this.edit(label, fn); } finally { this.ownersOff = false; this.history.player = p; }
+  }
+
+  /** Couch mode: the person who started it is P1 (keeping their undo history); others join with a press. */
+  startCouch() {
+    if (!this.song.tracks.length) { this.overlays.toast("Roll a jam first: couch mode needs instruments"); return; }
+    if (this.couch) { this.show("couch"); return; }
+    this.overlays.closeAll();
+    const c = (this.couch = new Couch(this));
+    this.actor = null;
+    c.join(this.inputDevice, true);
+    this.switchTo(c.seats[0]);
+    document.body.classList.add("couch-mode");
+    this.show("couch");
+  }
+
+  endCouch() {
+    const c = this.couch;
+    if (!c) return;
+    const p1 = c.seat("p1") ?? c.seats[0];
+    this.switchTo(null);
+    if (p1) { this.ed = p1.ed; this.scratch = p1.scratch; }
+    this.ed.focus = "roll";
+    this.couch = null;
+    this.owners.tracks.clear();
+    this.owners.conductor = null;
+    this.history.player = "p1";
+    document.body.classList.remove("couch-mode");
+    this.show("song");
+  }
+
+  /** On a screen where notes go into a clip (the editor, or couch mode's quarters). */
+  get editing() { return this.screenName === "edit" || this.screenName === "couch"; }
 
   // ------------------------------------------------------------ screens
 
@@ -230,10 +346,12 @@ export class App {
   private commit() {
     const player = this.history.player, patches = this.history.pending(this.song);
     if (!patches.length) return;
-    if (this.owners.refused(player, patches).length) {
+    const refused = this.ownersOff ? [] : this.owners.refused(player, patches);
+    if (refused.length) {
       applyPatches(this.song, invert(patches));
       assignShades(this.song);
-      this.overlays.toast("That belongs to another player");
+      const shared = refused.some((p) => scopeOf(p, patches) === "shared");
+      this.overlays.toast(shared ? `Only ${String(this.owners.conductor).toUpperCase()} (the conductor) can change that` : "That's another player's instrument", 1400);
       return;
     }
     this.history.accept(patches, player);
@@ -275,6 +393,7 @@ export class App {
 
   /** The track that MIDI and the musical keyboard play. */
   selectedTrack(): Track | undefined {
+    if (this.screenName === "couch") return this.track();
     if (this.screenName === "mix") return (this.screens.mix as Screen & { focusedTrack(): Track | undefined }).focusedTrack() ?? this.track();
     if (this.screenName === "song") {
       const c = this.songCur.col;
@@ -381,7 +500,7 @@ export class App {
       return;
     }
     if (this.locked) { this.overlays.toast("Time's up. Recording is locked."); return; }
-    if (this.screenName !== "edit" && this.screenName !== "mix") { this.overlays.toast("Open a clip (or the mixer) to record"); return; }
+    if (!this.editing && this.screenName !== "mix") { this.overlays.toast("Open a clip (or the mixer) to record"); return; }
     this.history.push(this.song, "Record");
     this.recording = true;
     if (!this.engine.playing) {
@@ -416,10 +535,10 @@ export class App {
     const heard = this.engine.heardTime(perfMs);
     const pos = this.engine.tickAtHeard(heard);
     if (!pos) return;
-    if (on) { this.recPending.set(pitch, { sceneId: pos.sceneId, tick: pos.tick, vel }); return; }
-    const start = this.recPending.get(pitch);
+    if (on) { this.scratch.recPending.set(pitch, { sceneId: pos.sceneId, tick: pos.tick, vel }); return; }
+    const start = this.scratch.recPending.get(pitch);
     if (!start) return;
-    this.recPending.delete(pitch);
+    this.scratch.recPending.delete(pitch);
     const clip = ensureClip(this.song, track, start.sceneId);
     const clipTicks = clip.bars * TICKS_PER_BAR;
     let len = pos.tick - start.tick;
@@ -437,8 +556,8 @@ export class App {
 
   private finishRecording() {
     // Notes still held when recording stops get one grid step.
-    for (const [pitch] of this.recPending) this.recordNote(pitch, 0, false, performance.now());
-    this.recPending.clear();
+    for (const [pitch] of this.scratch.recPending) this.recordNote(pitch, 0, false, performance.now());
+    this.scratch.recPending.clear();
   }
 
   grid(): number {
@@ -453,15 +572,15 @@ export class App {
     if (!track) return;
     if (on) { this.engine.noteOn(track.id, pitch, vel); this.flashPad(track, pitch); }
     else this.engine.noteOff(track.id, pitch);
-    if (this.screenName !== "edit" || track.id !== this.ed.trackId || this.locked) return;
+    if (!this.editing || track.id !== this.ed.trackId || this.locked) return;
     if (this.recording && this.engine.playing) this.recordNote(pitch, vel, on, perfMs);
     else if (this.ed.stepInput && !this.engine.playing) this.stepNote(track, pitch, vel, on);
   }
 
   /** Light the matching pad on the open drum panel for a moment. */
   private flashPad(track: Track, pitch: number) {
-    if (this.screenName !== "edit" || track.id !== this.ed.trackId || !isDrumKind(track.kind)) return;
-    const el = document.querySelector<HTMLElement>(`.panel .pad[data-note="${pitch}"]`);
+    if (!this.editing || track.id !== this.ed.trackId || !isDrumKind(track.kind)) return;
+    const el = document.querySelector<HTMLElement>(`[data-panel-track="${track.id}"] .pad[data-note="${pitch}"]`);
     if (!el) return;
     el.classList.remove("hit");
     void el.offsetWidth;
@@ -472,29 +591,29 @@ export class App {
   private stepNote(track: Track, pitch: number, vel: number, on: boolean) {
     const clip = this.song.tracks.find((t) => t.id === track.id)!.clips[this.ed.sceneId];
     if (on) {
-      if (this.stepHeld === 0) { this.history.push(this.song, "Step input"); this.stepChordTick = this.ed.stepTick; }
-      this.stepHeld++;
+      if (this.scratch.stepHeld === 0) { this.history.push(this.song, "Step input"); this.scratch.stepChordTick = this.ed.stepTick; }
+      this.scratch.stepHeld++;
       const c = clip ?? ensureClip(this.song, track, this.ed.sceneId);
-      addNote(this.song, c, { pitch, start: this.stepChordTick, len: this.grid(), vel });
+      addNote(this.song, c, { pitch, start: this.scratch.stepChordTick, len: this.grid(), vel });
       this.changed(false);
-    } else if (this.stepHeld > 0) {
-      this.stepHeld--;
-      if (this.stepHeld === 0) {
+    } else if (this.scratch.stepHeld > 0) {
+      this.scratch.stepHeld--;
+      if (this.scratch.stepHeld === 0) {
         const c = ensureClip(this.song, track, this.ed.sceneId);
-        this.ed.stepTick = (this.stepChordTick + this.grid()) % (c.bars * TICKS_PER_BAR);
+        this.ed.stepTick = (this.scratch.stepChordTick + this.grid()) % (c.bars * TICKS_PER_BAR);
         this.ed.tick = this.ed.stepTick;
       }
     }
-    this.screens.edit.render();
+    this.screens[this.screenName]?.render();
   }
 
-  private musicKeyPitch: Map<string, number> = new Map();
 
   musicKey(k: MusicKey, on: boolean) {
+    if (this.inLobby) { if (on) this.lobbyJoin(); return; }
     const id = `${k.row}${k.index}`;
     if (!on) {
-      const p = this.musicKeyPitch.get(id);
-      if (p !== undefined) { this.musicKeyPitch.delete(id); this.noteInput(p, 0, false); }
+      const p = this.scratch.musicKeyPitch.get(id);
+      if (p !== undefined) { this.scratch.musicKeyPitch.delete(id); this.noteInput(p, 0, false); }
       return;
     }
     const track = this.selectedTrack();
@@ -511,13 +630,13 @@ export class App {
       if (k.chromatic < 0) return;
       pitch = (this.ed.octave + 1) * 12 + k.chromatic;
     }
-    this.musicKeyPitch.set(id, pitch);
+    this.scratch.musicKeyPitch.set(id, pitch);
     this.noteInput(pitch, 100, true);
   }
 
-  private midiHeld = new Map<number, number>();
 
   private midiKey(pitch: number, vel: number, on: boolean, t: number) {
+    if (this.inLobby) { if (on) this.lobbyJoin(); return; }
     const track = this.selectedTrack();
     if (!track) return;
     // Remember what each key played, so note-off matches even if lock changes mid-hold.
@@ -525,15 +644,16 @@ export class App {
     if (on) {
       if (isDrumKind(track.kind)) { const n = drumCount(track.kind); p = DRUM_BASE_NOTE + ((((pitch - DRUM_BASE_NOTE) % n) + n) % n); }
       else if (this.settings.scaleLock) p = snapToScale(pitch, this.song.key, this.song.scale);
-      this.midiHeld.set(pitch, p);
+      this.scratch.midiHeld.set(pitch, p);
     } else {
-      p = this.midiHeld.get(pitch) ?? pitch;
-      this.midiHeld.delete(pitch);
+      p = this.scratch.midiHeld.get(pitch) ?? pitch;
+      this.scratch.midiHeld.delete(pitch);
     }
     this.noteInput(p, vel, on, t);
   }
 
   private midiPad(index: number, vel: number, on: boolean, t: number) {
+    if (this.inLobby) { if (on) this.lobbyJoin(); return; }
     const track = this.selectedTrack();
     if (track && isDrumKind(track.kind)) {
       this.noteInput(DRUM_BASE_NOTE + (index % drumCount(track.kind)), vel, on, t);
@@ -657,7 +777,13 @@ export class App {
   // ------------------------------------------------------------ dispatch
 
   dispatch(a: Action) {
+    if (this.inLobby) { if (a.type === "confirm") this.lobbyJoin(); return; }
     if (this.overlays.handle(a)) return;
+    if (this.couch && this.screenName === "couch") {
+      // F2-F4 would leave the quarters; the system button is the conductor's way into the shared strip.
+      if (a.type === "screen") return;
+      if (a.type === "system") { this.screens.couch.handle(a); return; }
+    }
     switch (a.type) {
       case "play": if (this.screenName !== "dice") { this.togglePlay(); return; } break;
       case "record": if (this.screenName !== "dice") { this.toggleRecord(); return; } break;

@@ -15,6 +15,13 @@ import type { MenuItem } from "./overlay";
 import { SpatialNav } from "./nav";
 import { buildPanel } from "./panels";
 import { PianoRoll } from "./roll";
+import { channelStrip } from "./mixer";
+
+/** Couch mode: a compact editor locked to one player's instrument. */
+export interface CouchEditorOpts {
+  /** Extra menu items (change instrument, leave the game...). */
+  extraMenu: () => MenuItem[];
+}
 
 export class EditorScreen implements Screen {
   el = h("div", { class: "editor" });
@@ -22,21 +29,29 @@ export class EditorScreen implements Screen {
   private toolbar = h("div", { class: "ed-toolbar" });
   private rollWrap = h("div", { class: "roll-wrap" });
   private panelWrap = h("div", { class: "panel-wrap" });
-  private nav = new SpatialNav(() => this.panelWrap);
+  private mixWrap = h("div", { class: "mix-wrap" });
+  private nav = new SpatialNav(() => (this.app.ed.focus === "mix" ? this.mixWrap : this.panelWrap));
   private heldKey: HTMLElement | null = null;
+  private meter = h("div", { class: "meter" }, h("div", { class: "meter-fill" }));
+  private peak = 0;
 
-  constructor(private app: App) {
+  constructor(private app: App, private couch?: CouchEditorOpts) {
     this.roll = new PianoRoll(app, (x, y) => this.openMenu({ x, y }));
     this.rollWrap.appendChild(this.roll.canvas);
     this.el.append(this.toolbar, this.rollWrap, this.panelWrap);
-    this.panelWrap.addEventListener("pointerdown", () => { if (app.ed.focus !== "panel") { app.ed.focus = "panel"; this.paintFocus(); } });
+    if (couch) { this.el.classList.add("couch-ed"); this.el.append(this.mixWrap); }
+    this.panelWrap.addEventListener("pointerdown", () => { if (app.ed.focus === "roll" && !couch) { app.ed.focus = "panel"; this.paintFocus(); } });
   }
+
+  /** Couch quarters show one view at a time: notes, sound, or mix. */
+  private setView(v: "roll" | "panel" | "mix") { this.app.ed.focus = v; this.render(); }
 
   private get clip(): Clip | undefined { return this.app.track()?.clips[this.app.ed.sceneId]; }
 
   render() {
     const app = this.app, ed = app.ed, track = app.track();
     if (!track) return;
+    if (this.couch) { this.renderCouch(); return; }
     const scene = app.song.scenes.find((s) => s.id === ed.sceneId);
     const clip = this.clip;
     const ti = app.song.tracks.indexOf(track);
@@ -83,20 +98,79 @@ export class EditorScreen implements Screen {
     this.paintFocus();
   }
 
+  /** The couch quarter: a short toolbar, then the notes, the sound panel or the mix strip. */
+  private renderCouch() {
+    const app = this.app, ed = app.ed, track = app.track()!, clip = this.clip;
+    const btn = (label: string, on: boolean | null, onclick: () => void, title?: string) =>
+      h("button", { class: "tb-btn" + (on ? " on" : ""), onclick, title }, label);
+    const tab = (v: "roll" | "panel" | "mix", label: string) => btn(label, ed.focus === v, () => this.setView(v), "Switch view (RB / Tab)");
+    const roll = ed.focus === "roll";
+    this.toolbar.replaceChildren(
+      h("div", { class: "tb-group tabs" }, tab("roll", "Notes"), tab("panel", "Sound"), tab("mix", "Mix")),
+      roll ? h("div", { class: "tb-group" },
+        h("span", { class: "tb-label" }, "Bars"),
+        btn("−", null, () => this.setBars((clip?.bars ?? 1) - 1)),
+        h("span", { class: "tb-value" }, String(clip?.bars ?? "—")),
+        btn("+", null, () => this.setBars((clip?.bars ?? 1) + 1)),
+        btn("×2", null, () => this.duplicate(), "Double the clip, notes included")) : "",
+      roll ? h("div", { class: "tb-group" },
+        btn("−", null, () => { this.roll.zoom(-1); this.render(); }, "Zoom out"),
+        h("span", { class: "tb-value zoom-value" }, this.roll.zoomLabel()),
+        btn("+", null, () => { this.roll.zoom(1); this.render(); }, "Zoom in")) : "",
+      roll ? h("div", { class: "tb-group" },
+        btn("1/8", ed.grid === 48, () => this.setGrid(48)),
+        btn("1/16", ed.grid === 24, () => this.setGrid(24)),
+        btn("Step", ed.stepInput, () => this.toggleStep(), "Step input: play notes while stopped, the cursor advances")) : "",
+      h("button", { class: "tb-btn menu-btn", onclick: () => this.openMenu() }, "☰"),
+    );
+    this.el.classList.toggle("view-roll", ed.focus === "roll");
+    this.el.classList.toggle("view-panel", ed.focus === "panel");
+    this.el.classList.toggle("view-mix", ed.focus === "mix");
+    if (ed.focus === "panel") {
+      const panel = buildPanel(app, track);
+      this.panelWrap.replaceChildren(panel);
+      this.panelWrap.dataset.panelTrack = String(track.id);
+      app.markLearned(this.panelWrap, track.id);
+      requestAnimationFrame(() => this.fitPanel(panel));
+    } else this.panelWrap.replaceChildren();
+    if (ed.focus === "mix") this.mixWrap.replaceChildren(channelStrip(app, track, app.song.tracks.indexOf(track), this.meter));
+    else this.mixWrap.replaceChildren();
+    this.roll.invalidate();
+    this.paintFocus();
+  }
+
+  /** Shrink the sound panel to fit its quarter (instrument panels are laid out for a full screen). */
+  private fitPanel(panel: HTMLElement) {
+    panel.style.zoom = "";
+    const avail = this.panelWrap.clientHeight, aw = this.panelWrap.clientWidth;
+    const need = panel.scrollHeight, nw = panel.scrollWidth;
+    const z = Math.min(1, avail / Math.max(1, need), aw / Math.max(1, nw));
+    if (z < 1) panel.style.zoom = String(Math.max(0.45, z * 0.98));
+  }
+
   private paintFocus() {
     const f = this.app.ed.focus;
-    this.el.classList.toggle("focus-panel", f === "panel");
+    this.el.classList.toggle("focus-panel", f === "panel" || f === "mix");
     this.el.classList.toggle("focus-roll", f === "roll");
-    if (f === "panel") this.nav.paint(); else this.nav.clearPaint();
+    if (f !== "roll") this.nav.paint(); else this.nav.clearPaint();
     this.roll.invalidate();
   }
 
-  frame() { this.roll.frame(); }
+  frame() {
+    this.roll.frame();
+    if (this.couch && this.app.ed.focus === "mix") {
+      const raw = this.app.engine.meter(this.app.ed.trackId);
+      this.peak = Math.max(raw, this.peak * 0.92);
+      const db = this.peak > 0 ? 20 * Math.log10(this.peak) : -60;
+      (this.meter.firstElementChild as HTMLElement).style.height = `${100 - Math.max(0, Math.min(100, ((db + 48) / 48) * 100))}%`;
+    }
+  }
 
   enter() { this.fitCursor(); }
 
   paramChanged(trackId: number, id: string) {
     if (trackId !== this.app.ed.trackId) return;
+    this.mixWrap.querySelector<HTMLElement & { redraw?: () => void }>(`[data-param="${id}"]`)?.redraw?.();
     const el = this.panelWrap.querySelector<HTMLElement & { redraw?: () => void }>(`[data-param="${id}"]`);
     el?.redraw?.();
     // Drum sound names and chord labels live outside the knob.
@@ -107,6 +181,7 @@ export class EditorScreen implements Screen {
   // ------------------------------------------------------------ navigation
 
   private switchTrack(d: number) {
+    if (this.couch) return; // a couch player keeps their own instrument
     const app = this.app, ts = app.song.tracks;
     const i = ts.findIndex((t) => t.id === app.ed.trackId);
     const n = ts[(i + d + ts.length) % ts.length];
@@ -118,6 +193,7 @@ export class EditorScreen implements Screen {
   }
 
   private switchScene(d: number) {
+    if (this.couch) return; // the conductor picks the scene for everyone
     const app = this.app, ss = app.song.scenes;
     const i = ss.findIndex((s) => s.id === app.ed.sceneId);
     const n = ss[(i + d + ss.length) % ss.length];
@@ -239,10 +315,13 @@ export class EditorScreen implements Screen {
 
   handle(a: Action): boolean {
     const app = this.app, ed = app.ed;
-    if (a.type === "focusSwap") { ed.focus = ed.focus === "roll" ? "panel" : "roll"; this.paintFocus(); return true; }
+    if (a.type === "focusSwap") {
+      if (this.couch) { this.setView(ed.focus === "roll" ? "panel" : ed.focus === "panel" ? "mix" : "roll"); return true; }
+      ed.focus = ed.focus === "roll" ? "panel" : "roll"; this.paintFocus(); return true;
+    }
     if (a.type === "menu") { this.openMenu(); return true; }
     if (a.type === "shortcut") return false;
-    if (ed.focus === "panel") return this.handlePanel(a);
+    if (ed.focus !== "roll") return this.handlePanel(a);
     return this.handleRoll(a);
   }
 
@@ -252,7 +331,7 @@ export class EditorScreen implements Screen {
     const f = this.nav.focused;
     switch (a.type) {
       case "dir":
-        if (!this.nav.move(a.dir) && a.dir === "up") { app.ed.focus = "roll"; this.paintFocus(); }
+        if (!this.nav.move(a.dir) && a.dir === "up" && !this.couch) { app.ed.focus = "roll"; this.paintFocus(); }
         if (app.learning && this.nav.focused?.dataset.param) app.noteLearnTarget(track.id, this.nav.focused.dataset.param);
         return true;
       case "knob": {
@@ -274,7 +353,7 @@ export class EditorScreen implements Screen {
       case "confirmUp":
         if (this.heldKey) { app.noteInput(Number(this.heldKey.dataset.note), 0, false); this.heldKey.classList.remove("down"); this.heldKey = null; }
         return true;
-      case "back": app.ed.focus = "roll"; this.paintFocus(); return true;
+      case "back": if (this.couch) this.setView("roll"); else { app.ed.focus = "roll"; this.paintFocus(); } return true;
     }
     return false;
   }
@@ -405,7 +484,7 @@ export class EditorScreen implements Screen {
       case "duplicate": this.duplicate(); break;
       case "back":
         if (ed.sel.size) { ed.sel.clear(); break; }
-        app.show("song");
+        if (!this.couch) app.show("song");
         return true;
       default: return false;
     }
@@ -494,6 +573,7 @@ export class EditorScreen implements Screen {
         { label: "Redo", disabled: !app.history.canRedo, run: () => app.redo() },
         { label: "Undo history…", disabled: !app.history.canUndo, sub: () => app.history.labels().slice(0, 20).map((l, i) => ({ label: l, run: () => { for (let k = 0; k <= i; k++) app.undo(); } })) },
         { label: `Key: ${NOTE_NAMES[app.song.key]} ${scaleById(app.song.scale).name}`, disabled: true },
+        ...(this.couch?.extraMenu() ?? []),
       ];
     };
     app.overlays.menu(`${INSTRUMENTS[track.kind].name} · clip`, items, at);

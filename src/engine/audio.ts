@@ -10,7 +10,7 @@ import { workletParams } from "./params";
 import { buildMips, parseWav } from "./wavetable";
 import { DEFAULT_SAMPLER_REFS } from "./instruments3";
 import {
-  eventsInWindow, expandPitch, firstInstance, nextInstance, secPerTick, wholeSong,
+  barCut, eventsInWindow, expandPitch, firstInstance, nextInstance, secPerTick, wholeSong,
   type NoteEvent, type PlayMode, type SceneInstance,
 } from "./timeline";
 
@@ -340,11 +340,16 @@ export class AudioEngine {
   }
 
   /** Change which scene loops (or switch to song mode) without stopping; takes effect at the next scene boundary. */
-  queue(mode: PlayMode) {
+  /**
+   * Switch to `mode` when the current scene ends, or (atBar) at the next bar line:
+   * the playing scene is cut short there, so nobody waits out a long loop.
+   */
+  queue(mode: PlayMode, atBar = false) {
     this.mode = mode;
     if (!this.playing) return;
     const cur = this.currentInstance(this.scheduledUntil);
     this.instances = cur ? [cur] : this.instances.slice(0, 1);
+    if (atBar && cur) cur.ticks = barCut(cur.ticks, (this.scheduledUntil - cur.startTime) / cur.secPerTick);
   }
 
   get playMode(): PlayMode { return this.mode; }

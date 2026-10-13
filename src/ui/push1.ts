@@ -66,11 +66,12 @@ export class Push1Surface {
   private ledLast = new Map<string, number>();
   private timer: number;
 
-  constructor(private app: App, private out: { send(d: number[]): void } | null, private sysex: boolean) {
+  /** `run` wraps each refresh (couch mode: draw as the seat that owns the Push). */
+  constructor(private app: App, private out: { send(d: number[]): void } | null, private sysex: boolean, private run: (fn: () => void) => void = (fn) => fn()) {
     if (sysex) this.send(LIVE_MODE);
     this.lcdClear();
     // LEDs follow the playhead and the LCD shows the countdown: refresh ~20 times a second.
-    this.timer = setInterval(() => this.render(), 50) as unknown as number;
+    this.timer = setInterval(() => this.run(() => this.render()), 50) as unknown as number;
     this.render();
   }
 

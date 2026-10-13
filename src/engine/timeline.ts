@@ -2,7 +2,7 @@
 // the real-time scheduler (in small look-ahead windows) and the offline
 // WAV renderer (whole song at once).
 
-import { PPQ, sceneTempo, sceneTicks, type Song, type Track } from "./model";
+import { PPQ, TICKS_PER_BAR, sceneTempo, sceneTicks, type Song, type Track } from "./model";
 import { scaleChord } from "./music";
 import { INSTRUMENTS, fromUnit } from "./instruments";
 import { getParam, paramInfo } from "./params";
@@ -178,4 +178,10 @@ export function wholeSong(song: Song): { events: NoteEvent[]; duration: number; 
   const last = instances[instances.length - 1];
   const duration = last ? last.startTime + last.ticks * last.secPerTick : 0;
   return { events, duration, instances };
+}
+
+/** Where a scene `ticks` long, now at `tick`, should end to change at the next bar line. */
+export function barCut(ticks: number, tick: number): number {
+  const end = Math.ceil(tick / TICKS_PER_BAR - 1e-9) * TICKS_PER_BAR;
+  return end > 0 && end < ticks ? end : ticks;
 }
