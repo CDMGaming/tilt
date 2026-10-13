@@ -8,7 +8,7 @@ import { INSTRUMENTS, drumCount, fromUnit, isDrumKind, paramDef, toUnit } from "
 import { getParam, paramInfo, setParamValue } from "../engine/params";
 import { AUTO_STEP } from "../engine/timeline";
 import { DRUM_BASE_NOTE } from "../engine/instruments";
-import { PPQ, TICKS_PER_BAR, assignShades, normalizeSong, type Song, type Track } from "../engine/model";
+import { PPQ, TICKS_PER_BAR, assignShades, idLanes, normalizeSong, type Song, type Track } from "../engine/model";
 import { scaleById, snapToScale } from "../engine/music";
 import { addNote, addTrack, clearAutoRange, ensureClip, quantizeNotes, setAutoPoint } from "../engine/songops";
 import { NO_LOCKS, roll, type Locks, type Setup } from "../engine/dice";
@@ -16,6 +16,7 @@ import { mods, type Action } from "./actions";
 import { h } from "./dom";
 import { GamepadInput, bindKeyboard, connectedPads, type MusicKey } from "./input";
 import { Couch, type Device, type Seat } from "./seats";
+import { Online, type RosterSeat } from "./online";
 import { Midi } from "./midi";
 import { MidiClock, type SyncMode } from "./clock";
 import { Push1Surface } from "./push1";
@@ -79,6 +80,8 @@ export interface Settings {
   padLayout: "auto" | "xbox" | "nintendo";
   transport: { play?: { ch: number; cc: number }; record?: { ch: number; cc: number } };
   midiSync: SyncMode; // internal clock, follow external, or auto (follow when clock arrives)
+  netName: string; // your name in online games
+  relayUrl: string; // the online server ("" = this computer, port 8787)
   clockOut: string; // MIDI output id to send clock to ("" = off)
   outputDevice: string;
 }
@@ -124,7 +127,7 @@ export class App {
     stepInput: false, stepTick: 0, sel: new Set(), selAnchor: null, placing: null, grabbing: false, clipboard: [],
     octave: 3, drumPart: 0, topPitch: 72,
   };
-  settings: Settings = { notePreview: true, scaleLock: true, fold: false, countIn: true, gridAtStart: false, recQuantize: true, padLayout: "auto", outputDevice: "", transport: {}, midiSync: "auto", clockOut: "" };
+  settings: Settings = { notePreview: true, scaleLock: true, fold: false, countIn: true, gridAtStart: false, recQuantize: true, padLayout: "auto", outputDevice: "", transport: {}, midiSync: "auto", clockOut: "", netName: "", relayUrl: "" };
   dice: { setup: Setup; locks: Locks; minutes: number; cards: number } = { setup: roll(null, NO_LOCKS), locks: { ...NO_LOCKS }, minutes: 20, cards: 0 };
   timer = { total: 0, endsAt: 0, running: false, done: false };
   locked = false;
@@ -246,6 +249,7 @@ export class App {
   input<T>(device: Device, fn: () => T, interactive = true): T | undefined {
     if (interactive) this.inputDevice = device;
     if (!this.couch) return fn();
+    if (this.couch.online) return this.couch.localSeat ? this.as(this.couch.localSeat, fn) : undefined; // every controller here plays your seat
     const seat = this.couch.seatFor(device) ?? this.couch.lobby;
     if (seat === this.couch.lobby) this.couch.lobby.device = device;
     return this.as(seat, fn);
@@ -288,6 +292,7 @@ export class App {
   endCouch() {
     const c = this.couch;
     if (!c) return;
+    if (c.online && !c.online.closed) { this.onlineEnded(null); return; } // leaving an online game closes the connection too
     const p1 = c.seat("p1") ?? c.seats[0];
     this.switchTo(null);
     if (p1) { this.ed = p1.ed; this.scratch = p1.scratch; }
@@ -298,6 +303,125 @@ export class App {
     this.history.player = "p1";
     document.body.classList.remove("couch-mode");
     this.show("song");
+  }
+
+  // ------------------------------------------------------------ online games
+
+  /** Players you've muted on this computer only (seat ids): the song isn't changed. */
+  localMutes = new Set<string>();
+
+  /** The song as this computer should hear it: muted players' tracks silenced. */
+  private soundSong(): Song {
+    const c = this.couch;
+    if (!c || !this.localMutes.size) return this.song;
+    const off = new Set(c.seats.filter((s) => this.localMutes.has(s.id)).map((s) => s.trackId));
+    return { ...this.song, tracks: this.song.tracks.map((t) => (off.has(t.id) ? { ...t, mute: true } : t)) };
+  }
+
+  toggleListen(seatId: string) {
+    if (this.localMutes.has(seatId)) { this.localMutes.delete(seatId); this.couch?.online?.unheard.delete(seatId); }
+    else this.localMutes.add(seatId);
+    this.engine.sync(this.soundSong());
+    this.refresh();
+  }
+
+  /** Hear only yourself (or everyone again). */
+  soloListen() {
+    const c = this.couch;
+    if (!c) return;
+    const others = c.seats.filter((s) => !c.isLocal(s)).map((s) => s.id);
+    const allMuted = others.every((id) => this.localMutes.has(id));
+    this.localMutes.clear();
+    if (!allMuted) for (const id of others) this.localMutes.add(id);
+    if (allMuted) this.couch?.online?.unheard.clear();
+    this.engine.sync(this.soundSong());
+    this.refresh();
+  }
+
+  private relayUrl() { return this.settings.relayUrl || `ws://${location.hostname || "localhost"}:8787`; }
+
+  /** Host an online game with this song: you are P1 and the conductor. Resolves with the room code. */
+  async hostOnline(): Promise<string> {
+    if (!this.song.tracks.length) throw "Roll a jam first: an online game needs instruments";
+    if (this.couch) this.endCouch();
+    const net = new Online(this, this.settings.netName || "Host");
+    await net.connect(this.relayUrl(), { create: true });
+    const c = (this.couch = new Couch(this));
+    c.online = net;
+    this.actor = null;
+    const me = c.join({ kind: "net", peer: net.myId, name: net.name }, true)!;
+    c.localId = me.id;
+    idLanes.lanes = 8;
+    idLanes.lane = me.slot;
+    this.switchTo(me);
+    this.onLocalPatches = (patches) => net.send({ t: "patches", patches });
+    document.body.classList.add("couch-mode");
+    this.show("couch");
+    return net.room;
+  }
+
+  /** Join a friend's game: their song replaces the one open here (yours is in the library). */
+  async joinOnline(code: string): Promise<void> {
+    if (this.couch) this.endCouch();
+    const net = new Online(this, this.settings.netName || "Guest");
+    await net.connect(this.relayUrl(), { room: code });
+    // The song arrives as a snapshot (joinedOnline).
+    this.pendingNet = net;
+    setTimeout(() => { if (this.pendingNet === net) { net.close(); this.pendingNet = null; this.overlays.toast("The host didn't answer"); } }, 8000);
+  }
+  private pendingNet: Online | null = null;
+
+  /** Guest: the host's song and seating arrived. */
+  joinedOnline(net: Online, song: Song, seats: RosterSeat[], conductor: string, sceneId: number) {
+    this.pendingNet = null;
+    this.engine.stop();
+    delete song.libId; // your own copy, saved in your library as its own song
+    this.replaceSong(song);
+    const c = (this.couch = new Couch(this));
+    c.online = net;
+    c.sceneId = sceneId;
+    this.actor = null;
+    net.applyRoster(seats, conductor);
+    const me = c.localSeat;
+    if (me) { this.ed = me.ed; this.switchTo(me); }
+    this.onLocalPatches = (patches) => net.send({ t: "patches", patches });
+    document.body.classList.add("couch-mode");
+    this.show("couch");
+    this.overlays.toast(`Joined game ${net.room}`);
+  }
+
+  /** Apply another player's change: into the song and the audio, in nobody's undo here. */
+  applyRemote(patches: Patch[], from: Seat | null) {
+    this.history.remote(this.song, patches);
+    assignShades(this.song);
+    this.fixCursors();
+    this.engine.sync(this.soundSong());
+    this.scheduleSave();
+    (this.screens.couch as Screen & { remoteChanged?(p: Patch[], s: Seat | null): void }).remoteChanged?.(patches, from);
+    this.renderHeader();
+  }
+
+  remoteCursor(seat: Seat, viewChanged: boolean) {
+    (this.screens.couch as Screen & { remoteCursor?(s: Seat, v: boolean): void }).remoteCursor?.(seat, viewChanged);
+  }
+
+  /** Leave (or, as host, end) the online game. The song stays on this computer. */
+  leaveOnline() {
+    this.couch?.online?.close();
+    this.onlineEnded(null);
+  }
+
+  onlineEnded(why: string | null) {
+    if (!this.couch?.online) return;
+    this.couch.online.close();
+    this.couch.online.closed = true;
+    this.onLocalPatches = null;
+    idLanes.lanes = 1;
+    idLanes.lane = 0;
+    this.localMutes.clear();
+    this.stopLocal();
+    this.endCouch();
+    if (why) this.overlays.toast(why, 3500);
   }
 
   /** On a screen where notes go into a clip (the editor, or couch mode's quarters). */
@@ -339,7 +463,7 @@ export class App {
   changed(render = true) {
     assignShades(this.song);
     this.commit();
-    this.engine.sync(this.song);
+    this.engine.sync(this.soundSong());
     this.scheduleSave();
     if (render) this.refresh();
   }
@@ -470,13 +594,23 @@ export class App {
   // ------------------------------------------------------------ transport
 
   togglePlay() {
-    if (this.engine.playing) {
-      this.engine.stop();
-      this.finishRecording();
-      this.recording = false;
-    } else {
-      this.engine.play(this.playMode());
-    }
+    if (this.couch?.online) { this.couch.online.transport(!this.engine.playing); return; } // everyone starts and stops together
+    if (this.engine.playing) this.stopLocal();
+    else this.playLocal();
+  }
+
+  /** Start / stop on this machine only (online games call these at the agreed moment). */
+  playLocal() {
+    if (this.engine.playing) return;
+    this.engine.play(this.playMode());
+    this.renderHeader();
+  }
+
+  stopLocal() {
+    if (!this.engine.playing) return;
+    this.engine.stop();
+    this.finishRecording();
+    this.recording = false;
     this.renderHeader();
   }
 
@@ -509,6 +643,12 @@ export class App {
     if (!this.editing && this.screenName !== "mix") { this.overlays.toast("Open a clip (or the mixer) to record"); return; }
     this.history.push(this.song, "Record");
     this.recording = true;
+    if (this.couch?.online && !this.engine.playing) {
+      // Online: everyone's loop starts together (no count-in); your playing records into your clip.
+      this.couch.online.transport(true);
+      this.renderHeader();
+      return;
+    }
     if (!this.engine.playing) {
       const beats = this.settings.countIn ? 4 : 0;
       const start = this.engine.play(this.screenName === "mix" ? this.playMode() : { kind: "scene", sceneId: this.ed.sceneId }, beats);

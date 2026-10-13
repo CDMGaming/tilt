@@ -4,8 +4,22 @@
     {
       "name": "rollbox",
       "runtimeExecutable": "deno",
-      "runtimeArgs": ["run", "-A", "tools/dev.ts"],
+      "runtimeArgs": [
+        "run",
+        "-A",
+        "tools/dev.ts"
+      ],
       "port": 5178
+    },
+    {
+      "name": "relay",
+      "runtimeExecutable": "deno",
+      "runtimeArgs": [
+        "run",
+        "-A",
+        "tools/relay.ts"
+      ],
+      "port": 8787
     }
   ]
 }

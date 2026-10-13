@@ -118,3 +118,17 @@ Deno.test("ownership: tracks, the shared song, and scene changes", () => {
   applyPatches(c, note);
   assertEquals(c.nextId, 1000);
 });
+
+Deno.test("id lanes: two players never hand out the same id", async () => {
+  const { idLanes, newId } = await import("../src/engine/model.ts");
+  const a = song(2), b = copy(a);
+  const ids = new Set<number>();
+  for (const [s, lane] of [[a, 0], [b, 1], [a, 0], [b, 1], [a, 0]] as const) {
+    idLanes.lanes = 8; idLanes.lane = lane;
+    const id = newId(s);
+    assertEquals(id % 8, lane);
+    assert(!ids.has(id));
+    ids.add(id);
+  }
+  idLanes.lanes = 1; idLanes.lane = 0;
+});

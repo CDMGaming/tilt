@@ -12,15 +12,18 @@ import type { InstrumentKind, Track } from "../engine/model";
 import { mods } from "./actions";
 import type { App, EditorState, Scratch } from "./app";
 import { newScratch } from "./app";
+import type { Online } from "./online";
 
 export type Device =
   | { kind: "keys" } // computer keyboard (and the mouse goes with it)
   | { kind: "pad"; index: number } // a gamepad, by its browser slot
   | { kind: "midi"; name: string } // a MIDI keyboard / controller, by port name
-  | { kind: "push" };
+  | { kind: "push" }
+  | { kind: "net"; peer: string; name: string }; // a player in an online game (on this machine or another)
 
 export const sameDevice = (a: Device, b: Device) =>
-  a.kind === b.kind && (a.kind !== "pad" || a.index === (b as { index: number }).index) && (a.kind !== "midi" || a.name === (b as { name: string }).name);
+  a.kind === b.kind && (a.kind !== "pad" || a.index === (b as { index: number }).index) && (a.kind !== "midi" || a.name === (b as { name: string }).name)
+  && (a.kind !== "net" || a.peer === (b as { peer: string }).peer);
 
 export function deviceName(d: Device): string {
   switch (d.kind) {
@@ -28,6 +31,7 @@ export function deviceName(d: Device): string {
     case "pad": return `Gamepad ${d.index + 1}`;
     case "midi": return d.name;
     case "push": return "Push";
+    case "net": return d.name;
   }
 }
 
@@ -55,6 +59,13 @@ export class Couch {
   readonly lobby: Seat;
   /** The scene everybody is working on. */
   sceneId: number;
+  /** Online game: the connection, and which seat is the person at this computer. */
+  online: Online | null = null;
+  localId: string | null = null;
+
+  /** Online: every controller here plays the local seat. */
+  get localSeat(): Seat | undefined { return this.localId ? this.seat(this.localId) : undefined; }
+  isLocal(s: Seat) { return !this.online || s.id === this.localId; }
 
   constructor(private app: App) {
     this.sceneId = app.ed.sceneId;
@@ -103,17 +114,38 @@ export class Couch {
     if (this.seats.length < 2) return;
     const order = [...this.seats].sort((a, b) => a.slot - b.slot);
     const i = order.findIndex((s) => s.id === this.conductor);
-    for (const s of order) s.inStrip = false;
-    this.conductor = order[(i + 1) % order.length].id;
-    this.app.owners.conductor = this.conductor;
+    this.setConductor(order[(i + 1) % order.length].id);
+    this.online?.send({ t: "conductor", id: this.conductor });
   }
 
-  /** Everyone moves to this scene; while playing it starts at the next bar. */
-  setScene(id: number) {
+  setConductor(id: string) {
+    for (const s of this.seats) s.inStrip = false;
+    this.conductor = id;
+    this.app.owners.conductor = id;
+  }
+
+  /** Everyone moves to this scene; while playing it starts at the next bar. `share`: tell the other machines. */
+  setScene(id: number, share = true) {
+    if (share && this.sceneId !== id) this.online?.send({ t: "scene", id });
     this.sceneId = id;
     for (const s of [...this.seats, this.lobby]) { s.ed.sceneId = id; s.ed.sel.clear(); }
     const app = this.app;
     if (app.engine.playing) app.engine.queue({ kind: "scene", sceneId: id }, true);
+  }
+
+  /** Online guests: the host's seating plan. Seats that stay keep their editor state. */
+  applyRoster(specs: { id: string; slot: number; trackId: number; device: Device }[], conductor: string) {
+    const app = this.app, keep = new Map(this.seats.map((s) => [s.id, s]));
+    this.seats = specs.map((r) => {
+      const s = keep.get(r.id) ?? { id: r.id, slot: r.slot, device: r.device, trackId: r.trackId, ed: cloneEd(app.ed), scratch: newScratch(), mods: freshMods(), inStrip: false };
+      Object.assign(s, { slot: r.slot, device: r.device, trackId: r.trackId });
+      s.ed.trackId = r.trackId;
+      s.ed.sceneId = this.sceneId;
+      return s;
+    });
+    app.owners.tracks.clear();
+    for (const s of this.seats) app.owners.tracks.set(s.trackId, s.id);
+    this.setConductor(conductor);
   }
 
   /** A track nobody plays yet, or a new one (a musical job the band is missing). */

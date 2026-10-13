@@ -262,13 +262,56 @@ export function playTogetherDialog(app: App) {
     h("button", { class: "row-btn primary", "data-nav": "couch", onclick: () => { close(); app.startCouch(); } },
       h("div", { class: "together-title" }, app.couch ? "🛋 Back to the couch" : "🛋 Couch: everyone on this computer"),
       h("div", { class: "note" }, "2 to 4 players, one controller each (gamepads, the keyboard, MIDI keyboards, the Push). The screen splits in four; each player gets one instrument. The others join by pressing A / Enter / a note.")),
-    h("button", { class: "row-btn", "data-nav": "host", disabled: true },
+    h("button", { class: "row-btn", "data-nav": "host", onclick: () => { close(); onlineDialog(app, "host"); } },
       h("div", { class: "together-title" }, "🌐 Host an online game"),
-      h("div", { class: "note" }, "Coming next: friends join with a code and paint notes into their own instrument.")),
-    h("button", { class: "row-btn", "data-nav": "join", disabled: true },
+      h("div", { class: "note" }, "Friends join with a code. Everyone gets one instrument and paints notes into it; the loop plays on every computer.")),
+    h("button", { class: "row-btn", "data-nav": "join", onclick: () => { close(); onlineDialog(app, "join"); } },
       h("div", { class: "together-title" }, "🔗 Join an online game"),
-      h("div", { class: "note" }, "Coming next.")),
+      h("div", { class: "note" }, "Type the code the host gives you. Their song opens here (yours stays in your library).")),
     h("button", { class: "row-btn", "data-nav": "close", onclick: close }, "Back")));
+}
+
+/** Host or join: your name, the code (joining), and the server (advanced). */
+export function onlineDialog(app: App, mode: "host" | "join") {
+  const st = app.settings;
+  const name = h("input", { class: "text-input", "data-nav": "name", value: st.netName, placeholder: "Your name", maxlength: 20 }) as HTMLInputElement;
+  const code = h("input", { class: "text-input code-input", "data-nav": "code", placeholder: "Game code (4 letters)", maxlength: 4 }) as HTMLInputElement;
+  const server = h("input", { class: "text-input", "data-nav": "server", value: st.relayUrl, placeholder: `ws://${location.hostname || "localhost"}:8787` }) as HTMLInputElement;
+  const status = h("p", { class: "note" }, "");
+  app.overlays.dialog(mode === "host" ? "Host an online game" : "Join an online game", (close) => {
+    const go = async () => {
+      st.netName = name.value.trim().slice(0, 20);
+      st.relayUrl = server.value.trim();
+      app.saveSettings();
+      status.textContent = "Connecting…";
+      try {
+        if (mode === "host") {
+          const room = await app.hostOnline();
+          close();
+          app.overlays.dialog("Your game is open", (done) => h("div", { class: "form" },
+            h("p", { class: "note" }, "Friends choose Play together → Join and type:"),
+            h("div", { class: "big-code" }, room),
+            h("p", { class: "note" }, "They need to reach the same online server as you."),
+            h("button", { class: "row-btn primary", "data-nav": "ok", onclick: done }, "Start jamming")));
+        } else {
+          if (code.value.trim().length !== 4) { status.textContent = "The code is 4 letters"; return; }
+          await app.joinOnline(code.value);
+          status.textContent = "Connected, waiting for the host's song…";
+          setTimeout(close, 300);
+        }
+      } catch (e) {
+        status.textContent = String(e);
+      }
+    };
+    return h("div", { class: "form" },
+      h("label", { class: "field" }, "Your name", name),
+      mode === "join" ? h("label", { class: "field" }, "Game code", code) : "",
+      h("details", { class: "advanced" }, h("summary", null, "Online server"), server,
+        h("p", { class: "note" }, "Leave empty to use the server on this computer (run: deno run -A tools/relay.ts).")),
+      status,
+      h("button", { class: "row-btn primary", "data-nav": "go", onclick: () => void go() }, mode === "host" ? "Open the game" : "Join"),
+      h("button", { class: "row-btn", "data-nav": "cancel", onclick: close }, "Cancel"));
+  });
 }
 
 export function systemMenu(app: App, newJam: () => void) {

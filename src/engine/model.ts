@@ -94,8 +94,17 @@ export interface Song {
   midiMap?: MidiBinding[];
 }
 
+/**
+ * Online games: each player hands out ids from their own lane (id % lanes === lane),
+ * so two machines adding notes at the same moment never pick the same id.
+ */
+export const idLanes = { lane: 0, lanes: 1 };
+
 export function newId(song: Song): number {
-  return song.nextId++;
+  let n = song.nextId;
+  while (idLanes.lanes > 1 && n % idLanes.lanes !== idLanes.lane) n++;
+  song.nextId = n + 1;
+  return n;
 }
 
 export function emptyClip(bars = 1): Clip {

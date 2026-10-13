@@ -14,6 +14,7 @@ import { h } from "./dom";
 import { EditorScreen } from "./editor";
 import { SpatialNav } from "./nav";
 import type { MenuItem } from "./overlay";
+import type { Patch } from "../engine/patches";
 import { MAX_SEATS, SEAT_COLORS, deviceName, type Seat } from "./seats";
 import { trackColor } from "./theme";
 
@@ -26,6 +27,9 @@ export class CouchScreen implements Screen {
   private quads = new Map<string, Quad>();
   private cells = Array.from({ length: MAX_SEATS }, (_, i) => h("div", { class: `couch-cell cell${i}` }));
   private queueEl = h("span", { class: "strip-queue" });
+  /** Online: quarters to redraw on the next frame (other players' edits arrive in bursts). */
+  private dirty = new Set<string>();
+  private dirtyAll = false;
 
   constructor(private app: App) {
     this.el.append(this.cells[0], this.cells[1], this.strip, this.cells[2], this.cells[3]);
@@ -43,7 +47,9 @@ export class CouchScreen implements Screen {
 
   /** The seat a mouse press in `seat`'s quarter acts as, or null if the mouse may not go there. */
   private mouseSeat(seat: Seat | null): Seat | null {
-    const c = this.couch, keys = c.seatFor({ kind: "keys" });
+    const c = this.couch;
+    if (c.online) { const me = c.localSeat ?? null; return !seat || seat === me ? me : null; } // online: the other quarters are to watch
+    const keys = c.seatFor({ kind: "keys" });
     if (keys) return !seat || seat === keys ? keys : null;
     return seat ?? c.seat(c.conductor) ?? null;
   }
@@ -64,7 +70,8 @@ export class CouchScreen implements Screen {
       if (as) { app.focusSeat(as); return; }
       e.stopPropagation();
       e.preventDefault();
-      app.as(this.couch.seatFor({ kind: "keys" })!, () => app.overlays.toast(`That's ${seat.id.toUpperCase()}'s quarter`, 900));
+      const me = this.couch.online ? this.couch.localSeat : this.couch.seatFor({ kind: "keys" });
+      if (me) app.as(me, () => app.overlays.toast(`That's ${seat.device.kind === "net" ? seat.device.name : seat.id.toUpperCase()}'s quarter`, 900));
     };
     for (const ev of ["pointerdown", "wheel", "contextmenu"]) root.addEventListener(ev, guard, { capture: true, passive: false });
     q = { root, head, editor };
@@ -80,31 +87,78 @@ export class CouchScreen implements Screen {
       const cell = this.cells[slot], seat = c.bySlot(slot);
       if (!seat) {
         cell.replaceChildren(h("div", { class: "quad empty", style: `--seat:${SEAT_COLORS[slot]}` },
-          h("div", { class: "join" },
+          c.online ? h("div", { class: "join" },
+            h("div", { class: "join-title" }, `Player ${slot + 1}`),
+            h("div", null, "Waiting for a friend. Game code:"),
+            h("div", { class: "join-code" }, c.online.room))
+          : h("div", { class: "join" },
             h("div", { class: "join-title" }, `Player ${slot + 1}`),
             h("div", null, "Press A on a gamepad, Enter on the keyboard,"),
             h("div", null, "or play a note on a MIDI controller to join"))));
         continue;
       }
-      const q = this.quad(seat), track = app.song.tracks.find((t) => t.id === seat.trackId);
-      if (!track) continue;
-      q.root.style.cssText = `--seat:${SEAT_COLORS[slot]};--track:${trackColor(track)}`;
-      q.root.classList.toggle("is-conductor", c.isConductor(seat));
-      q.head.replaceChildren(
-        h("span", { class: "seat-badge" }, seat.id.toUpperCase()),
-        h("span", { class: "quad-inst" }, INSTRUMENTS[track.kind].name),
-        h("span", { class: "quad-preset" }, track.preset),
-        c.isConductor(seat) ? h("span", { class: "conductor-badge", title: "Has the shared controls" }, "★ conductor") : "",
-        h("span", { class: "spacer" }),
-        h("span", { class: "quad-device" }, deviceName(seat.device)),
-      );
+      const q = this.quad(seat);
+      if (!this.renderHead(seat, q)) continue;
       if (cell.firstChild !== q.root) cell.replaceChildren(q.root);
       app.as(seat, () => q.editor.render());
     }
     this.renderStrip();
   }
 
+  /** A quarter's colours and title line. False if the seat's track is gone. */
+  private renderHead(seat: Seat, q: Quad): boolean {
+    const app = this.app, c = this.couch, track = app.song.tracks.find((t) => t.id === seat.trackId);
+    if (!track) return false;
+    {
+      q.root.style.cssText = `--seat:${SEAT_COLORS[seat.slot]};--track:${trackColor(track)}`;
+      q.root.classList.toggle("is-conductor", c.isConductor(seat));
+      q.root.classList.toggle("remote", !c.isLocal(seat));
+      q.root.classList.toggle("unheard", app.localMutes.has(seat.id));
+      q.head.replaceChildren(
+        h("span", { class: "seat-badge" }, seat.id.toUpperCase()),
+        h("span", { class: "quad-inst" }, INSTRUMENTS[track.kind].name),
+        h("span", { class: "quad-preset" }, track.preset),
+        c.isConductor(seat) ? h("span", { class: "conductor-badge", title: "Has the shared controls" }, "★ conductor") : "",
+        h("span", { class: "spacer" }),
+        app.localMutes.has(seat.id) ? h("span", { class: "muted-badge" }, `🔇 muted here${this.unheard(seat) ? ` · +${this.unheard(seat)} notes` : ""}`) : "",
+        h("span", { class: "quad-device" }, deviceName(seat.device) + (c.online && c.isLocal(seat) ? " (you)" : "")),
+      );
+    }
+    return true;
+  }
+
+  private unheard(seat: Seat) { return this.couch.online?.unheard.get(seat.id) ?? 0; }
+
+  /** Online: another player's edit arrived. Redraw their quarter (or everything, for shared changes). */
+  remoteChanged(patches: Patch[], from: Seat | null) {
+    const c = this.couch;
+    for (const p of patches) {
+      if (p.path[0] === "clip" || (p.path[0] === "track" && p.path.length === 3)) {
+        const s = c.seats.find((x) => x.trackId === p.path[1]);
+        if (s && !c.isLocal(s)) this.dirty.add(s.id); else this.dirtyAll = true;
+      } else if (!(p.path[0] === "song" && p.path[1] === "nextId")) this.dirtyAll = true;
+    }
+    if (from && this.app.localMutes.has(from.id)) this.dirty.add(from.id); // the "+N notes" badge
+  }
+
+  remoteCursor(seat: Seat, viewChanged: boolean) {
+    if (viewChanged) { this.dirty.add(seat.id); return; }
+    this.quads.get(seat.id)?.editor.poke();
+  }
+
   frame(now: number) {
+    const c = this.couch;
+    if (this.dirtyAll) { this.dirtyAll = false; this.dirty.clear(); this.render(); }
+    else if (this.dirty.size) {
+      // Only the quarters that changed: yours keeps whatever knob or note you're holding.
+      for (const id of this.dirty) {
+        const s = c.seat(id), q = this.quads.get(id);
+        if (s && q && this.renderHead(s, q)) this.app.as(s, () => q.editor.render());
+      }
+      this.dirty.clear();
+      this.renderStrip();
+    }
+    if (c.online && c.localSeat) c.online.tickCursor(c.localSeat);
     for (const s of this.couch.seats) {
       const q = this.quads.get(s.id);
       if (q) this.app.as(s, () => q.editor.frame());
@@ -198,8 +252,15 @@ export class CouchScreen implements Screen {
         b("vol-", "−", shared(() => app.setMaster("volume", Math.max(0, song.master.volume - 0.05), true))),
         h("span", { class: "strip-value" }, `Vol ${Math.round(song.master.volume * 100)}`),
         b("vol+", "+", shared(() => app.setMaster("volume", Math.min(1, song.master.volume + 0.05), true)))),
+      c.online ? h("div", { class: "strip-group listen" },
+        h("span", { class: "strip-label game-code", title: "Friends join with this code" }, `Game ${c.online.room}`),
+        ...c.seats.filter((s) => !c.isLocal(s)).map((s) => {
+          const off = app.localMutes.has(s.id), n = this.unheard(s);
+          return b(`listen-${s.id}`, `${off ? "🔇" : "🔊"} ${s.device.kind === "net" ? s.device.name : s.id}${off && n ? ` +${n}` : ""}`, () => app.toggleListen(s.id), off ? "muted" : "", off ? "Muted on this computer only: click to hear them again" : "Mute them on this computer only (they keep playing for everyone else)");
+        }),
+        c.seats.length > 1 ? b("listen-solo", "Only me", () => app.soloListen(), "", "Hear just yourself while you work (or everyone again)") : "") : "",
       h("div", { class: "spacer" }),
-      b("end", "End couch", () => this.confirmEnd(), "end"),
+      b("end", c.online ? (c.online.isHost ? "End game" : "Leave game") : "End couch", () => this.confirmEnd(), "end"),
     );
     if (conductor?.inStrip) this.stripNav.paint(); else this.stripNav.clearPaint();
     this.queueEl.textContent = this.queueText();
@@ -215,10 +276,14 @@ export class CouchScreen implements Screen {
   }
 
   private confirmEnd() {
-    const app = this.app;
-    app.overlays.dialog("End couch mode?", (close) => h("div", { class: "form" },
-      h("p", { class: "note" }, "Everyone's work stays in the song. P1 carries on solo."),
-      h("button", { class: "row-btn primary", "data-nav": "end", onclick: () => { close(); app.endCouch(); } }, "End couch mode"),
+    const app = this.app, net = this.couch.online;
+    const title = net ? (net.isHost ? "End the online game?" : "Leave the game?") : "End couch mode?";
+    const note = net
+      ? (net.isHost ? "Everyone is disconnected. The song stays on every computer." : "The song as it is now stays on your computer (in your library).")
+      : "Everyone's work stays in the song. P1 carries on solo.";
+    app.overlays.dialog(title, (close) => h("div", { class: "form" },
+      h("p", { class: "note" }, note),
+      h("button", { class: "row-btn primary", "data-nav": "end", onclick: () => { close(); app.endCouch(); } }, net ? (net.isHost ? "End game" : "Leave") : "End couch mode"),
       h("button", { class: "row-btn", "data-nav": "stay", onclick: close }, "Keep playing")));
   }
 
@@ -235,11 +300,19 @@ export class CouchScreen implements Screen {
         run: () => { app.edit("Change instrument", () => changeInstrument(track, k)); app.refresh(); },
       })) },
       ...(c.isConductor(seat) ? [{ label: "Pass the shared controls", disabled: c.seats.length < 2, run: () => { c.pass(); app.refresh(); } }] : []),
-      { label: "Leave the game", run: () => {
-        c.leave(seat);
-        if (!c.seats.length) app.endCouch(); else app.refresh();
-      } },
-      { label: "End couch mode…", run: () => this.confirmEnd() },
+      ...(c.online ? [
+        { label: "Listening (this computer only)", sub: () => [
+          ...c.seats.filter((s) => !c.isLocal(s)).map((s) => ({ label: s.device.kind === "net" ? s.device.name : s.id, checked: !app.localMutes.has(s.id), keepOpen: true, run: () => app.toggleListen(s.id) })),
+          { label: "Only me / everyone", run: () => app.soloListen() },
+        ] },
+        { label: c.online.isHost ? "End the online game…" : "Leave the game…", run: () => this.confirmEnd() },
+      ] : [
+        { label: "Leave the game", run: () => {
+          c.leave(seat);
+          if (!c.seats.length) app.endCouch(); else app.refresh();
+        } },
+        { label: "End couch mode…", run: () => this.confirmEnd() },
+      ]),
     ];
   }
 }

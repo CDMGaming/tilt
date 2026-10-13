@@ -291,6 +291,20 @@ export class AudioEngine {
     this.scheduledUntil += shift;
   }
 
+  /** Song position (ticks since play started, across scenes) heard at context time `t`. */
+  globalTickAt(t: number): number | null {
+    if (!this.playing) return null;
+    const inst = this.currentInstance(t) ?? this.instances[0];
+    if (!inst) return null;
+    return (this.globalStart.get(inst) ?? 0) + (t - inst.startTime) / inst.secPerTick;
+  }
+
+  /** Ticks per second right now (the playing scene's tempo). */
+  ticksPerSec(): number {
+    const inst = this.instances[0];
+    return inst ? 1 / inst.secPerTick : (this.song.tempo * PPQ) / 60;
+  }
+
   /** performance.now() time at which audio scheduled for context time `t` is heard. */
   perfTimeOf(t: number): number {
     const ts = this.ctx.getOutputTimestamp();

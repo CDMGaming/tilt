@@ -156,6 +156,9 @@ export class EditorScreen implements Screen {
     this.roll.invalidate();
   }
 
+  /** Redraw the roll (another player's cursor moved). */
+  poke() { this.roll.invalidate(); }
+
   frame() {
     this.roll.frame();
     if (this.couch && this.app.ed.focus === "mix") {

@@ -542,3 +542,17 @@ body.couch-mode .overlay-layer.menu-layer { background: transparent; }
 .together .row-btn { display: block; text-align: left; width: 100%; }
 .together-title { font-family: var(--font-display); font-size: 16px; }
 .together .row-btn.primary .note, .together .row-btn.navfocus .note { color: inherit; opacity: .85; }
+
+/* ---------- online ---------- */
+.quad.remote .ed-toolbar { opacity: .55; pointer-events: none; }
+.quad.unheard { opacity: .7; }
+.muted-badge { color: var(--coral); font-size: 12px; }
+.join-code, .big-code { font-family: var(--font-display); font-size: 40px; letter-spacing: 6px; color: var(--yellow); text-align: center; }
+.big-code { font-size: 56px; margin: 8px 0; }
+.strip-btn.muted { color: var(--coral); border-color: color-mix(in srgb, var(--coral) 50%, transparent); }
+.game-code { color: var(--yellow); }
+.text-input { width: 100%; box-sizing: border-box; background: var(--well); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-s); padding: 7px 9px; font: inherit; }
+.code-input { text-transform: uppercase; letter-spacing: 4px; font-family: var(--font-display); font-size: 20px; }
+.field { display: grid; gap: 4px; margin-bottom: 8px; color: var(--dim); }
+.advanced { margin: 6px 0; color: var(--dim); }
+.advanced summary { cursor: pointer; margin-bottom: 6px; }
