@@ -49,6 +49,17 @@ export class PianoRoll {
     });
     this.canvas.addEventListener("wheel", (e) => {
       e.preventDefault();
+      if (e.ctrlKey) {
+        const r = this.canvas.getBoundingClientRect();
+        this.zoom(e.deltaY < 0 ? 1 : -1, this.tickAt(e.clientX - r.left));
+        return;
+      }
+      if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        const d = Math.sign(e.shiftKey ? e.deltaY : e.deltaX);
+        this.app.ed.scrollTick = this.clampScroll(this.scroll() + d * PPQ);
+        this.invalidate();
+        return;
+      }
       if (this.isDrums()) return;
       const rows = this.allRows();
       const i = Math.max(0, Math.min(rows.length - this.visibleRows(), this.topIdx() + Math.sign(e.deltaY) * 2));
@@ -107,6 +118,8 @@ export class PianoRoll {
 
   /** Keep the cursor row on screen. */
   scrollToCursor() {
+    this.scrollToTick(this.app.ed.tick);
+    this.lastNav = performance.now();
     if (this.isDrums()) return;
     const ed = this.app.ed, rows = this.allRows(), vis = this.visibleRows();
     const r = rows.indexOf(ed.pitch);
@@ -117,10 +130,51 @@ export class PianoRoll {
     ed.topPitch = rows[Math.max(0, Math.min(rows.length - vis, top))];
   }
 
-  private pxPerTick() { return (this.size().w - KEYS_W) / this.clipTicks(); }
-  private xOf(tick: number) { return KEYS_W + tick * this.pxPerTick(); }
+  // ---- horizontal zoom: a window of `viewTicks` starting at `scroll`
+  static readonly ZOOMS = [0, 4, 2, 1]; // bars visible; 0 = the whole clip
+  viewTicks() { const ct = this.clipTicks(), vb = this.app.ed.viewBars; return vb ? Math.min(ct, vb * TICKS_PER_BAR) : ct; }
+  private clampScroll(t: number) { return Math.max(0, Math.min(this.clipTicks() - this.viewTicks(), t)); }
+  scroll() { return this.clampScroll(this.app.ed.scrollTick); }
+  zoomed() { return this.viewTicks() < this.clipTicks(); }
+
+  /** Zoom in (+1) or out (-1), keeping `anchor` (a tick) where it is on screen. */
+  zoom(dir: 1 | -1, anchor = this.app.ed.tick) {
+    const ed = this.app.ed, levels = PianoRoll.ZOOMS;
+    const bars = this.viewTicks() / TICKS_PER_BAR;
+    const next = dir > 0 ? levels.find((z) => z > 0 && z < bars) : [...levels].reverse().find((z) => z === 0 || z > bars) ?? 0;
+    if (next === undefined) return;
+    const before = (anchor - this.scroll()) / this.viewTicks();
+    ed.viewBars = next;
+    ed.scrollTick = this.clampScroll(Math.round((anchor - before * this.viewTicks()) / PPQ) * PPQ);
+    this.invalidate();
+    const label = document.querySelector(".zoom-value");
+    if (label) label.textContent = this.zoomLabel();
+  }
+
+  zoomLabel() { return this.zoomed() ? `${this.viewTicks() / TICKS_PER_BAR} bar${this.viewTicks() > TICKS_PER_BAR ? "s" : ""}` : "Fit"; }
+
+  /** Scroll so `tick` (and one grid step after it) is visible, moving a bar at a time. */
+  scrollToTick(tick: number) {
+    if (!this.zoomed()) return;
+    const ed = this.app.ed, vt = this.viewTicks(), s = this.scroll(), g = this.app.grid();
+    if (tick < s) ed.scrollTick = Math.floor(tick / TICKS_PER_BAR) * TICKS_PER_BAR;
+    else if (tick + g > s + vt) ed.scrollTick = Math.ceil((tick + g - vt) / TICKS_PER_BAR) * TICKS_PER_BAR;
+    ed.scrollTick = this.clampScroll(ed.scrollTick);
+  }
+
+  private lastNav = 0;
+  private pxPerTick() { return (this.size().w - KEYS_W) / this.viewTicks(); }
+  private xOf(tick: number) { return KEYS_W + (tick - this.scroll()) * this.pxPerTick(); }
   private yOf(pitch: number) { return RULER_H + (this.rowOf(pitch) - this.topIdx()) * this.rowH(); }
-  private tickAt(x: number) { return (x - KEYS_W) / this.pxPerTick(); }
+  private tickAt(x: number) { return (x - KEYS_W) / this.pxPerTick() + this.scroll(); }
+
+  /** Clip drawing to the note area (right of the key column), between y0 and y1. */
+  private clipTo(g: CanvasRenderingContext2D, y0: number, y1: number) {
+    g.save();
+    g.beginPath();
+    g.rect(KEYS_W, y0, this.size().w - KEYS_W, y1 - y0);
+    g.clip();
+  }
   private pitchAt(y: number) {
     const rows = this.allRows();
     return rows[Math.max(0, Math.min(rows.length - 1, this.topIdx() + Math.floor((y - RULER_H) / this.rowH())))];
@@ -132,6 +186,10 @@ export class PianoRoll {
     const pos = this.app.engine.position();
     const playTick = pos && pos.sceneId === this.app.ed.sceneId ? pos.tick % this.clipTicks() : -1;
     if (playTick !== this.lastPlayTick) { this.lastPlayTick = playTick; this.dirty = true; }
+    if (playTick >= 0 && this.zoomed() && (this.app.recording || performance.now() - this.lastNav > 3000)) {
+      const vt = this.viewTicks(), s = this.scroll();
+      if (playTick < s || playTick >= s + vt) { this.app.ed.scrollTick = this.clampScroll(Math.floor(playTick / vt) * vt); this.dirty = true; }
+    }
     if (this.dirty) this.draw(playTick);
   }
 
@@ -193,6 +251,7 @@ export class PianoRoll {
 
     // grid
     const grid = app.grid(), ct = this.clipTicks();
+    this.clipTo(g, 0, laneBottom);
     for (let t = 0; t <= ct; t += grid) {
       const x = Math.round(this.xOf(t)) + 0.5;
       g.strokeStyle = t % TICKS_PER_BAR === 0 ? col("--roll-bar") : t % PPQ === 0 ? col("--roll-beat") : col("--roll-grid");
@@ -205,7 +264,14 @@ export class PianoRoll {
     g.fillStyle = col("--dim");
     g.font = "11px system-ui";
     for (let b = 0; b < ct / TICKS_PER_BAR; b++) g.fillText(String(b + 1), this.xOf(b * TICKS_PER_BAR) + 4, RULER_H / 2);
-    g.fillText(ed.velView ? "vel" : "", 6, RULER_H / 2);
+    if (this.zoomed()) {
+      // Overview: where the visible window sits in the whole clip (click the ruler to jump).
+      const ow = w - KEYS_W, s = this.scroll();
+      g.fillStyle = col("--well");
+      g.fillRect(KEYS_W, RULER_H - 4, ow, 3);
+      g.fillStyle = col("--accent");
+      g.fillRect(KEYS_W + (s / ct) * ow, RULER_H - 4, (this.viewTicks() / ct) * ow, 3);
+    }
 
     // step-input position
     if (ed.stepInput && !app.engine.playing) {
@@ -234,7 +300,7 @@ export class PianoRoll {
         g.globalAlpha = 1;
         if (ed.sel.has(n.id)) { g.strokeStyle = "#fff"; g.lineWidth = 2; roundRect(g, x + 1, y + 1, nw - 1, rowH - 2, 3); g.stroke(); }
         // the part that hangs past the clip end (it wraps when looping)
-        if (n.start + n.len > ct) { g.fillStyle = color; g.globalAlpha = 0.25; g.fillRect(KEYS_W, y + 2, (n.start + n.len - ct) * this.pxPerTick(), rowH - 4); g.globalAlpha = 1; }
+        if (n.start + n.len > ct) { g.fillStyle = color; g.globalAlpha = 0.25; g.fillRect(this.xOf(0), y + 2, (n.start + n.len - ct) * this.pxPerTick(), rowH - 4); g.globalAlpha = 1; }
       }
     }
 
@@ -269,6 +335,10 @@ export class PianoRoll {
       g.lineWidth = 2;
       g.beginPath(); g.moveTo(x, 0); g.lineTo(x, laneBottom); g.stroke();
     }
+    g.restore();
+    g.fillStyle = col("--dim");
+    g.font = "11px system-ui";
+    g.fillText(ed.velView ? "vel" : this.zoomed() ? this.zoomLabel() : "", 6, RULER_H / 2);
 
     if (ed.autoKey) this.drawAuto(g, col, w, h, color);
 
@@ -280,6 +350,7 @@ export class PianoRoll {
       g.fillStyle = col("--dim");
       g.font = "11px system-ui";
       g.fillText("Velocity", 6, y0 + 12);
+      this.clipTo(g, y0, h);
       if (clip) for (const n of clip.notes) {
         const x = this.xOf(n.start);
         const bh = (VEL_H - 10) * (n.vel / 127);
@@ -287,6 +358,7 @@ export class PianoRoll {
         g.fillRect(x + 1, h - 4 - bh, 4, bh);
         g.fillRect(x - 1, h - 4 - bh, 8, 2);
       }
+      g.restore();
     }
   }
 
@@ -308,6 +380,7 @@ export class PianoRoll {
     g.fillStyle = col("--dim");
     g.font = "11px system-ui";
     g.fillText(`${def?.label ?? key}${def ? "  " + formatParam(def, fromUnit(def, curV)) : ""}`, 6, y0 + 11);
+    this.clipTo(g, top - 6, h);
     if (!lane.length) {
       g.strokeStyle = col("--dim");
       g.setLineDash([4, 4]);
@@ -330,6 +403,7 @@ export class PianoRoll {
     // cursor column
     g.strokeStyle = ed.focus === "roll" ? col("--accent") : col("--dim");
     g.strokeRect(this.xOf(ed.tick) + 0.5, top, Math.max(3, app.grid() * this.pxPerTick()), bot - top);
+    g.restore();
   }
 
   private makeHatch(color: string): CanvasPattern | null {
@@ -355,6 +429,13 @@ export class PianoRoll {
     const r = this.canvas.getBoundingClientRect();
     const x = e.clientX - r.left, y = e.clientY - r.top;
     ed.focus = "roll";
+    if (y < RULER_H && x >= KEYS_W && this.zoomed()) {
+      const t = ((x - KEYS_W) / (this.size().w - KEYS_W)) * this.clipTicks();
+      ed.scrollTick = this.clampScroll(Math.floor((t - this.viewTicks() / 2) / PPQ) * PPQ);
+      this.lastNav = performance.now();
+      this.invalidate();
+      return;
+    }
     if (x < KEYS_W || y < RULER_H) {
       // Key column: audition the row.
       if (x < KEYS_W && y >= RULER_H) app.engine.preview(track.id, this.pitchAt(y));

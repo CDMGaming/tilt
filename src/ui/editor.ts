@@ -59,6 +59,11 @@ export class EditorScreen implements Screen {
         h("span", { class: "tb-value" }, String(clip?.bars ?? "—")),
         btn("+", null, () => this.setBars((clip?.bars ?? 1) + 1)),
         btn("Duplicate", null, () => this.duplicate(), "Double the clip, notes included (Ctrl+D)")),
+      h("div", { class: "tb-group", title: "Zoom (Ctrl + mouse wheel). Shift + wheel scrolls sideways." },
+        h("span", { class: "tb-label" }, "Zoom"),
+        btn("−", null, () => { this.roll.zoom(-1); this.render(); }),
+        h("span", { class: "tb-value zoom-value" }, this.roll.zoomLabel()),
+        btn("+", null, () => { this.roll.zoom(1); this.render(); })),
       h("div", { class: "tb-group" },
         btn("1/8", ed.grid === 48, () => this.setGrid(48)),
         btn("1/16", ed.grid === 24, () => this.setGrid(24)),
@@ -461,6 +466,11 @@ export class EditorScreen implements Screen {
         { label: "Select all", run: () => { if (clip) ed.sel = new Set(clip.notes.map((n) => n.id)); this.roll.invalidate(); }, hint: "Ctrl+A" },
         { label: "Clip length", sub: () => Array.from({ length: MAX_BARS }, (_, i) => ({ label: `${i + 1} bar${i ? "s" : ""}`, checked: (clip?.bars ?? 1) === i + 1, run: () => this.setBars(i + 1) })) },
         { label: "Duplicate clip (x2)", run: () => this.duplicate(), hint: "Ctrl+D" },
+        { label: `Zoom: ${this.roll.zoomLabel()}`, sub: () => [0, 4, 2, 1].map((b) => ({
+          label: b ? `${b} bar${b > 1 ? "s" : ""}` : "Fit the whole clip",
+          checked: (ed.viewBars || 0) === b,
+          run: () => { ed.viewBars = b; this.roll.scrollToTick(ed.tick); this.render(); },
+        })) },
         { label: "Grid", sub: () => [
           { label: "1/8", checked: ed.grid === 48, run: () => this.setGrid(48) },
           { label: "1/16", checked: ed.grid === 24, run: () => this.setGrid(24) },

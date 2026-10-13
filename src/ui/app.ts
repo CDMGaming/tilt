@@ -40,6 +40,8 @@ export interface EditorState {
   triplet: boolean;
   velView: boolean;
   autoKey: string | null; // automation lane shown under the roll
+  viewBars: number; // piano-roll zoom: bars visible (0 = the whole clip)
+  scrollTick: number; // piano-roll horizontal scroll (first visible tick)
   stepInput: boolean;
   stepTick: number;
   sel: Set<number>;
@@ -81,7 +83,7 @@ export class App {
   screenName: ScreenName = "dice";
   songCur = { row: 0, col: 0 }; // row -1 = track headers, col -1 = scene names
   ed: EditorState = {
-    trackId: 0, sceneId: 0, focus: "roll", tick: 0, pitch: 48, grid: 24, triplet: false, velView: false, autoKey: null,
+    trackId: 0, sceneId: 0, focus: "roll", tick: 0, pitch: 48, grid: 24, triplet: false, velView: false, autoKey: null, viewBars: 0, scrollTick: 0,
     stepInput: false, stepTick: 0, sel: new Set(), selAnchor: null, placing: null, grabbing: false, clipboard: [],
     octave: 3, drumPart: 0, topPitch: 72,
   };
