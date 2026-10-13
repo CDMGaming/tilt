@@ -72,9 +72,10 @@ export class Scope {
     const tap = this.app.engine.scopeTap(this.source);
     const g = this.canvas.getContext("2d")!;
     const w = this.canvas.width, ht = this.canvas.height;
-    g.fillStyle = "#07080a";
+    const css = getComputedStyle(document.documentElement);
+    g.fillStyle = css.getPropertyValue("--well").trim();
     g.fillRect(0, 0, w, ht);
-    g.strokeStyle = "#1c2a22";
+    g.strokeStyle = css.getPropertyValue("--line").trim();
     g.lineWidth = 1;
     g.beginPath();
     g.moveTo(0, ht / 2); g.lineTo(w, ht / 2);
@@ -84,7 +85,7 @@ export class Scope {
     tap.l.getFloatTimeDomainData(this.bufL);
     tap.r.getFloatTimeDomainData(this.bufR);
     const t = this.source !== null ? this.app.song.tracks.find((x) => x.id === this.source) : undefined;
-    const color = t ? TRACK_COLORS[t.color] : "#6fdc8c";
+    const color = t ? TRACK_COLORS[t.color] : css.getPropertyValue("--mint").trim();
     g.strokeStyle = color;
     g.lineWidth = 1.6;
     g.shadowColor = color;

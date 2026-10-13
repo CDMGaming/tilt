@@ -178,7 +178,7 @@ export class PianoRoll {
       // key column
       g.fillStyle = drums ? col("--roll-keys") : black ? col("--roll-key-black") : col("--roll-key-white");
       g.fillRect(0, y, KEYS_W - 2, rowH - 1);
-      g.fillStyle = drums || black ? col("--ink") : "#222";
+      g.fillStyle = drums || black ? col("--ink") : col("--roll-key-ink");
       g.font = `${Math.min(12, rowH - 3)}px system-ui`;
       g.textBaseline = "middle";
       if (drums) {
