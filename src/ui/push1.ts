@@ -9,11 +9,11 @@
 // 17 lime, 21 green, 29 turquoise, 37 sky, 45 blue, 49 orchid, 53 magenta,
 // 57 pink (+1/+2 dimmer), 1 dark, 2 grey, 3 white.
 
-import { DRUM_BASE_NOTE, INSTRUMENTS, drumCount, formatParam, fromUnit, isDrumKind, toUnit } from "../engine/instruments";
-import { TICKS_PER_BAR, type Track } from "../engine/model";
+import { DRUM_BASE_NOTE, INSTRUMENTS, drumCount, drumPartName, formatParam, fromUnit, isDrumKind, presetParams, toUnit } from "../engine/instruments";
+import { MAX_BARS, TICKS_PER_BAR, type Track } from "../engine/model";
 import { NOTE_NAMES, inScale, scaleById } from "../engine/music";
 import { getParam, paramInfo } from "../engine/params";
-import { addNote, duplicateClip, ensureClip, quantizeClip } from "../engine/songops";
+import { addNote, duplicateClip, ensureClip, quantizeClip, setClipBars } from "../engine/songops";
 import type { App } from "./app";
 import { fmtTime } from "./dom";
 import { trackColor } from "./theme";
@@ -51,6 +51,8 @@ export function pushColor(hex: string, level = 0): number {
 export class Push1Surface {
   mode: "session" | "note" = "session";
   page: Page = "Macros";
+  /** Which of the selected instrument's parameter pages the encoders show (Device page). */
+  private devPage = 0;
   private shift = false;
   private del = false;
   private sceneOffset = 0;
@@ -100,7 +102,49 @@ export class Push1Surface {
     if (!t) return Array(8).fill(null);
     if (this.page === "Mixer") return Array.from({ length: 8 }, (_, i) => (this.app.song.tracks[i] ? [this.app.song.tracks[i], this.shift ? "mix:pan" : "mix:vol"] : null));
     if (this.page === "FX") return ["fx0:a", "fx0:b", "fx1:a", "fx1:b", "fx2:a", "fx2:b", "mix:send", "mix:pan"].map((k) => (paramInfo(t, k) && (k.startsWith("mix") || t.fx[Number(k[2])].type !== "off") ? [t, k] : null));
-    return INSTRUMENTS[t.kind].macros.map((k) => [t, k]);
+    const pg = this.devPages()[this.devPage] ?? this.devPages()[0];
+    return Array.from({ length: 8 }, (_, i) => (pg.keys[i] && paramInfo(t, pg.keys[i]) ? [t, pg.keys[i]] : null));
+  }
+
+  /**
+   * The selected instrument's parameter pages: its 8 macros first, then every
+   * parameter. Drum machines get a page per part (Kitbox / Grab: the selected pad,
+   * Thump Lab: Kick, Snare, Tom, Perc), everything else pages of 8.
+   */
+  devPages(): { name: string; keys: string[] }[] {
+    const t = this.track();
+    if (!t) return [{ name: "Macros", keys: [] }];
+    const def = INSTRUMENTS[t.kind];
+    const pages = [{ name: def.name, keys: def.macros }];
+    const groups = new Map<string, string[]>(), rest: string[] = [];
+    let perPad = false;
+    for (const p of def.params) {
+      if (/^p\d+[a-z]/.test(p.id)) { perPad = true; continue; }
+      const m = def.partNames ? /^([a-z])[A-Z]/.exec(p.id) : null;
+      if (m) { if (!groups.has(m[1])) groups.set(m[1], []); groups.get(m[1])!.push(p.id); continue; }
+      rest.push(p.id);
+    }
+    if (perPad) {
+      const part = this.app.ed.drumPart, re = new RegExp(`^p${part}[a-z]`);
+      pages.push({ name: drumPartName(t.params, part, t.kind), keys: def.params.filter((p) => re.test(p.id)).map((p) => p.id) });
+    }
+    [...groups.values()].forEach((keys, i) => pages.push({ name: def.partNames?.[i] ?? `Part ${i + 1}`, keys }));
+    const chunks = Math.ceil(rest.length / 8);
+    for (let i = 0; i < chunks; i++) {
+      pages.push({ name: def.drumParts ? (chunks > 1 ? `Main ${i + 1}` : "Main") : `Params ${i + 1}`, keys: rest.slice(i * 8, i * 8 + 8) });
+    }
+    return pages.slice(0, 8);
+  }
+
+  private pickDevPage(i: number) {
+    const pages = this.devPages();
+    if (i >= pages.length) return;
+    const t = this.track();
+    // Pressing the per-pad page again steps to the next pad.
+    if (i === this.devPage && t && i === 1 && INSTRUMENTS[t.kind].params.some((p) => /^p\d+[a-z]/.test(p.id))) {
+      this.app.ed.drumPart = (this.app.ed.drumPart + 1) % drumCount(t.kind);
+    }
+    this.devPage = i;
   }
 
   // ------------------------------------------------------------ input
@@ -110,17 +154,27 @@ export class Push1Surface {
     const st = d[0] & 0xf0;
     if (st === 0x90 || st === 0x80) {
       const note = d[1], on = st === 0x90 && d[2] > 0;
+      // Encoder touch (notes 0..7): hold Delete and touch a knob to put it back to the preset's value.
+      if (note < 8) { if (on && this.del) this.resetSlot(note); return; }
       if (note >= 36 && note <= 99) { if (on) this.padDown(note, d[2], time); else this.padUp(note, time); }
       return;
     }
     if (st !== 0xb0) return;
     const cc = d[1], val = d[2], rel = val < 64 ? val : val - 128, pressed = val > 0;
-    if (cc >= 71 && cc <= 78) { this.turn(cc - 71, rel); return; }
+    if (cc >= 71 && cc <= 78) { if (this.del) this.resetSlot(cc - 71); else this.turn(cc - 71, rel); return; }
     if (cc === BTN.tempo) { this.stepped("tempo", rel, 1, (dir) => this.app.edit("Tempo", () => (this.app.song.tempo = Math.max(40, Math.min(250, this.app.song.tempo + dir))), { render: false })); this.app.renderHeader(); return; }
     if (cc === BTN.swing) { this.stepped("swing", rel, 2, (dir) => this.app.edit("Swing", () => (this.app.song.swing = Math.max(0, Math.min(100, this.app.song.swing + dir * 5))), { render: false })); return; }
     if (cc === BTN.master) { const m = this.app.song.master; this.app.setMaster("volume", Math.max(0, Math.min(1, m.volume + rel / 200))); return; }
-    if (cc >= 20 && cc <= 27) { if (pressed && cc - 20 < PAGES.length) this.page = PAGES[cc - 20]; return; }
-    if (cc >= 102 && cc <= 109) { if (pressed) this.resetSlot(cc - 102); return; }
+    // Row under the display: the instrument's parameter pages (Device) or the tracks (Mixer).
+    if (cc >= 20 && cc <= 27) {
+      if (!pressed) return;
+      if (this.page === "Macros") this.pickDevPage(cc - 20);
+      else { const t = this.app.song.tracks[cc - 20]; if (t) { this.app.ed.trackId = t.id; this.selPitch = null; } }
+      this.app.screens[this.app.screenName]?.render();
+      return;
+    }
+    // Second row: Device / Mixer / FX.
+    if (cc >= 102 && cc <= 109) { if (pressed && cc - 102 < PAGES.length) this.page = PAGES[cc - 102]; return; }
     if (cc >= 36 && cc <= 43) { if (pressed) this.launchScene(this.sceneOffset + (43 - cc)); return; }
     if (!pressed && cc !== BTN.shift && cc !== BTN.del) return;
     const app = this.app;
@@ -150,15 +204,19 @@ export class Push1Surface {
       case BTN.volume: this.page = "Mixer"; break;
       case BTN.panSend: this.page = "FX"; break;
       case BTN.left: case BTN.right: {
+        // Left / right: previous / next instrument. Shift: step page (note mode).
         const d = cc === BTN.left ? -1 : 1;
-        if (this.mode === "note" && !this.shift) this.stepPage = Math.max(0, Math.min(this.stepPages() - 1, this.stepPage + d));
+        if (this.shift && this.mode === "note") this.stepPage = Math.max(0, Math.min(this.stepPages() - 1, this.stepPage + d));
         else this.selectTrack(d);
         break;
       }
       case BTN.up: case BTN.down: {
-        const d = cc === BTN.up ? -1 : 1;
-        if (this.mode === "session") this.sceneOffset = Math.max(0, Math.min(Math.max(0, app.song.scenes.length - 8), this.sceneOffset + d));
-        else this.selectScene(d);
+        // Up / down: add / remove a bar of the selected clip. Shift: scroll scenes / pick scene.
+        if (this.shift) {
+          const d = cc === BTN.up ? -1 : 1;
+          if (this.mode === "session") this.sceneOffset = Math.max(0, Math.min(Math.max(0, app.song.scenes.length - 8), this.sceneOffset + d));
+          else this.selectScene(d);
+        } else this.changeBars(cc === BTN.up ? 1 : -1);
         break;
       }
     }
@@ -168,7 +226,23 @@ export class Push1Surface {
   private selectTrack(d: number) {
     const ts = this.app.song.tracks, i = ts.findIndex((t) => t.id === this.app.ed.trackId);
     const n = ts[(i + d + ts.length) % ts.length];
-    if (n) { this.app.ed.trackId = n.id; this.selPitch = null; this.stepPage = 0; }
+    if (!n) return;
+    this.app.ed.trackId = n.id;
+    this.app.songCur.col = ts.indexOf(n);
+    this.selPitch = null;
+    this.stepPage = 0;
+    this.devPage = Math.min(this.devPage, this.devPages().length - 1);
+  }
+
+  private changeBars(d: number) {
+    const app = this.app, t = this.track();
+    if (!t) return;
+    const clip = ensureClip(app.song, t, this.sceneId());
+    const bars = Math.max(1, Math.min(MAX_BARS, clip.bars + d));
+    if (bars === clip.bars) { app.overlays.toast(d > 0 ? `Clips are ${MAX_BARS} bars max` : "1 bar is the shortest"); return; }
+    app.edit("Clip length", () => setClipBars(clip, bars));
+    this.stepPage = Math.min(this.stepPage, this.stepPages() - 1);
+    app.overlays.toast(`${INSTRUMENTS[t.kind].name}: ${bars} bar${bars > 1 ? "s" : ""}`, 1200);
   }
 
   private selectScene(d: number) {
@@ -216,7 +290,10 @@ export class Push1Surface {
     if (!slot) return;
     const [t, key] = slot;
     const p = paramInfo(t, key);
-    if (p) this.app.setParam(t, key, p.def, true);
+    if (!p) return;
+    const pi = INSTRUMENTS[t.kind].presets.findIndex((x) => x.name === t.preset);
+    const v = pi >= 0 && INSTRUMENTS[t.kind].params.some((q) => q.id === key) ? presetParams(t.kind, pi)[key] : p.def;
+    this.app.setParam(t, key, v, true);
   }
 
   // ---- pads
@@ -270,7 +347,9 @@ export class Push1Surface {
       app.ed.trackId = t.id;
       app.songCur = { row: si, col: this.col(idx) };
       if (this.del) { if (t.clips[s.id]) app.edit("Clear clip", () => delete t.clips[s.id]); return; }
-      this.launchScene(si);
+      // A pad selects that clip; Shift + pad (or the scene buttons) launches.
+      if (this.shift) this.launchScene(si);
+      else { app.ed.sceneId = s.id; this.selPitch = null; this.stepPage = 0; this.devPage = Math.min(this.devPage, this.devPages().length - 1); app.refresh(); }
       return;
     }
     const step = this.stepOf(idx);
@@ -401,9 +480,15 @@ export class Push1Surface {
 
   private renderButtons() {
     const app = this.app, pos = app.engine.position();
-    PAGES.forEach((p, i) => this.led("c", 20 + i, p === this.page ? 16 : 13)); // yellow / half
-    for (let i = PAGES.length; i < 8; i++) this.led("c", 20 + i, 0);
-    this.slots().forEach((s, i) => this.led("c", 102 + i, s ? pushColor(trackColor(s[0]), 2) : 0));
+    // Row 1 (CC 20..27): parameter pages, or tracks on the Mixer page. Upper-row LEDs are red/amber/yellow/green.
+    if (this.page === "Macros") {
+      const n = this.devPages().length;
+      for (let i = 0; i < 8; i++) this.led("c", 20 + i, i >= n ? 0 : i === this.devPage ? 16 : 13); // yellow / dim yellow
+    } else if (this.page === "Mixer") {
+      for (let i = 0; i < 8; i++) { const t = app.song.tracks[i]; this.led("c", 20 + i, !t ? 0 : t.id === app.ed.trackId ? 22 : 19); } // green / dim green
+    } else for (let i = 0; i < 8; i++) this.led("c", 20 + i, 0);
+    // Row 2 (CC 102..109): Device / Mixer / FX.
+    for (let i = 0; i < 8; i++) this.led("c", 102 + i, i >= PAGES.length ? 0 : PAGES[i] === this.page ? pushColor("#4fd8ff", 0) : pushColor("#4fd8ff", 2));
     for (let k = 0; k < 8; k++) {
       const s = app.song.scenes[this.sceneOffset + k];
       this.led("c", 43 - k, !s ? 0 : pos?.sceneId === s.id ? 22 : s.id === app.ed.sceneId ? 16 : 13); // green playing, yellow selected
@@ -477,14 +562,26 @@ export class Push1Surface {
     const timer = app.timer.running ? `T ${fmtTime(app.timeLeft())}` : app.timer.done ? "TIME UP" : "no timer";
     const state = app.recording ? "REC" : app.engine.playing ? "PLAY" : "STOP";
     const head = this.page === "Mixer" ? "MIXER" : t ? `${INSTRUMENTS[t.kind].name}` : "";
+    const bars = t?.clips[this.sceneId()]?.bars ?? 1;
+    const barsTxt = `${bars} bar${bars > 1 ? "s" : ""}${this.mode === "note" && this.stepPages() > 1 ? ` p${this.stepPage + 1}` : ""}`;
+    const bpm = `${app.engine.externalTempo ?? app.song.tempo} bpm`;
+    let bottom: string[];
+    if (this.page === "Macros") {
+      // The page tabs sit over the buttons that pick them; spare columns keep the essentials.
+      const tabs = this.devPages().map((p) => p.name); // the lit button marks the current one
+      const extra = [timer, t ? t.preset : "", barsTxt, bpm, state].slice(0, 8 - tabs.length);
+      bottom = [...tabs, ...extra.reverse()];
+    } else {
+      bottom = [
+        head, t ? t.preset : "", scene ? scene.name : "", barsTxt,
+        `${NOTE_NAMES[app.song.key]} ${scaleById(app.song.scale).name}`.slice(0, 9), bpm, state, timer,
+      ];
+    }
     return [
       this.columns(slots.map(label)),
       this.columns(slots.map(value)),
       slots.map((s, i) => bar(s, COLS[i + 1] - COLS[i])).join(""),
-      this.columns([
-        head, t ? t.preset : "", scene ? scene.name : "", this.mode === "note" ? `NOTE p${this.stepPage + 1}` : "SESSION",
-        `${NOTE_NAMES[app.song.key]} ${scaleById(app.song.scale).name}`.slice(0, 9), `${app.engine.externalTempo ?? app.song.tempo} bpm`, state, timer,
-      ]),
+      this.columns(bottom),
     ];
   }
 
