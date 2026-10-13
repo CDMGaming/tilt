@@ -296,32 +296,6 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .key.down, .key:active { background: var(--track); color: var(--key-ink); transform: translateY(2px); box-shadow: inset 0 -1px 0 #00000022, 0 0 12px color-mix(in srgb, var(--track) 45%, transparent); }
 .keyboard.chromatic .key { min-width: 0; }
 
-/* Kitbox: charcoal box, orange rubber pads */
-.panel.kind-drums .panel-body { background: linear-gradient(180deg, #24201d, #1a1715); border: 1px solid #3d3129; --knob: #ff7a45; flex-direction: row; gap: 18px; flex-wrap: wrap; }
-.panel.kind-drums .inst-name { color: #ff9c6b; }
-.pads { display: grid; grid-template-columns: repeat(4, 84px); grid-template-rows: repeat(2, 72px); gap: 8px; }
-.pad { background: linear-gradient(180deg, #3b2a20, #2a1e17); border: 2px solid #4d3628; border-radius: 12px; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: 6px 8px; touch-action: none; }
-.pad.selected { border-color: #ff7a45; }
-.pad:active, .pad.down { background: #ff7a45; color: #1a0d05; }
-.pad-num { font-size: 11px; opacity: .6; }
-.pad-label { font-weight: 800; }
-.pad-smp { font-size: 10px; opacity: .65; }
-.part-edit { display: flex; flex-direction: column; gap: 6px; }
-
-/* Squelch: brushed metal, lime LCD accents */
-.panel.kind-acid .panel-body { background: linear-gradient(180deg, #c9cdd3, #a7acb4); color: #17181b; border: 1px solid #e3e6ea; --knob: #4e7d00; --knob-dot: #17181b; }
-.panel.kind-acid .inst-name { color: #c6ff4d; text-shadow: 0 0 8px #c6ff4d55; }
-.panel.kind-acid .switch { background: #2a2c30; color: #c6ff4d; border-color: #111; }
-.panel.kind-acid .switch.on { background: #c6ff4d; color: #111; }
-.panel.kind-acid .knob-track { stroke: #00000030; }
-.panel.kind-acid .section-title { color: #3c3f45; }
-
-/* Chordette: deep violet, pink/cyan glow */
-.panel.kind-poly .panel-body { background: linear-gradient(180deg, #2b1840, #1d1029); border: 1px solid #4a2a6b; --knob: #ff7ad9; }
-.panel.kind-poly .inst-name { color: #d9a6ff; }
-.panel.kind-poly .switch.on { background: #c77dff; border-color: #c77dff; color: #1a0b28; }
-.panel.kind-poly .key small { color: #8a3fd0; }
-
 /* ---------------------------------------------------------------- shortcut overlay */
 .shortcut { background: var(--panel); border-radius: 14px; padding: 10px 16px 16px; max-width: 94vw; max-height: 90vh; overflow: auto; }
 .sc-grid { display: grid; gap: 4px; margin-top: 4px; }
@@ -366,36 +340,6 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
   font: 900 160px/1 "Segoe UI", system-ui, sans-serif; color: var(--rec); text-shadow: 0 6px 40px var(--shadow); }
 .count-in.pop { animation: countpop .35s ease-out; }
 @keyframes countpop { from { transform: translate(-50%, -50%) scale(1.35); opacity: .4; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
-
-
-/* Thump Lab: cream vintage box, coloured module stripes */
-.panel.kind-analog .panel-body { background: linear-gradient(180deg, #e9e0cc, #d4c8ad); color: #241d12; border: 1px solid #f4ecd9; --knob: #3a2f1e; --knob-dot: #241d12; flex-direction: row; flex-wrap: wrap; gap: 14px; }
-.panel.kind-analog .inst-name { color: #f0d9a8; }
-.panel.kind-analog .knob-track { stroke: #00000025; }
-.pads.four { grid-template-columns: repeat(2, 84px); grid-template-rows: repeat(2, 72px); }
-.panel.kind-analog .pad { background: linear-gradient(180deg, #4a3f2c, #2f281c); color: #f4ecd9; border-color: #6b5b3d; }
-.panel.kind-analog .pad.selected, .panel.kind-analog .pad:active { border-color: #e2582c; }
-.modules { display: flex; gap: 8px; flex-wrap: wrap; }
-.module { display: flex; gap: 2px; align-items: flex-end; flex-wrap: wrap; max-width: 300px; padding: 6px 8px 4px; border-radius: 10px; background: #ffffff55; border-top: 5px solid var(--mod); }
-.module.m0 { --mod: #e2582c; } .module.m1 { --mod: #e8b52e; } .module.m2 { --mod: #3f7fbf; } .module.m3 { --mod: #4f9a5a; }
-.module-title { width: 100%; font-weight: 900; letter-spacing: .1em; font-size: 12px; text-transform: uppercase; }
-.panel.kind-analog .switch { background: #2f281c; color: #f4ecd9; }
-
-/* Razor: black blade, hot orange edge */
-.panel.kind-lead .panel-body { background: linear-gradient(160deg, #141317, #0a0a0c); border: 1px solid #ff5a1f55; box-shadow: inset 0 0 0 1px #00000080, 0 0 18px #ff5a1f22; --knob: #ff5a1f; }
-.panel.kind-lead .inst-name { color: #ff7a3d; font-style: italic; }
-.panel.kind-lead .switch.on { background: #ff5a1f; border-color: #ff5a1f; color: #160600; }
-
-/* Wobbler: deep navy, cyan and magenta */
-.panel.kind-wobble .panel-body { background: linear-gradient(180deg, #0f1a33, #0a1022); border: 1px solid #23406e; --knob: #38e0ff; }
-.panel.kind-wobble .inst-name { color: #ff4fd8; text-shadow: 0 0 10px #ff4fd855; }
-.panel.kind-wobble .knob.size-l { --knob: #ff4fd8; }
-
-/* Haze: dusk pastel */
-.panel.kind-pad .panel-body { background: linear-gradient(160deg, #3b2a4f, #5a3a5c 55%, #7a4a50); border: 1px solid #a07aa0; --knob: #ffd1e6; }
-.panel.kind-pad .inst-name { color: #ffc8e0; }
-.panel.kind-pad .key small { color: #8a3f80; }
-
 
 
 .preset-save { font-size: 12px; padding: 6px 10px; }
@@ -455,3 +399,40 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
   * { transition-duration: 0s !important; animation-duration: 0s !important; }
   button:active:not(:disabled), .key.down, .key:active { transform: none; }
 }
+
+/* ---------------------------------------------------------------- instrument panels: one chassis
+   Every instrument shares the faceplate; identity comes from its colour (--track)
+   on the header strip, knob arcs and lit switches, plus one small cue each. */
+.panel { --knob: var(--track); }
+.panel .inst-name { color: var(--track); }
+.panel-body { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--track); box-shadow: inset 0 1px 0 var(--bevel-hi); }
+.panel .switch.on { background: color-mix(in srgb, var(--track) 18%, var(--raise)); border-color: var(--track); color: var(--ink);
+  box-shadow: inset 0 1px 0 var(--bevel-hi), 0 2px 0 var(--bevel-lo), 0 0 10px color-mix(in srgb, var(--track) 25%, transparent); }
+.panel .switch.on .switch-value { color: var(--track); }
+.panel .switch.on::before { background: var(--track); box-shadow: 0 0 6px var(--track); }
+.panel .key small { color: var(--key-chord); }
+
+/* drum machines lay out side by side: pads, then the editor */
+.panel.kind-drums .panel-body, .panel.kind-analog .panel-body { flex-direction: row; flex-wrap: wrap; gap: 16px; }
+.pads { display: grid; grid-template-columns: repeat(4, 84px); grid-template-rows: repeat(2, 72px); gap: 8px; }
+.pads.four { grid-template-columns: repeat(2, 84px); grid-template-rows: repeat(2, 72px); }
+.pad { background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-m); display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between;
+  padding: 6px 8px; touch-action: none; box-shadow: inset 0 1px 0 var(--bevel-hi), 0 3px 0 var(--bevel-lo); transition: background-color var(--t-fast), transform var(--t-fast), box-shadow var(--t-med); }
+.pad.selected { border-color: var(--track); box-shadow: inset 0 0 0 1px var(--track), inset 0 1px 0 var(--bevel-hi), 0 3px 0 var(--bevel-lo); }
+.pad:active, .pad.down, .pad.hit { background: var(--track); color: var(--key-ink); transform: translateY(3px);
+  box-shadow: 0 0 0 var(--bevel-lo), 0 0 18px color-mix(in srgb, var(--track) 55%, transparent); transition-duration: 0s; }
+.pad-num { font-size: 11px; opacity: .6; }
+.pad-label { font-weight: 800; }
+.pad-smp { font-size: 10px; opacity: .65; }
+.part-edit { display: flex; flex-direction: column; gap: 6px; }
+
+/* Thump Lab: one stripe colour per module */
+.modules { display: flex; gap: 8px; flex-wrap: wrap; }
+.module { display: flex; gap: 2px; align-items: flex-end; flex-wrap: wrap; max-width: 300px; padding: 6px 8px 4px; border-radius: var(--r-m); background: var(--well); border-top: 3px solid var(--mod); }
+.module.m0 { --mod: var(--coral); } .module.m1 { --mod: var(--purple); } .module.m2 { --mod: var(--inst-poly); } .module.m3 { --mod: var(--inst-acid); }
+.module-title { width: 100%; font-weight: 900; letter-spacing: .1em; font-size: 12px; text-transform: uppercase; color: var(--mod); }
+
+/* small identity cues */
+.panel.kind-lead .inst-name { font-style: italic; }
+.panel.kind-wobble .inst-name { text-shadow: 0 0 10px color-mix(in srgb, var(--track) 60%, transparent); }
+.panel.kind-acid .knob-value { color: var(--track); }

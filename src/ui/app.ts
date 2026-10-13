@@ -399,11 +399,22 @@ export class App {
   noteInput(pitch: number, vel: number, on: boolean, perfMs = performance.now(), trackOverride?: Track) {
     const track = trackOverride ?? this.selectedTrack();
     if (!track) return;
-    if (on) this.engine.noteOn(track.id, pitch, vel);
+    if (on) { this.engine.noteOn(track.id, pitch, vel); this.flashPad(track, pitch); }
     else this.engine.noteOff(track.id, pitch);
     if (this.screenName !== "edit" || track.id !== this.ed.trackId || this.locked) return;
     if (this.recording && this.engine.playing) this.recordNote(pitch, vel, on, perfMs);
     else if (this.ed.stepInput && !this.engine.playing) this.stepNote(track, pitch, vel, on);
+  }
+
+  /** Light the matching pad on the open drum panel for a moment. */
+  private flashPad(track: Track, pitch: number) {
+    if (this.screenName !== "edit" || track.id !== this.ed.trackId || !isDrumKind(track.kind)) return;
+    const el = document.querySelector<HTMLElement>(`.panel .pad[data-note="${pitch}"]`);
+    if (!el) return;
+    el.classList.remove("hit");
+    void el.offsetWidth;
+    el.classList.add("hit");
+    setTimeout(() => el.classList.remove("hit"), 120);
   }
 
   private stepNote(track: Track, pitch: number, vel: number, on: boolean) {
