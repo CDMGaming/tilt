@@ -351,3 +351,10 @@ button.on { background: var(--accent); color: var(--accent-ink); border-color: v
 [data-param].learned::after { content: "MIDI"; position: absolute; font: 700 8px system-ui; background: #4a8cff; color: #fff; padding: 0 3px; border-radius: 3px; margin-top: -4px; }
 .knob, .switch, .fader { position: relative; }
 [data-param].learn-target { outline: 3px solid #4a8cff !important; outline-offset: 2px; }
+
+/* clip drag and drop */
+.drag-ghost { position: fixed; z-index: 95; pointer-events: none; background: var(--panel); border: 2px solid var(--track); border-radius: 8px;
+  padding: 6px 10px; font-weight: 700; font-size: 13px; box-shadow: 0 8px 24px #000a; }
+.cell.drop-target { outline: 3px dashed var(--accent); outline-offset: 2px; }
+.cell.carry-src { outline: 3px dashed var(--accent); opacity: .7; }
+.song-grid .cell:not(.empty) { cursor: grab; }

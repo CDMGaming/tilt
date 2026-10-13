@@ -2,8 +2,8 @@
 
 import { canArrange, autoArrange } from "../engine/arranger";
 import { pickPreset, usedPresets } from "../engine/dice";
-import { ALL_KINDS, INSTRUMENTS } from "../engine/instruments";
-import { MAX_BARS, TICKS_PER_BAR, type Clip, type Scene, type Track } from "../engine/model";
+import { ALL_KINDS, INSTRUMENTS, isDrumKind } from "../engine/instruments";
+import { MAX_BARS, TICKS_PER_BAR, newId, type Clip, type Scene, type Track } from "../engine/model";
 import {
   SCENE_NAMES, addScene, changeInstrument, deleteScene, deleteTrack, duplicateClip, duplicateScene,
   duplicateTrack, ensureClip, insertBlankScene, loadPreset, presetIndex, setClipBars,
@@ -18,6 +18,8 @@ export class SongScreen implements Screen {
   el = h("div", { class: "song-screen" });
   private grid = h("div", { class: "song-grid" });
   private clipboard: Clip | null = null;
+  /** A clip picked up with "Move / copy to…" (controller-friendly drag and drop). */
+  private carry: { trackId: number; sceneId: number } | null = null;
 
   constructor(private app: App) {
     this.el.appendChild(this.grid);
@@ -84,8 +86,13 @@ export class SongScreen implements Screen {
 
   private cell(t: Track, s: Scene): HTMLElement {
     const clip = t.clips[s.id];
-    const el = h("div", { class: "cell" + (clip ? "" : " empty") + (clip?.muted ? " muted" : ""), style: `--track:${TRACK_COLORS[t.color]}`, "data-scene": s.id });
+    const carrying = this.carry && this.carry.trackId === t.id && this.carry.sceneId === s.id;
+    const el = h("div", {
+      class: "cell" + (clip ? "" : " empty") + (clip?.muted ? " muted" : "") + (carrying ? " carry-src" : ""),
+      style: `--track:${TRACK_COLORS[t.color]}`, "data-scene": s.id, "data-track": t.id,
+    });
     if (!clip) return el;
+    el.addEventListener("pointerdown", (e) => { if (e.button === 0) this.startDrag(e, t, s); });
     const cv = h("canvas", { class: "cell-preview" });
     el.append(cv, h("span", { class: "cell-bars" }, `${clip.bars}`));
     requestAnimationFrame(() => drawPreview(cv, clip, t));
@@ -124,9 +131,21 @@ export class SongScreen implements Screen {
         this.render();
         return true;
       }
-      case "confirm": this.activate(); return true;
+      case "confirm": {
+        // Carrying a clip (controller move/copy): A on a cell drops it there.
+        const t = this.curTrack(), s = this.curScene();
+        if (this.carry && t && s) {
+          const r = this.grid.querySelector(".cursor")?.getBoundingClientRect();
+          this.dropMenu(this.carry, { trackId: t.id, sceneId: s.id }, r ? { x: r.left + 20, y: r.bottom - 8 } : undefined);
+          return true;
+        }
+        this.activate();
+        return true;
+      }
       case "menu": this.openMenu(); return true;
-      case "back": return false;
+      case "back":
+        if (this.carry) { this.carry = null; this.render(); app.overlays.toast("Move cancelled", 800); return true; }
+        return false;
       case "copy": { const c = this.curClip(); if (c) { this.clipboard = JSON.parse(JSON.stringify(c)); app.overlays.toast("Clip copied", 800); } return true; }
       case "paste": this.pasteClip(); return true;
       case "duplicate": { const c = this.curClip(); if (c) app.edit("Duplicate clip", () => duplicateClip(song, c)); return true; }
@@ -189,6 +208,69 @@ export class SongScreen implements Screen {
   private deleteAtCursor() {
     const app = this.app, t = this.curTrack(), s = this.curScene();
     if (t && s && t.clips[s.id]) app.edit("Clear clip", () => delete t.clips[s.id]);
+  }
+
+  // ------------------------------------------------------------ drag and drop
+
+  /** Mouse drag of a clip cell: a ghost follows the pointer; dropping on another cell asks what to do. */
+  private startDrag(e: PointerEvent, t: Track, s: Scene) {
+    const x0 = e.clientX, y0 = e.clientY;
+    let ghost: HTMLElement | null = null;
+    let over: HTMLElement | null = null;
+    const target = (ev: PointerEvent) => (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>(".cell[data-track]") ?? null;
+    const move = (ev: PointerEvent) => {
+      if (!ghost) {
+        if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
+        ghost = h("div", { class: "drag-ghost", style: `--track:${TRACK_COLORS[t.color]}` }, `${INSTRUMENTS[t.kind].name} · ${s.name}`);
+        document.body.appendChild(ghost);
+      }
+      ghost.style.left = `${ev.clientX + 12}px`;
+      ghost.style.top = `${ev.clientY + 12}px`;
+      const tgt = target(ev);
+      if (tgt !== over) { over?.classList.remove("drop-target"); over = tgt; over?.classList.add("drop-target"); }
+    };
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      over?.classList.remove("drop-target");
+      if (!ghost) return; // a plain click
+      ghost.remove();
+      const tgt = target(ev);
+      if (!tgt) return;
+      const dst = { trackId: Number(tgt.dataset.track), sceneId: Number(tgt.dataset.scene) };
+      if (dst.trackId === t.id && dst.sceneId === s.id) return;
+      this.dropMenu({ trackId: t.id, sceneId: s.id }, dst, { x: ev.clientX, y: ev.clientY });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  /** Ask: move / copy (or replace / swap when the target already has a clip). */
+  private dropMenu(src: { trackId: number; sceneId: number }, dst: { trackId: number; sceneId: number }, at?: { x: number; y: number }) {
+    const app = this.app, song = app.song;
+    const st = song.tracks.find((x) => x.id === src.trackId), dt = song.tracks.find((x) => x.id === dst.trackId);
+    const ss = song.scenes.find((x) => x.id === src.sceneId), ds = song.scenes.find((x) => x.id === dst.sceneId);
+    const done = () => { this.carry = null; this.render(); };
+    if (!st || !dt || !ss || !ds || !st.clips[ss.id]) { done(); return; }
+    if (st.id === dt.id && ss.id === ds.id) { done(); return; }
+    const occupied = !!dt.clips[ds.id];
+    const clone = () => {
+      const c = JSON.parse(JSON.stringify(st.clips[ss.id])) as Clip;
+      for (const n of c.notes) n.id = newId(song); // fresh note ids in the copy
+      return c;
+    };
+    const mismatch = isDrumKind(st.kind) !== isDrumKind(dt.kind);
+    const where = `${INSTRUMENTS[dt.kind].name} · ${ds.name}`;
+    app.overlays.menu(`${INSTRUMENTS[st.kind].name} · ${ss.name} → ${where}${mismatch ? " (different instrument type!)" : ""}`, () => [
+      { label: occupied ? "Move here (replace)" : "Move here", run: () => { app.edit("Move clip", () => { dt.clips[ds.id] = st.clips[ss.id]; delete st.clips[ss.id]; }); app.songCur = this.cellPos(dt, ds); done(); } },
+      { label: occupied ? "Copy here (replace)" : "Copy here", run: () => { app.edit("Copy clip", () => { dt.clips[ds.id] = clone(); }); app.songCur = this.cellPos(dt, ds); done(); } },
+      ...(occupied ? [{ label: "Swap the two clips", run: () => { app.edit("Swap clips", () => { const a = st.clips[ss.id]; st.clips[ss.id] = dt.clips[ds.id]; dt.clips[ds.id] = a; }); done(); } }] : []),
+      { label: "Cancel", run: done },
+    ], at);
+  }
+
+  private cellPos(t: Track, s: Scene) {
+    return { row: this.app.song.scenes.indexOf(s), col: this.app.song.tracks.indexOf(t) };
   }
 
   // ------------------------------------------------------------ menus
@@ -254,6 +336,7 @@ export class SongScreen implements Screen {
     const clip = t.clips[s.id];
     return [
       { label: "Edit clip", run: () => this.openEditor(t, s, "roll") },
+      { label: "Move / copy to…", disabled: !clip, run: () => { this.carry = { trackId: t.id, sceneId: s.id }; this.render(); app.overlays.toast("Pick a cell and press A (or Enter). B cancels.", 2500); } },
       { label: "Duplicate (x2 length)", disabled: !clip || clip.bars * 2 > MAX_BARS, run: () => app.edit("Duplicate clip", () => duplicateClip(song, clip!)) },
       { label: "Clip length", sub: () => Array.from({ length: MAX_BARS }, (_, i) => ({ label: `${i + 1} bar${i ? "s" : ""}`, checked: clip?.bars === i + 1, run: () => app.edit("Clip length", () => setClipBars(ensureClip(song, t, s.id), i + 1)) })) },
       { label: "Mute clip", disabled: !clip, checked: !!clip?.muted, keepOpen: true, run: () => app.edit("Mute clip", () => (clip!.muted = !clip!.muted)) },

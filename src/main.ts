@@ -8,6 +8,7 @@ import { openShortcut } from "./ui/shortcut";
 import { SongScreen } from "./ui/song";
 import { MixerScreen } from "./ui/mixer";
 import { bindTopbar } from "./ui/topbar";
+import { bindRightClick } from "./ui/rightclick";
 
 const root = document.getElementById("app")!;
 const app = new App(root);
@@ -16,6 +17,7 @@ app.screens.song = new SongScreen(app);
 app.screens.edit = new EditorScreen(app);
 app.screens.mix = new MixerScreen(app);
 bindTopbar(app, app.headerEl);
+bindRightClick(app);
 app.openSystemMenu = () => systemMenu(app, () => { app.engine.stop(); app.show("dice"); });
 app.songSettings = () => songSettings(app);
 app.onTimeUp = () => timeUpDialog(app);
