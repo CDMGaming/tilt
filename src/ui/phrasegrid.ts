@@ -7,7 +7,8 @@ import { NOTE_NAMES, scaleById } from "../engine/music";
 import { ROLES, ROLE_NAMES, makeGrid, mapDrumPart, seedFrom, type Phrase, type Role } from "../engine/phrases";
 import { addNote, addTrack } from "../engine/songops";
 import type { App } from "./app";
-import { h, TRACK_COLORS } from "./dom";
+import { h } from "./dom";
+import { trackColor } from "./theme";
 
 const GROUP_FOR: Record<Role, InstrumentDef["group"][]> = {
   drums: ["drums"], bass: ["bass"], chords: ["harmony"], lead: ["lead"], arp: ["harmony", "lead"],
@@ -99,7 +100,7 @@ export function phraseGridDialog(app: App, opts: { sceneId?: number; onDone: () 
         ROLES.map((role) => {
           const t = targets[role];
           const [nk] = NEW_FOR[role];
-          return h("div", { class: "pg-head", style: t ? `--track:${TRACK_COLORS[t.color]}` : "" },
+          return h("div", { class: "pg-head", style: t ? `--track:${trackColor(t)}` : "" },
             h("div", { class: "pg-role" }, ROLE_NAMES[role]),
             h("div", { class: "pg-target" }, t ? `→ ${app.song.tracks.indexOf(t) + 1} ${INSTRUMENTS[t.kind].name}` : `+ adds ${INSTRUMENTS[nk].name}`));
         }),

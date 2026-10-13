@@ -6,7 +6,8 @@ import type { Master, Track } from "../engine/model";
 import { FX_TYPES, fxDef, getParam, paramInfo } from "../engine/params";
 import type { Action } from "./actions";
 import type { App, Screen } from "./app";
-import { h, TRACK_COLORS } from "./dom";
+import { h } from "./dom";
+import { trackColor } from "./theme";
 import { control, fader, knob, type ControlHost } from "./knob";
 import { SpatialNav } from "./nav";
 
@@ -63,7 +64,7 @@ export class MixerScreen implements Screen {
           knob(paramInfo(t, `fx${s}:a`)!, host, { label: d.a, size: "s" }),
           knob(paramInfo(t, `fx${s}:b`)!, host, { label: d.b, size: "s" })) : null);
     });
-    return h("div", { class: "strip", "data-track": t.id, style: `--track:${TRACK_COLORS[t.color]}` },
+    return h("div", { class: "strip", "data-track": t.id, style: `--track:${trackColor(t)}` },
       h("div", { class: "strip-head" }, h("div", { class: "strip-name" }, `${i + 1} ${INSTRUMENTS[t.kind].name}`), h("div", { class: "strip-preset" }, t.preset)),
       ...slots,
       h("div", { class: "strip-row" },

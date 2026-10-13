@@ -9,7 +9,8 @@ import { drumCount, isDrumKind, toUnit } from "../engine/instruments";
 import { addNote, duplicateClip, ensureClip, laneValue, noteAt, quantizeClip, setAutoPoint, setClipBars } from "../engine/songops";
 import { mods, type Action } from "./actions";
 import type { App, Screen } from "./app";
-import { h, TRACK_COLORS } from "./dom";
+import { h } from "./dom";
+import { trackColor } from "./theme";
 import type { MenuItem } from "./overlay";
 import { SpatialNav } from "./nav";
 import { buildPanel } from "./panels";
@@ -44,7 +45,7 @@ export class EditorScreen implements Screen {
       h("button", { class: "tb-btn" + (on ? " on" : ""), onclick, title }, label);
     this.toolbar.replaceChildren(
       h("button", { class: "tb-btn", onclick: () => app.show("song"), title: "Back to the song (B / Esc)" }, "◀ Song"),
-      h("div", { class: "tb-track", style: `--track:${TRACK_COLORS[track.color]}` },
+      h("div", { class: "tb-track", style: `--track:${trackColor(track)}` },
         h("button", { class: "tb-arrow", onclick: () => this.switchTrack(-1) }, "‹"),
         h("span", { class: "tb-trackname" }, `${ti + 1} · ${INSTRUMENTS[track.kind].name}`),
         h("button", { class: "tb-arrow", onclick: () => this.switchTrack(1) }, "›")),

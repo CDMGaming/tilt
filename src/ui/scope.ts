@@ -3,7 +3,8 @@
 
 import { INSTRUMENTS } from "../engine/instruments";
 import type { App } from "./app";
-import { h, TRACK_COLORS } from "./dom";
+import { h } from "./dom";
+import { trackColor } from "./theme";
 
 export class Scope {
   private el: HTMLElement | null = null;
@@ -85,7 +86,7 @@ export class Scope {
     tap.l.getFloatTimeDomainData(this.bufL);
     tap.r.getFloatTimeDomainData(this.bufR);
     const t = this.source !== null ? this.app.song.tracks.find((x) => x.id === this.source) : undefined;
-    const color = t ? TRACK_COLORS[t.color] : css.getPropertyValue("--mint").trim();
+    const color = t ? trackColor(t) : css.getPropertyValue("--mint").trim();
     g.strokeStyle = color;
     g.lineWidth = 1.6;
     g.shadowColor = color;

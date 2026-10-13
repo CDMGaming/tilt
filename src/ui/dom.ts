@@ -31,8 +31,6 @@ export function clear(el: Element) {
   while (el.firstChild) el.removeChild(el.firstChild);
 }
 
-/** Track colours (index = Track.color). */
-export const TRACK_COLORS = ["#ff7a45", "#ffc53d", "#73d13d", "#36cfc9", "#40a9ff", "#9254de", "#f759ab", "#d4b106"];
 
 export function download(name: string, data: BlobPart, type: string) {
   const url = URL.createObjectURL(new Blob([data], { type }));

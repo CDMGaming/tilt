@@ -8,7 +8,7 @@ import { PPQ, TICKS_PER_BAR, type Clip, type Note, type Track } from "../engine/
 import { inScale, noteName } from "../engine/music";
 import { addNote, ensureClip, laneValue, noteAt, setAutoPoint } from "../engine/songops";
 import type { App } from "./app";
-import { TRACK_COLORS } from "./dom";
+import { trackColor } from "./theme";
 
 const KEYS_W = 54;
 const RULER_H = 22;
@@ -154,7 +154,7 @@ export class PianoRoll {
     const rowH = this.rowH(), allRows = this.allRows(), top = this.topIdx();
     const rows = Math.min(this.visibleRows(), allRows.length - top);
     const laneBottom = RULER_H + rows * rowH;
-    const color = TRACK_COLORS[track.color];
+    const color = trackColor(track);
     if (!this.hatch) this.hatch = this.makeHatch(col("--roll-hatch"));
 
     g.fillStyle = col("--roll-bg");

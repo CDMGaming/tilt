@@ -11,7 +11,8 @@ import {
 import type { Action } from "./actions";
 import type { App, Screen } from "./app";
 import { instrumentPicker } from "./dialogs";
-import { h, TRACK_COLORS } from "./dom";
+import { h } from "./dom";
+import { trackColor } from "./theme";
 import type { MenuItem } from "./overlay";
 
 export class SongScreen implements Screen {
@@ -65,7 +66,7 @@ export class SongScreen implements Screen {
 
   private trackHeader(t: Track, c: number): HTMLElement {
     const def = INSTRUMENTS[t.kind];
-    return h("div", { class: "track-head" + (t.mute ? " muted" : ""), style: `--track:${TRACK_COLORS[t.color]}` },
+    return h("div", { class: "track-head" + (t.mute ? " muted" : ""), style: `--track:${trackColor(t)}` },
       h("div", { class: "th-name" }, `${c + 1} ${def.name}`),
       h("div", { class: "th-preset" }, t.preset),
       h("div", { class: "th-btns" },
@@ -89,7 +90,7 @@ export class SongScreen implements Screen {
     const carrying = this.carry && this.carry.trackId === t.id && this.carry.sceneId === s.id;
     const el = h("div", {
       class: "cell" + (clip ? "" : " empty") + (clip?.muted ? " muted" : "") + (carrying ? " carry-src" : ""),
-      style: `--track:${TRACK_COLORS[t.color]}`, "data-scene": s.id, "data-track": t.id,
+      style: `--track:${trackColor(t)}`, "data-scene": s.id, "data-track": t.id,
     });
     if (!clip) return el;
     el.addEventListener("pointerdown", (e) => { if (e.button === 0) this.startDrag(e, t, s); });
@@ -221,7 +222,7 @@ export class SongScreen implements Screen {
     const move = (ev: PointerEvent) => {
       if (!ghost) {
         if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
-        ghost = h("div", { class: "drag-ghost", style: `--track:${TRACK_COLORS[t.color]}` }, `${INSTRUMENTS[t.kind].name} · ${s.name}`);
+        ghost = h("div", { class: "drag-ghost", style: `--track:${trackColor(t)}` }, `${INSTRUMENTS[t.kind].name} · ${s.name}`);
         document.body.appendChild(ghost);
       }
       ghost.style.left = `${ev.clientX + 12}px`;
@@ -364,7 +365,7 @@ function drawPreview(cv: HTMLCanvasElement, clip: Clip, t: Track) {
   const lo = Math.min(...ps), hi = Math.max(...ps);
   const span = Math.max(8, hi - lo + 1);
   const rowH = Math.max(1.5, r.height / span);
-  g.fillStyle = TRACK_COLORS[t.color];
+  g.fillStyle = trackColor(t);
   for (const n of clip.notes) {
     const x = (n.start / ticks) * r.width;
     const w = Math.max(1.5, (n.len / ticks) * r.width - 1);

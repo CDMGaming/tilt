@@ -27,6 +27,15 @@
   --rec: var(--coral);
   --focus: var(--yellow);
 
+  /* ---- instrument identity colours (no yellow/cyan/mint: those mean focus/on/playing) ---- */
+  --inst-drums: #ff5f6d;   /* Kitbox: coral red */
+  --inst-analog: #ff9a3c;  /* Thump Lab: orange */
+  --inst-acid: #b8f04a;    /* Squelch: lime */
+  --inst-wobble: #d36bff;  /* Wobbler: magenta-violet */
+  --inst-poly: #4aa8ff;    /* Chordette: blue */
+  --inst-pad: #ff8fd0;     /* Haze: pink */
+  --inst-lead: #2fd6c6;    /* Razor: teal */
+
   /* ---- shape ---- */
   --r-s: 4px;
   --r-m: 8px;
@@ -140,10 +149,9 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .pick-card { text-align: left; padding: 16px; border-radius: 12px; min-height: 92px; }
 .pick-name { font-weight: 800; font-size: 18px; }
 .pick-role { color: var(--dim); font-size: 12px; margin-top: 4px; }
-.pick-card.kind-drums { background: linear-gradient(135deg, #2a1d14, #3b2414); border-color: #ff7a45; }
-.pick-card.kind-acid { background: linear-gradient(135deg, #b9bec6, #8e949d); color: #15161a; border-color: #c6ff4d; }
-.pick-card.kind-acid .pick-role { color: #33363c; }
-.pick-card.kind-poly { background: linear-gradient(135deg, #2b1840, #3d1d55); border-color: #c77dff; }
+.pick-card[class*="kind-"] { background: var(--raise); border-color: var(--line); box-shadow: inset 4px 0 0 var(--kc), inset 0 1px 0 var(--bevel-hi), 0 2px 0 var(--bevel-lo); }
+.pick-card[class*="kind-"] .pick-name { color: var(--kc); }
+.pick-card[class*="kind-"]:hover:not(:disabled) { border-color: var(--kc); }
 .pick-card.random { background: var(--raise); border-style: dashed; }
 
 /* ---------------------------------------------------------------- dice */
@@ -165,7 +173,9 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .die.locked .die-lock { color: var(--accent); }
 .lineup { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { background: var(--well); border-radius: var(--r-s); padding: 3px 10px; font-size: 13px; }
-.chip.kind-drums { color: #ff9c6b; } .chip.kind-acid { color: #c6ff4d; } .chip.kind-poly { color: #d9a6ff; }
+.chip[class*="kind-"] { color: var(--kc); box-shadow: inset 2px 0 0 var(--kc); }
+.kind-drums { --kc: var(--inst-drums); } .kind-analog { --kc: var(--inst-analog); } .kind-acid { --kc: var(--inst-acid); }
+.kind-wobble { --kc: var(--inst-wobble); } .kind-poly { --kc: var(--inst-poly); } .kind-pad { --kc: var(--inst-pad); } .kind-lead { --kc: var(--inst-lead); }
 .dice-actions { display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap; justify-content: center; }
 .roll-btn { font-size: 28px; font-weight: 900; padding: 16px 36px; border-radius: 16px; background: var(--raise); border: 2px solid var(--accent); display: flex; flex-direction: column; align-items: center; }
 .roll-btn small, .go-btn small { font-size: 11px; color: var(--dim); font-weight: 400; }
@@ -375,12 +385,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .panel.kind-pad .inst-name { color: #ffc8e0; }
 .panel.kind-pad .key small { color: #8a3f80; }
 
-.pick-card.kind-analog { background: linear-gradient(135deg, #e9e0cc, #c8baa0); color: #241d12; border-color: #e2582c; }
-.pick-card.kind-analog .pick-role { color: #4a3f2c; }
-.pick-card.kind-lead { background: linear-gradient(135deg, #18161c, #0a0a0c); border-color: #ff5a1f; }
-.pick-card.kind-wobble { background: linear-gradient(135deg, #0f1a33, #1a2a55); border-color: #ff4fd8; }
-.pick-card.kind-pad { background: linear-gradient(135deg, #3b2a4f, #7a4a50); border-color: #ffc8e0; }
-.chip.kind-analog { color: #f0d9a8; } .chip.kind-lead { color: #ff7a3d; } .chip.kind-wobble { color: #ff8fe6; } .chip.kind-pad { color: #ffc8e0; }
+
 
 .preset-save { font-size: 12px; padding: 6px 10px; }
 

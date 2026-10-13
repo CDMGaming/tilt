@@ -57,7 +57,7 @@ export interface Track {
   mute: boolean;
   solo: boolean;
   clips: Record<number, Clip>; // keyed by scene id; a missing key is an empty cell
-  color: number; // palette index
+  color: number; // shade of the instrument's colour: 0 = first of its kind, 1 = second… (see assignShades)
 }
 
 export interface Scene {
@@ -139,8 +139,19 @@ export function emptyFx(): FxSlot[] {
   return Array.from({ length: FX_SLOTS }, () => ({ type: "off", a: 0.5, b: 0.5 }));
 }
 
+/** Colour shades follow the instrument: the n-th track of an instrument gets shade n. */
+export function assignShades(song: Song) {
+  const seen = new Map<InstrumentKind, number>();
+  for (const t of song.tracks) {
+    const n = seen.get(t.kind) ?? 0;
+    t.color = n;
+    seen.set(t.kind, n + 1);
+  }
+}
+
 /** Fill in fields added after a song was saved (older autosaves, shared files). */
 export function normalizeSong(song: Song): Song {
+  assignShades(song);
   song.master = { ...defaultMaster(), ...(song.master ?? {}) };
   song.midiMap ??= [];
   for (const t of song.tracks) {

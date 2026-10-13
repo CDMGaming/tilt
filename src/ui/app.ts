@@ -7,7 +7,7 @@ import { INSTRUMENTS, drumCount, fromUnit, isDrumKind, paramDef, toUnit } from "
 import { getParam, paramInfo, setParamValue } from "../engine/params";
 import { AUTO_STEP } from "../engine/timeline";
 import { DRUM_BASE_NOTE } from "../engine/instruments";
-import { PPQ, TICKS_PER_BAR, normalizeSong, type Song, type Track } from "../engine/model";
+import { PPQ, TICKS_PER_BAR, assignShades, normalizeSong, type Song, type Track } from "../engine/model";
 import { scaleById, snapToScale } from "../engine/music";
 import { addNote, addTrack, clearAutoRange, ensureClip, quantizeNotes, setAutoPoint } from "../engine/songops";
 import { NO_LOCKS, roll, type Locks, type Setup } from "../engine/dice";
@@ -178,6 +178,7 @@ export class App {
   }
 
   changed(render = true) {
+    assignShades(this.song);
     this.engine.sync(this.song);
     this.scheduleSave();
     if (render) this.refresh();

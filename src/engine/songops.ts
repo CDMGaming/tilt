@@ -10,10 +10,9 @@ export const SCENE_NAMES = ["Intro", "Verse", "Build", "Chorus", "Drop", "Break"
 
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 
-function freeColor(song: Song): number {
-  const used = new Set(song.tracks.map((t) => t.color));
-  for (let c = 0; c < 8; c++) if (!used.has(c)) return c;
-  return song.tracks.length % 8;
+/** Shade for a new track of `kind` (the count of that instrument already in the song). */
+function shadeFor(song: Song, kind: InstrumentKind): number {
+  return song.tracks.filter((t) => t.kind === kind).length;
 }
 
 export function addTrack(song: Song, kind: InstrumentKind, preset = 0, at = song.tracks.length): Track | null {
@@ -23,7 +22,7 @@ export function addTrack(song: Song, kind: InstrumentKind, preset = 0, at = song
     id: newId(song), name: def.name, kind,
     preset: def.presets[preset % def.presets.length].name,
     params: presetParams(kind, preset),
-    volume: 0.8, pan: 0, send: 0.15, fx: emptyFx(), mute: false, solo: false, clips: {}, color: freeColor(song),
+    volume: 0.8, pan: 0, send: 0.15, fx: emptyFx(), mute: false, solo: false, clips: {}, color: shadeFor(song, kind),
   };
   song.tracks.splice(at, 0, t);
   return t;
@@ -32,7 +31,7 @@ export function addTrack(song: Song, kind: InstrumentKind, preset = 0, at = song
 export function duplicateTrack(song: Song, index: number): Track | null {
   if (song.tracks.length >= MAX_TRACKS) return null;
   const src = song.tracks[index];
-  const t: Track = { ...clone(src), id: newId(song), color: freeColor(song), solo: false };
+  const t: Track = { ...clone(src), id: newId(song), color: shadeFor(song, src.kind), solo: false };
   song.tracks.splice(index + 1, 0, t);
   return t;
 }

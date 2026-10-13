@@ -8,7 +8,8 @@ import { allPresets, applyPreset, deleteUserPreset, presetPosition, saveUserPres
 import { getParam } from "../engine/params";
 import { expandPitch } from "../engine/timeline";
 import type { App } from "./app";
-import { h, TRACK_COLORS } from "./dom";
+import { h } from "./dom";
+import { trackColor } from "./theme";
 import { control, type ControlHost } from "./knob";
 
 export function buildPanel(app: App, track: Track): HTMLElement {
@@ -116,7 +117,7 @@ export function buildPanel(app: App, track: Track): HTMLElement {
       keyboard(app, track),
     );
   }
-  return h("div", { class: `panel kind-${track.kind}`, style: `--track:${TRACK_COLORS[track.color]}` }, presetBar, body);
+  return h("div", { class: `panel kind-${track.kind}`, style: `--track:${trackColor(track)}` }, presetBar, body);
 }
 
 function previewSound(app: App, track: Track) {

@@ -5,7 +5,8 @@ import { INSTRUMENTS } from "../engine/instruments";
 import { ensureClip } from "../engine/songops";
 import type { Action } from "./actions";
 import type { App } from "./app";
-import { h, TRACK_COLORS } from "./dom";
+import { h } from "./dom";
+import { trackColor } from "./theme";
 import type { Overlay } from "./overlay";
 
 export function openShortcut(app: App) {
@@ -20,12 +21,12 @@ export function openShortcut(app: App) {
       h("div", { class: "menu-title" }, "Jump to… (release to go)"),
       h("div", { class: "sc-grid", style: `grid-template-columns: 110px repeat(${song.tracks.length}, 90px)` },
         h("div", null),
-        song.tracks.map((t, c) => h("div", { class: "sc-head" + (c === col ? " on" : ""), style: `--track:${TRACK_COLORS[t.color]}` }, INSTRUMENTS[t.kind].name)),
+        song.tracks.map((t, c) => h("div", { class: "sc-head" + (c === col ? " on" : ""), style: `--track:${trackColor(t)}` }, INSTRUMENTS[t.kind].name)),
         song.scenes.map((s, r) => [
           h("div", { class: "sc-scene" + (r === row ? " on" : "") }, `${r + 1} ${s.name}`),
           song.tracks.map((t, c) => h("div", {
             class: "sc-cell" + (r === row && c === col ? " cursor" : "") + (t.clips[s.id]?.notes.length ? " has" : ""),
-            style: `--track:${TRACK_COLORS[t.color]}`,
+            style: `--track:${trackColor(t)}`,
           })),
         ]),
       ),
