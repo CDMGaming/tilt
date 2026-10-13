@@ -3,6 +3,7 @@
 
 import { AudioEngine } from "../engine/audio";
 import { History } from "../engine/history";
+import { Ownership, applyPatches, invert, type Patch } from "../engine/patches";
 import { INSTRUMENTS, drumCount, fromUnit, isDrumKind, paramDef, toUnit } from "../engine/instruments";
 import { getParam, paramInfo, setParamValue } from "../engine/params";
 import { AUTO_STEP } from "../engine/timeline";
@@ -80,6 +81,10 @@ export class App {
   engine = new AudioEngine();
   song!: Song;
   history = new History();
+  /** Who may edit which track / the shared song (couch and online modes; empty = everyone). */
+  owners = new Ownership();
+  /** Every accepted local change, as patches (the hook online mode sends from). */
+  onLocalPatches: ((patches: Patch[], player: string) => void) | null = null;
   overlays: OverlayHost;
   midi: Midi;
   pad: GamepadInput;
@@ -159,6 +164,7 @@ export class App {
 
   async boot(song: Song) {
     this.song = normalizeSong(song);
+    this.history.reset(this.song);
     await this.engine.init(song);
     if (this.settings.outputDevice) await this.engine.setOutputDevice(this.settings.outputDevice).catch(() => {});
     this.engine.onEnded = () => { this.recording = false; this.renderHeader(); };
@@ -211,31 +217,45 @@ export class App {
 
   changed(render = true) {
     assignShades(this.song);
+    this.commit();
     this.engine.sync(this.song);
     this.scheduleSave();
     if (render) this.refresh();
   }
 
-  undo() {
-    const s = this.history.undo(this.song);
-    if (!s) { this.overlays.toast("Nothing to undo"); return; }
-    this.replaceSong(s, false);
-    this.overlays.toast("Undo");
+  /**
+   * Turn what just changed into patches and file them under the acting player.
+   * A change that touches something the player doesn't own is rolled back whole.
+   */
+  private commit() {
+    const player = this.history.player, patches = this.history.pending(this.song);
+    if (!patches.length) return;
+    if (this.owners.refused(player, patches).length) {
+      applyPatches(this.song, invert(patches));
+      assignShades(this.song);
+      this.overlays.toast("That belongs to another player");
+      return;
+    }
+    this.history.accept(patches, player);
+    this.onLocalPatches?.(patches, player);
   }
 
-  redo() {
-    const s = this.history.redo(this.song);
-    if (!s) return;
-    this.replaceSong(s, false);
-    this.overlays.toast("Redo");
+  undo() { this.travel("undo"); }
+  redo() { this.travel("redo"); }
+
+  private travel(dir: "undo" | "redo") {
+    const r = dir === "undo" ? this.history.undo(this.song) : this.history.redo(this.song);
+    if (!r) { if (dir === "undo") this.overlays.toast("Nothing to undo"); return; }
+    if (r.patches.length) this.onLocalPatches?.(r.patches, this.history.player);
+    this.ed.sel.clear();
+    this.fixCursors();
+    this.changed();
+    this.overlays.toast(`${dir === "undo" ? "Undo" : "Redo"}: ${r.label}${r.patches.length ? "" : " (already changed by someone else)"}`);
   }
 
-  replaceSong(song: Song, clearHistory = true) {
-    // Undo/redo snapshots may predate the library id: keep the song's identity.
-    const keepId = !clearHistory ? this.song?.libId : undefined;
+  replaceSong(song: Song) {
     this.song = normalizeSong(song);
-    if (keepId) this.song.libId = keepId;
-    if (clearHistory) this.history.clear();
+    this.history.reset(this.song);
     this.ed.sel.clear();
     this.fixCursors();
     this.changed();
