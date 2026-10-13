@@ -306,6 +306,11 @@ export class App {
   // ------------------------------------------------------------ screens
 
   show(name: ScreenName) {
+    if (this.couch && name !== "couch") {
+      // A new jam ends the session; Song / Edit / Mix from inside it (menus, shortcuts, the Push) stay in the quarters.
+      if (name === "dice") this.endCouch();
+      else name = "couch";
+    }
     if (name !== "dice" && !this.song.tracks.length && name === "edit") name = "song";
     this.screenName = name;
     const s = this.screens[name];
@@ -372,6 +377,7 @@ export class App {
   }
 
   replaceSong(song: Song) {
+    if (this.couch) this.endCouch(); // a different song: the seats belonged to the old one
     this.song = normalizeSong(song);
     this.history.reset(this.song);
     this.ed.sel.clear();

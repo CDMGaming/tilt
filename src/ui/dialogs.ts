@@ -259,8 +259,8 @@ export function timeUpDialog(app: App) {
 /** Solo is the default; this is the door to playing with other people. */
 export function playTogetherDialog(app: App) {
   app.overlays.dialog("Play together", (close) => h("div", { class: "form together" },
-    h("button", { class: "row-btn primary", "data-nav": "couch", disabled: !!app.couch, onclick: () => { close(); app.startCouch(); } },
-      h("div", { class: "together-title" }, "🛋 Couch: everyone on this computer"),
+    h("button", { class: "row-btn primary", "data-nav": "couch", onclick: () => { close(); app.startCouch(); } },
+      h("div", { class: "together-title" }, app.couch ? "🛋 Back to the couch" : "🛋 Couch: everyone on this computer"),
       h("div", { class: "note" }, "2 to 4 players, one controller each (gamepads, the keyboard, MIDI keyboards, the Push). The screen splits in four; each player gets one instrument. The others join by pressing A / Enter / a note.")),
     h("button", { class: "row-btn", "data-nav": "host", disabled: true },
       h("div", { class: "together-title" }, "🌐 Host an online game"),
@@ -273,7 +273,8 @@ export function playTogetherDialog(app: App) {
 
 export function systemMenu(app: App, newJam: () => void) {
   app.overlays.menu("Rollbox", () => [
-    ...(app.couch ? [{ label: "End couch mode", run: () => app.endCouch() }] : [{ label: "👥 Play together…", run: () => playTogetherDialog(app) }]),
+    ...(app.couch ? [{ label: "End couch mode", run: () => app.endCouch() }] : []),
+    { label: app.couch ? "🛋 Back to the couch" : "👥 Play together…", run: () => (app.couch ? app.show("couch") : playTogetherDialog(app)) },
     { label: "New jam (dice)…", run: newJam },
     { label: "Songs (library)…", run: () => libraryDialog(app, { onOpen: () => app.show("song") }) },
     { label: "💡 Stuck? Phrase grid for this scene…", disabled: app.locked, run: () => phraseGridDialog(app, { sceneId: app.currentSceneId(), onDone: () => app.refresh() }) },

@@ -37,7 +37,7 @@ export function bindTopbar(app: App, el: HTMLElement) {
       app.locked ? h("span", { class: "locked-badge" }, "LOCKED") : "",
       h("div", { class: "spacer" }),
       ...(app.couch ? [
-        h("span", { class: "chip-btn on couch-chip" }, `🛋 Couch · ${app.couch.seats.length} player${app.couch.seats.length === 1 ? "" : "s"}`),
+        h("button", { class: "chip-btn on couch-chip", onclick: () => app.show("couch"), title: "Back to the couch screen" }, `🛋 Couch · ${app.couch.seats.length} player${app.couch.seats.length === 1 ? "" : "s"}`),
       ] : [
         h("button", { class: "chip-btn", onclick: () => playTogetherDialog(app), disabled: !s.tracks.length, title: "Couch mode (and online, soon)" }, "👥 Together"),
         h("button", { class: "chip-btn" + (app.screenName === "song" ? " on" : ""), onclick: () => app.show("song") }, "Song"),
