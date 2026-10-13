@@ -16,6 +16,7 @@ import { h } from "./dom";
 import { GamepadInput, bindKeyboard, type MusicKey } from "./input";
 import { Midi } from "./midi";
 import { MidiClock, type SyncMode } from "./clock";
+import { Push1Surface } from "./push1";
 import { OverlayHost } from "./overlay";
 
 export type ScreenName = "dice" | "song" | "edit" | "mix";
@@ -83,6 +84,21 @@ export class App {
   midi: Midi;
   pad: GamepadInput;
   clock: MidiClock;
+  push: Push1Surface | null = null;
+  private taps: number[] = [];
+
+  /** Tap tempo (Push button, dialogs): the last few taps set the song tempo. */
+  tapTempo() {
+    const now = performance.now();
+    if (this.taps.length && now - this.taps[this.taps.length - 1] > 2000) this.taps = [];
+    this.taps.push(now);
+    if (this.taps.length >= 3) {
+      const iv = this.taps.slice(-6).map((t, i, a) => (i ? t - a[i - 1] : 0)).slice(1);
+      const bpm = Math.round(60000 / (iv.reduce((x, y) => x + y, 0) / iv.length));
+      this.edit("Tap tempo", () => (this.song.tempo = Math.max(40, Math.min(250, bpm))), { render: false });
+      this.renderHeader();
+    }
+  }
   screens = {} as Record<ScreenName, Screen>;
   screenName: ScreenName = "dice";
   songCur = { row: 0, col: 0 }; // row -1 = track headers, col -1 = scene names
@@ -122,6 +138,12 @@ export class App {
       onDevicesChanged: () => this.renderHeader(),
       onCC: (ch, cc, raw, v) => this.onCC(ch, cc, raw, v),
       onRealtime: (b, t) => this.clock.onRealtime(b, t),
+      onPush: (port) => {
+        this.push?.destroy();
+        this.push = port ? new Push1Surface(this, port.out, port.sysex) : null;
+        if (port) this.overlays.toast(port.sysex ? "Push 1 connected" : "Push 1 connected (no SysEx permission: its display stays blank)");
+        return this.push ? (d, t) => this.push!.onMessage(d, t) : null;
+      },
     });
     this.clock = new MidiClock(this);
     this.pad = new GamepadInput({ action: (a) => this.dispatch(a), musicKey: () => {} });

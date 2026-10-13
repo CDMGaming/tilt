@@ -15,9 +15,13 @@ export interface MidiSink {
   onCC(ch: number, cc: number, raw: number, v: { abs?: number; delta?: number }): boolean;
   /** System realtime: clock 0xF8, start 0xFA, continue 0xFB, stop 0xFC. */
   onRealtime(byte: number, time: number): void;
+  /** A Push 1 appeared (output for LEDs/LCD) or went away (null). */
+  onPush(port: { out: MIDIOutput | null; sysex: boolean } | null): ((d: Uint8Array, t: number) => void) | null;
 }
 
 export interface MonitorLine { time: number; device: string; text: string }
+
+import { isPush1Name } from "./push1";
 
 // MiniLab mkII factory map (Arturia's default template).
 // Knobs are endless encoders; in the factory template they send relative values.
@@ -43,13 +47,32 @@ export class Midi {
     if (!this.supported) { this.error = "This browser has no Web MIDI (use Chrome or Edge)."; return; }
     try {
       this.access = await navigator.requestMIDIAccess({ sysex: false });
-      this.access.onstatechange = () => { this.bind(); this.sink.onDevicesChanged(); };
+      // The Push 1 LCD needs SysEx: ask for it only when a Push is actually connected.
+      if (this.inputs().some((i) => isPush1Name(i.name ?? ""))) await this.upgradeSysex();
+      this.access.onstatechange = () => {
+        if (!this.access!.sysexEnabled && this.inputs().some((i) => isPush1Name(i.name ?? ""))) void this.upgradeSysex().then(() => { this.bind(); this.sink.onDevicesChanged(); });
+        this.bind();
+        this.sink.onDevicesChanged();
+      };
       this.bind();
       this.sink.onDevicesChanged();
     } catch (e) {
       this.error = `MIDI permission refused: ${e}`;
     }
   }
+
+  private async upgradeSysex() {
+    try {
+      const a = await navigator.requestMIDIAccess({ sysex: true });
+      a.onstatechange = this.access?.onstatechange ?? null;
+      this.access = a;
+    } catch { /* refused: the Push still works, just without its display */ }
+  }
+
+  private pushHandler: ((d: Uint8Array, t: number) => void) | null = null;
+  private pushName = "";
+
+  get pushConnected() { return !!this.pushHandler; }
 
   outputs(): MIDIOutput[] {
     const out: MIDIOutput[] = [];
@@ -68,8 +91,27 @@ export class Midi {
   get miniLabConnected() { return this.inputs().some((i) => this.isMiniLab(i.name)); }
 
   private bind() {
+    const push = this.inputs().find((i) => isPush1Name(i.name ?? ""));
+    if (push && push.name !== this.pushName) {
+      this.pushName = push.name ?? "";
+      const out = this.outputs().find((o) => isPush1Name(o.name ?? "")) ?? null;
+      this.pushHandler = this.sink.onPush({ out, sysex: !!this.access?.sysexEnabled });
+    } else if (!push && this.pushHandler) {
+      this.pushName = "";
+      this.pushHandler = null;
+      this.sink.onPush(null);
+    }
     for (const input of this.inputs()) {
-      input.onmidimessage = (e) => this.onMessage(input, e as MIDIMessageEvent);
+      if (push && input === push && this.pushHandler) {
+        const h = this.pushHandler;
+        input.onmidimessage = (e) => {
+          const ev = e as MIDIMessageEvent;
+          if (!ev.data) return;
+          if (ev.data[0] >= 0xf8) { this.sink.onRealtime(ev.data[0], ev.timeStamp); return; }
+          this.log(input.name ?? "Push", Array.from(ev.data).map((b) => b.toString(16).padStart(2, "0")).join(" "));
+          h(ev.data, ev.timeStamp);
+        };
+      } else input.onmidimessage = (e) => this.onMessage(input, e as MIDIMessageEvent);
     }
   }
 

@@ -168,6 +168,7 @@ export function settingsDialog(app: App) {
       h("div", { class: "section-title" }, "MIDI"),
       h("p", { class: "note" }, app.midi.error || (app.midi.inputs().length ? `Inputs: ${app.midi.inputs().map((i) => i.name).join(", ")}` : "No MIDI inputs found. Plug one in; it's picked up live.")),
       mini ? h("p", { class: "note ok" }, "MiniLab mkII detected: keys play the selected track (scale-locked), knobs 1-8 = the track's 8 macros, knobs 9-16 = track volumes, pads = drum parts on a drum track, otherwise scene launch. Knob 1 click = play/stop.") : null,
+      app.midi.pushConnected ? h("p", { class: "note ok" }, "Push 1 connected: Session button = clip grid, Note button = steps + keys, encoders = macros (upper buttons: Macros / Mixer / FX), Play / Record / Tap / Undo / Double / Quantize / Mute / Solo work. The LCD shows the countdown.") : null,
       app.midi.knobModes().length ? h("p", { class: "note" }, `Knob modes seen: ${app.midi.knobModes().join(", ")}`) : null,
       stepper("sync", "MIDI sync", { int: "Internal", ext: "Follow external clock", auto: "Auto (follow when clock arrives)" }[st.midiSync], (d) => {
         const o: typeof st.midiSync[] = ["auto", "int", "ext"];

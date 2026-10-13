@@ -264,3 +264,13 @@ Deno.test("MIDI clock tempo estimate", () => {
   }
   assertEquals(estimateBpm([1, 2, 3]), null);
 });
+
+import { pushColor } from "../src/ui/push1.ts";
+
+Deno.test("Push palette mapping", () => {
+  assertEquals(pushColor("#ff2020"), 5); // red
+  assertEquals(pushColor("#20ff20"), 21); // green
+  assertEquals(pushColor("#2040ff"), 45); // blue
+  assertEquals(pushColor("#c3cbe0"), 3); // steel -> white
+  assertEquals(pushColor("#ff2020", 2), 7); // dimmer red
+});
