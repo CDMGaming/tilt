@@ -70,7 +70,7 @@ export class SongScreen implements Screen {
       h("div", { class: "th-name" }, `${c + 1} ${def.name}`),
       h("div", { class: "th-preset" }, t.preset),
       h("div", { class: "th-btns" },
-        h("button", { class: "mini" + (t.mute ? " on" : ""), onclick: (e: Event) => { e.stopPropagation(); this.app.edit("Mute", () => (t.mute = !t.mute)); } }, "M"),
+        h("button", { class: "mini mute" + (t.mute ? " on" : ""), onclick: (e: Event) => { e.stopPropagation(); this.app.edit("Mute", () => (t.mute = !t.mute)); } }, "M"),
         h("button", { class: "mini" + (t.solo ? " on solo" : ""), onclick: (e: Event) => { e.stopPropagation(); this.app.edit("Solo", () => (t.solo = !t.solo)); } }, "S"),
         h("div", { class: "vol-bar", title: `Volume ${Math.round(t.volume * 100)}` }, h("div", { style: `width:${t.volume * 100}%` }))));
   }
@@ -102,11 +102,19 @@ export class SongScreen implements Screen {
 
   // ------------------------------------------------------------ playback indicators
 
+  private lastBeat = -1;
+
   frame() {
     const pos = this.app.engine.position();
+    // A beat pulse on the playing row (restarted each beat; CSS does the decay).
+    const beat = pos ? Math.floor(pos.tick / 96) + pos.repeat * 1000 : -1;
+    const pulse = beat !== this.lastBeat && beat >= 0;
+    this.lastBeat = beat;
     for (const el of this.grid.querySelectorAll<HTMLElement>("[data-scene]")) {
       const on = !!pos && Number(el.dataset.scene) === pos.sceneId;
       el.classList.toggle("playing", on);
+      if (on && pulse) { el.classList.remove("beat"); void el.offsetWidth; el.classList.add("beat"); }
+      if (!on) el.classList.remove("beat");
       if (el.classList.contains("scene-head")) {
         const bar = el.querySelector<HTMLElement>(".sh-progress");
         if (bar) bar.style.width = on && pos ? `${((pos.repeat + pos.tick / pos.ticks) / pos.repeats) * 100}%` : "0";

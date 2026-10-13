@@ -72,7 +72,7 @@ export class MixerScreen implements Screen {
         control(paramInfo(t, "mix:pan")!, host, { label: "Pan", size: "s" })),
       h("div", { class: "strip-fader" }, fader(paramInfo(t, "mix:vol")!, host, "Vol"), meter),
       h("div", { class: "strip-row" },
-        h("button", { class: "mini" + (t.mute ? " on" : ""), "data-nav": `t${t.id}m`, onclick: () => app.edit("Mute", () => (t.mute = !t.mute)) }, "M"),
+        h("button", { class: "mini mute" + (t.mute ? " on" : ""), "data-nav": `t${t.id}m`, onclick: () => app.edit("Mute", () => (t.mute = !t.mute)) }, "M"),
         h("button", { class: "mini" + (t.solo ? " on solo" : ""), "data-nav": `t${t.id}s`, onclick: () => app.edit("Solo", () => (t.solo = !t.solo)) }, "S")),
     );
   }

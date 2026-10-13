@@ -222,10 +222,14 @@ export class PianoRoll {
         if (r < 0 || r >= rows) continue; // off screen, or hidden by fold
         const x = this.xOf(n.start), y = this.yOf(n.pitch);
         const nw = Math.max(3, n.len * this.pxPerTick() - 1);
-        g.globalAlpha = 0.45 + 0.55 * (n.vel / 127);
+        const sounding = playTick >= n.start && playTick < n.start + n.len;
+        g.globalAlpha = sounding ? 1 : 0.45 + 0.55 * (n.vel / 127);
         g.fillStyle = color;
+        if (sounding) { g.shadowColor = color; g.shadowBlur = 10; }
         roundRect(g, x + 1, y + 1, nw - 1, rowH - 2, 3);
         g.fill();
+        g.shadowBlur = 0;
+        if (sounding) { g.globalAlpha = 0.35; g.fillStyle = "#fff"; roundRect(g, x + 1, y + 1, nw - 1, Math.max(2, (rowH - 2) * 0.35), 3); g.fill(); }
         g.globalAlpha = 1;
         if (ed.sel.has(n.id)) { g.strokeStyle = "#fff"; g.lineWidth = 2; roundRect(g, x + 1, y + 1, nw - 1, rowH - 2, 3); g.stroke(); }
         // the part that hangs past the clip end (it wraps when looping)
