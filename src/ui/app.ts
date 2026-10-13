@@ -15,6 +15,7 @@ import { mods, type Action } from "./actions";
 import { h } from "./dom";
 import { GamepadInput, bindKeyboard, type MusicKey } from "./input";
 import { Midi } from "./midi";
+import { MidiClock, type SyncMode } from "./clock";
 import { OverlayHost } from "./overlay";
 
 export type ScreenName = "dice" | "song" | "edit" | "mix";
@@ -63,6 +64,8 @@ export interface Settings {
   recQuantize: boolean;
   padLayout: "auto" | "xbox" | "nintendo";
   transport: { play?: { ch: number; cc: number }; record?: { ch: number; cc: number } };
+  midiSync: SyncMode; // internal clock, follow external, or auto (follow when clock arrives)
+  clockOut: string; // MIDI output id to send clock to ("" = off)
   outputDevice: string;
 }
 
@@ -79,6 +82,7 @@ export class App {
   overlays: OverlayHost;
   midi: Midi;
   pad: GamepadInput;
+  clock: MidiClock;
   screens = {} as Record<ScreenName, Screen>;
   screenName: ScreenName = "dice";
   songCur = { row: 0, col: 0 }; // row -1 = track headers, col -1 = scene names
@@ -87,7 +91,7 @@ export class App {
     stepInput: false, stepTick: 0, sel: new Set(), selAnchor: null, placing: null, grabbing: false, clipboard: [],
     octave: 3, drumPart: 0, topPitch: 72,
   };
-  settings: Settings = { notePreview: true, scaleLock: true, fold: false, countIn: true, gridAtStart: false, recQuantize: true, padLayout: "auto", outputDevice: "", transport: {} };
+  settings: Settings = { notePreview: true, scaleLock: true, fold: false, countIn: true, gridAtStart: false, recQuantize: true, padLayout: "auto", outputDevice: "", transport: {}, midiSync: "auto", clockOut: "" };
   dice: { setup: Setup; locks: Locks; minutes: number; cards: number } = { setup: roll(null, NO_LOCKS), locks: { ...NO_LOCKS }, minutes: 20, cards: 0 };
   timer = { total: 0, endsAt: 0, running: false, done: false };
   locked = false;
@@ -117,7 +121,9 @@ export class App {
       onTransport: () => this.togglePlay(),
       onDevicesChanged: () => this.renderHeader(),
       onCC: (ch, cc, raw, v) => this.onCC(ch, cc, raw, v),
+      onRealtime: (b, t) => this.clock.onRealtime(b, t),
     });
+    this.clock = new MidiClock(this);
     this.pad = new GamepadInput({ action: (a) => this.dispatch(a), musicKey: () => {} });
     bindKeyboard({ action: (a) => this.dispatch(a), musicKey: (k, on) => this.musicKey(k, on) }, () => {
       const el = document.activeElement;
@@ -134,6 +140,7 @@ export class App {
     await this.engine.init(song);
     if (this.settings.outputDevice) await this.engine.setOutputDevice(this.settings.outputDevice).catch(() => {});
     this.engine.onEnded = () => { this.recording = false; this.renderHeader(); };
+    this.clock.bindOutput();
     // Browsers start audio suspended until the first click or key.
     const resume = () => { if (this.engine.ctx.state !== "running") void this.engine.ctx.resume(); };
     window.addEventListener("pointerdown", resume);
@@ -143,6 +150,7 @@ export class App {
       this.pad.nintendoLayout = this.settings.padLayout === "auto" ? null : this.settings.padLayout === "nintendo";
       this.pad.poll(now);
       for (const f of this.frameHooks) f(now);
+      this.clock.tick();
       this.screens[this.screenName]?.frame?.(now);
       requestAnimationFrame(loop);
     };

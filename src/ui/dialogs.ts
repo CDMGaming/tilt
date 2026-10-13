@@ -169,6 +169,19 @@ export function settingsDialog(app: App) {
       h("p", { class: "note" }, app.midi.error || (app.midi.inputs().length ? `Inputs: ${app.midi.inputs().map((i) => i.name).join(", ")}` : "No MIDI inputs found. Plug one in; it's picked up live.")),
       mini ? h("p", { class: "note ok" }, "MiniLab mkII detected: keys play the selected track (scale-locked), knobs 1-8 = the track's 8 macros, knobs 9-16 = track volumes, pads = drum parts on a drum track, otherwise scene launch. Knob 1 click = play/stop.") : null,
       app.midi.knobModes().length ? h("p", { class: "note" }, `Knob modes seen: ${app.midi.knobModes().join(", ")}`) : null,
+      stepper("sync", "MIDI sync", { int: "Internal", ext: "Follow external clock", auto: "Auto (follow when clock arrives)" }[st.midiSync], (d) => {
+        const o: typeof st.midiSync[] = ["auto", "int", "ext"];
+        st.midiSync = o[(o.indexOf(st.midiSync) + d + 3) % 3];
+        app.saveSettings();
+        rerender();
+      }),
+      stepper("clockout", "Send clock to", st.clockOut ? app.midi.outputs().find((o) => o.id === st.clockOut)?.name ?? "(disconnected)" : "Off", (d) => {
+        const ids = ["", ...app.midi.outputs().map((o) => o.id)];
+        st.clockOut = ids[(ids.indexOf(st.clockOut) + d + ids.length) % ids.length];
+        app.saveSettings();
+        rerender();
+      }),
+      h("p", { class: "note" }, app.engine.externalTempo ? `Following external clock at ${app.engine.externalTempo.toFixed(1)} bpm.` : "Follow: Rollbox starts, stops and keeps tempo with incoming MIDI clock. Send: it drives other gear (and Ableton, with Sync on its MIDI input) while it plays."),
       h("button", { class: "row-btn", "data-nav": "monitor", onclick: () => midiMonitor(app) }, "MIDI monitor…"),
       h("button", { class: "row-btn", "data-nav": "learn-play", onclick: () => { app.learnTransport = "play"; app.overlays.toast("Press the button on your MIDI device for play / stop"); } },
         `Transport CC, play / stop: ${st.transport.play ? `CC ${st.transport.play.cc} ch ${st.transport.play.ch + 1}` : "not set"} (click, then press a button)`),

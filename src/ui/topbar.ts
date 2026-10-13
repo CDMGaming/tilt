@@ -17,7 +17,9 @@ export function bindTopbar(app: App, el: HTMLElement) {
       h("button", { class: "brand", onclick: () => app.openSystemMenu?.(), title: "Menu (Start / F1)" }, "⚄ ROLLBOX"),
       h("button", { class: "chip-btn title", onclick: () => songSettings(app) }, s.title),
       h("button", { class: "chip-btn", onclick: () => songSettings(app), title: "Key and scale" }, `${NOTE_NAMES[s.key]} ${scaleById(s.scale).name}`),
-      h("button", { class: "chip-btn", onclick: () => songSettings(app), title: "Tempo, swing, tap" }, `${s.tempo} bpm${s.swing ? ` · swing ${s.swing}%` : ""}`),
+      app.engine.externalTempo
+        ? h("button", { class: "chip-btn ext-tempo", onclick: () => songSettings(app), title: "Following external MIDI clock (Settings → MIDI sync)" }, `EXT ${app.engine.externalTempo.toFixed(1)} bpm`)
+        : h("button", { class: "chip-btn", onclick: () => songSettings(app), title: "Tempo, swing, tap" }, `${s.tempo} bpm${s.swing ? ` · swing ${s.swing}%` : ""}`),
       h("div", { class: "transport" },
         h("button", { class: "tp-btn" + (playing ? " on" : ""), onclick: () => app.togglePlay(), title: "Play / stop (Y, Space)" }, playing ? "■" : "▶"),
         h("button", { class: "tp-btn rec" + (app.recording ? " on" : ""), onclick: () => app.toggleRecord(), title: "Record (hold Y, Shift+Space)" }, "●"),

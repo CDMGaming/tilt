@@ -253,3 +253,14 @@ Deno.test("FFT round-trips and wavetable mips are band-limited", () => {
   for (let k = 1; k < n / 2; k++) { const m = Math.hypot(r2[k], i2[k]); if (k > 4) high += m; else low += m; }
   assert(high < low * 1e-6, `energy above harmonic 4: ${high}`);
 });
+
+import { estimateBpm } from "../src/ui/clock.ts";
+
+Deno.test("MIDI clock tempo estimate", () => {
+  for (const bpm of [70, 120, 128, 174]) {
+    const iv = 60000 / bpm / 24;
+    const times = Array.from({ length: 25 }, (_, i) => 1000 + i * iv + (i % 2 ? 0.4 : -0.4)); // with a little jitter
+    assert(Math.abs(estimateBpm(times)! - bpm) < 0.5, `${bpm}`);
+  }
+  assertEquals(estimateBpm([1, 2, 3]), null);
+});

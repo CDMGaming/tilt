@@ -13,6 +13,8 @@ export interface MidiSink {
   onDevicesChanged(): void;
   /** Any CC, before the device profile. Return true if it was used (learn / learned binding / transport). */
   onCC(ch: number, cc: number, raw: number, v: { abs?: number; delta?: number }): boolean;
+  /** System realtime: clock 0xF8, start 0xFA, continue 0xFB, stop 0xFC. */
+  onRealtime(byte: number, time: number): void;
 }
 
 export interface MonitorLine { time: number; device: string; text: string }
@@ -49,6 +51,12 @@ export class Midi {
     }
   }
 
+  outputs(): MIDIOutput[] {
+    const out: MIDIOutput[] = [];
+    this.access?.outputs.forEach((o) => { if (o.state === "connected") out.push(o); });
+    return out;
+  }
+
   inputs(): MIDIInput[] {
     const out: MIDIInput[] = [];
     this.access?.inputs.forEach((i) => { if (i.state === "connected") out.push(i); });
@@ -76,7 +84,8 @@ export class Midi {
     const status = d[0] & 0xf0, ch = d[0] & 0x0f;
     const name = input.name ?? "MIDI";
     const mini = this.isMiniLab(name);
-    if (status === 0xf0 || d[0] >= 0xf8) return; // sysex / realtime (clock comes in Phase 3)
+    if (d[0] >= 0xf8) { if (d[0] !== 0xf8) this.log(name, `${d[0].toString(16)}  ${({ 0xfa: "start", 0xfb: "continue", 0xfc: "stop" } as Record<number, string>)[d[0]] ?? "realtime"}`); this.sink.onRealtime(d[0], e.timeStamp); return; }
+    if (status === 0xf0) return; // sysex
     const hex = Array.from(d).map((b) => b.toString(16).padStart(2, "0")).join(" ");
     if (status === 0x90 || status === 0x80) {
       const on = status === 0x90 && d[2] > 0;

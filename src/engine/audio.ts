@@ -74,7 +74,8 @@ export class AudioEngine {
 
   /** Bring audio nodes in line with the song. Cheap; call after every edit. */
   sync(song: Song) {
-    this.song = song;
+    this.baseSong = song;
+    song = this.song = this.applyOverride(song);
     const soloing = song.tracks.some((t) => t.solo);
     const seen = new Set<number>();
     for (const t of song.tracks) {
@@ -241,6 +242,64 @@ export class AudioEngine {
    * Start playback. `countIn` beats of metronome clicks play first (the
    * recording lead-in); returns the context time the song itself starts.
    */
+  // ------------------------------------------------------------ external clock / clock out
+
+  private baseSong!: Song;
+  private tempoOverride: number | null = null;
+  /** Song position (in ticks since play started) at which each scene instance began. */
+  private globalStart = new WeakMap<SceneInstance, number>();
+  /** Called each scheduler pass with the context times of 24-per-beat MIDI clock pulses. */
+  onClockOut: ((ctxTimes: number[]) => void) | null = null;
+  /** Called when playback starts (with the context time of beat 1) and stops. */
+  onTransport: ((what: "start" | "stop", ctxTime: number) => void) | null = null;
+
+  /** An external clock sets the tempo without touching the song (scene tempos are ignored meanwhile). */
+  setTempoOverride(bpm: number | null) {
+    if (bpm === this.tempoOverride) return;
+    this.tempoOverride = bpm;
+    if (!this.baseSong) return;
+    this.song = this.applyOverride(this.baseSong);
+    if (this.playing) this.reanchor();
+  }
+
+  get externalTempo(): number | null { return this.tempoOverride; }
+
+  private applyOverride(song: Song): Song {
+    const bpm = this.tempoOverride;
+    if (!bpm) return song;
+    return { ...song, tempo: bpm, scenes: song.scenes.map((s) => (s.tempo === null ? s : { ...s, tempo: null })) };
+  }
+
+  /**
+   * Phase-lock to an external clock: song position `globalTick` should be heard
+   * at context time `ctxTime`. Moves the timeline (and the scheduling boundary with it,
+   * so nothing is played twice or skipped) part of the way there.
+   */
+  alignTo(globalTick: number, ctxTime: number) {
+    if (!this.playing) return;
+    const inst = this.instances.find((i) => {
+      const g = this.globalStart.get(i) ?? 0;
+      return globalTick >= g && globalTick < g + i.ticks;
+    });
+    if (!inst) return;
+    const desired = ctxTime - (globalTick - (this.globalStart.get(inst) ?? 0)) * inst.secPerTick;
+    const err = desired - inst.startTime;
+    if (Math.abs(err) < 0.002) return;
+    const shift = Math.abs(err) > 0.05 ? err : err * 0.5; // big jumps at once, small drift gently
+    const from = this.instances.indexOf(inst);
+    for (let k = from; k < this.instances.length; k++) this.instances[k].startTime += shift;
+    this.scheduledUntil += shift;
+  }
+
+  /** performance.now() time at which audio scheduled for context time `t` is heard. */
+  perfTimeOf(t: number): number {
+    const ts = this.ctx.getOutputTimestamp();
+    if (ts.contextTime === undefined || ts.performanceTime === undefined || !ts.performanceTime) {
+      return performance.now() + (t - this.ctx.currentTime + this.latency) * 1000;
+    }
+    return ts.performanceTime + (t - ts.contextTime) * 1000;
+  }
+
   play(mode: PlayMode, countIn = 0): number {
     if (this.playing) this.stop();
     if (this.ctx.state !== "running") void this.ctx.resume();
@@ -253,8 +312,10 @@ export class AudioEngine {
     first.startTime = start;
     for (let k = 0; k < countIn; k++) this.click(now + k * beat, k === 0);
     this.instances = [first];
+    this.globalStart = new WeakMap([[first, 0]]);
     this.scheduledUntil = start;
     this.playing = true;
+    this.onTransport?.("start", start);
     this.master.fade.gain.cancelScheduledValues(0);
     this.master.fade.gain.setValueAtTime(1, this.ctx.currentTime);
     this.tick();
@@ -264,6 +325,7 @@ export class AudioEngine {
 
   stop() {
     if (!this.playing) return;
+    this.onTransport?.("stop", this.ctx.currentTime);
     this.playing = false;
     clearInterval(this.timer);
     for (const tn of this.tracks.values()) {
@@ -317,6 +379,7 @@ export class AudioEngine {
     while (last && last.startTime + last.ticks * last.secPerTick < until) {
       const next = nextInstance(this.song, this.mode, last);
       if (!next) break;
+      this.globalStart.set(next, (this.globalStart.get(last) ?? 0) + last.ticks);
       this.instances.push(next);
       last = next;
     }
@@ -327,6 +390,17 @@ export class AudioEngine {
       if (inst.startTime >= this.scheduledUntil) this.onInstanceStart(inst);
       for (const ev of eventsInWindow(this.song, inst, this.scheduledUntil, until)) push(byTrack, ev);
       if (this.song.metronome) this.clicks(inst, this.scheduledUntil, until);
+      if (this.onClockOut) {
+        // MIDI clock: 24 pulses per quarter note = one every PPQ/24 ticks.
+        const step = PPQ / 24, times: number[] = [];
+        const t0 = Math.max(0, Math.ceil(((this.scheduledUntil - inst.startTime) / inst.secPerTick) / step) * step);
+        for (let tk = t0; tk < inst.ticks; tk += step) {
+          const t = inst.startTime + tk * inst.secPerTick;
+          if (t >= until) break;
+          if (t >= this.scheduledUntil) times.push(t);
+        }
+        if (times.length) this.onClockOut(times);
+      }
     }
     for (const [id, evs] of byTrack) {
       const tn = this.tracks.get(id);

@@ -498,3 +498,5 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .panel.kind-chip .inst-name { letter-spacing: .14em; }
 
 .zoom-value { min-width: 46px; }
+
+.chip-btn.ext-tempo { color: var(--purple); border-color: color-mix(in srgb, var(--purple) 55%, transparent); }
