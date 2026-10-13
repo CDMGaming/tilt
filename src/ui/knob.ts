@@ -24,6 +24,14 @@ export function control(p: ParamDef, host: ControlHost, opts: { label?: string; 
   return p.options && p.options.length <= 4 && p.max - p.min < 4 ? switchCtl(p, host, opts.label) : knob(p, host, opts);
 }
 
+/** Brief "being turned" highlight (for changes that aren't a held drag). */
+function flash(el: HTMLElement) {
+  el.classList.add("turning");
+  const t = (el as HTMLElement & { _flash?: number })._flash;
+  if (t) clearTimeout(t);
+  (el as HTMLElement & { _flash?: number })._flash = setTimeout(() => el.classList.remove("turning"), 260) as unknown as number;
+}
+
 export function knob(p: ParamDef, host: ControlHost, opts: { label?: string; size?: "s" | "m" | "l" } = {}): HTMLElement {
   const svgNS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(svgNS, "svg");
@@ -34,9 +42,12 @@ export function knob(p: ParamDef, host: ControlHost, opts: { label?: string; siz
   track.setAttribute("class", "knob-track");
   const val = document.createElementNS(svgNS, "path");
   val.setAttribute("class", "knob-val");
+  const cap = document.createElementNS(svgNS, "circle");
+  cap.setAttribute("cx", "20"); cap.setAttribute("cy", "20"); cap.setAttribute("r", "10.5");
+  cap.setAttribute("class", "knob-cap");
   const dot = document.createElementNS(svgNS, "line");
   dot.setAttribute("class", "knob-dot");
-  svg.append(track, val, dot);
+  svg.append(track, val, cap, dot);
   const valueText = h("div", { class: "knob-value" });
   const el = h("div", { class: `knob size-${opts.size ?? "m"}`, "data-nav": p.id, "data-param": p.id, title: p.label },
     svg, h("div", { class: "knob-label" }, opts.label ?? p.label), valueText);
@@ -46,13 +57,14 @@ export function knob(p: ParamDef, host: ControlHost, opts: { label?: string; siz
     const u = Math.max(0, Math.min(1, toUnit(p, v)));
     val.setAttribute("d", arcPath(u, 15));
     const a = ((-ARC / 2 - 90 + u * ARC) * Math.PI) / 180;
-    dot.setAttribute("x1", String(20 + 6 * Math.cos(a)));
-    dot.setAttribute("y1", String(20 + 6 * Math.sin(a)));
-    dot.setAttribute("x2", String(20 + 13 * Math.cos(a)));
-    dot.setAttribute("y2", String(20 + 13 * Math.sin(a)));
+    dot.setAttribute("x1", String(20 + 3.5 * Math.cos(a)));
+    dot.setAttribute("y1", String(20 + 3.5 * Math.sin(a)));
+    dot.setAttribute("x2", String(20 + 9 * Math.cos(a)));
+    dot.setAttribute("y2", String(20 + 9 * Math.sin(a)));
     valueText.textContent = formatParam(p, v);
   };
-  (el as HTMLElement & { redraw?: () => void }).redraw = draw;
+  // Changes from elsewhere (gamepad, MIDI, undo) light the knob briefly too.
+  (el as HTMLElement & { redraw?: () => void }).redraw = () => { draw(); flash(el); };
   draw();
 
   el.addEventListener("pointerdown", (e) => {
@@ -60,6 +72,7 @@ export function knob(p: ParamDef, host: ControlHost, opts: { label?: string; siz
     e.preventDefault();
     el.setPointerCapture(e.pointerId);
     host.begin(p.id);
+    el.classList.add("turning");
     let u = Math.max(0, Math.min(1, toUnit(p, host.get(p.id))));
     let lastY = e.clientY;
     const move = (ev: PointerEvent) => {
@@ -68,7 +81,7 @@ export function knob(p: ParamDef, host: ControlHost, opts: { label?: string; siz
       host.set(p.id, fromUnit(p, u));
       draw();
     };
-    const up = () => { el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); };
+    const up = () => { el.classList.remove("turning"); el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); };
     el.addEventListener("pointermove", move);
     el.addEventListener("pointerup", up);
   });
@@ -78,6 +91,7 @@ export function knob(p: ParamDef, host: ControlHost, opts: { label?: string; siz
     const u = toUnit(p, host.get(p.id)) - Math.sign(e.deltaY) * (p.options ? 1 / (p.max - p.min) : e.shiftKey ? 0.005 : 0.03);
     host.set(p.id, fromUnit(p, u));
     draw();
+    flash(el);
   }, { passive: false });
   el.addEventListener("dblclick", () => { host.begin(p.id); host.set(p.id, p.def); draw(); });
   return el;
@@ -123,6 +137,7 @@ export function fader(p: ParamDef, host: ControlHost, label: string): HTMLElemen
     e.preventDefault();
     track.setPointerCapture(e.pointerId);
     host.begin(p.id);
+    el.classList.add("turning");
     const set = (y: number) => {
       const r = track.getBoundingClientRect();
       host.set(p.id, fromUnit(p, 1 - (y - r.top) / r.height));
@@ -130,7 +145,7 @@ export function fader(p: ParamDef, host: ControlHost, label: string): HTMLElemen
     };
     set(e.clientY);
     const move = (ev: PointerEvent) => set(ev.clientY);
-    const up = () => { track.removeEventListener("pointermove", move); track.removeEventListener("pointerup", up); };
+    const up = () => { el.classList.remove("turning"); track.removeEventListener("pointermove", move); track.removeEventListener("pointerup", up); };
     track.addEventListener("pointermove", move);
     track.addEventListener("pointerup", up);
   });
