@@ -1,0 +1,2 @@
+These sound effects were synthesised by tools/make-sfx.ts for Rollbox.
+Released under CC0 1.0 (public domain dedication).

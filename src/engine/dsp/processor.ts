@@ -5,6 +5,7 @@ import { AcidDSP, DrumsDSP, PolyDSP, type Clock, type InstrumentDSP } from "./in
 import { makeFx, type Fx } from "./fx-dsp";
 import { FX_SLOTS, type InstrumentKind } from "../model";
 import { AnalogDrumsDSP, LeadDSP, PadDSP, WobbleDSP } from "./instruments2-dsp";
+import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "./instruments3-dsp";
 
 declare const sampleRate: number;
 declare const currentTime: number;
@@ -23,6 +24,8 @@ export interface InstrumentOptions {
   samples?: Float32Array[];
   samplesRate?: number;
   events?: TimedEvent[]; // offline rendering: everything up front
+  rates?: number[]; // sampler: each pad's sample rate
+  mips?: Float32Array[]; // wavetable: band-limited levels of the selected table
   clock: Clock;
 }
 
@@ -31,7 +34,8 @@ export type InstrumentMessage =
   | { t: "live"; type: "on" | "off"; pitch: number; vel: number }
   | { t: "params"; params: Record<string, number> }
   | { t: "clock"; clock: Clock }
-  | { t: "samples"; samples: Float32Array[]; samplesRate: number }
+  | { t: "samples"; samples: Float32Array[]; samplesRate?: number; rates?: number[] }
+  | { t: "wavetable"; mips: Float32Array[] }
   | { t: "stop" };
 
 class RbInstrument extends AudioWorkletProcessor {
@@ -57,6 +61,10 @@ class RbInstrument extends AudioWorkletProcessor {
     else if (o.kind === "analog") this.dsp = new AnalogDrumsDSP(o.params, sampleRate);
     else if (o.kind === "wobble") this.dsp = new WobbleDSP(o.params, sampleRate, this.clock);
     else if (o.kind === "pad") this.dsp = new PadDSP(o.params, sampleRate);
+    else if (o.kind === "chip") this.dsp = new ChipDSP(o.params, sampleRate);
+    else if (o.kind === "fm") this.dsp = new FmDSP(o.params, sampleRate);
+    else if (o.kind === "wave") { const w = new WavetableDSP(o.params, sampleRate); if (o.mips) w.setMips(o.mips); this.dsp = w; }
+    else if (o.kind === "sampler") { const s = new SamplerDSP(o.params, sampleRate); if (o.samples) s.setSamples(o.samples, o.rates ?? []); this.dsp = s; }
     else this.dsp = new PolyDSP(o.params, sampleRate);
     if (o.events) this.enqueue(o.events);
     this.port.onmessage = (e: MessageEvent<InstrumentMessage>) => this.onMessage(e.data);
@@ -78,7 +86,11 @@ class RbInstrument extends AudioWorkletProcessor {
       case "params": Object.assign(this.dsp.params, m.params); break;
       case "clock": Object.assign(this.clock, m.clock); break;
       case "samples":
-        if (this.dsp instanceof DrumsDSP) { this.dsp.setSamples(m.samples); this.dsp.samplesRate = m.samplesRate; }
+        if (this.dsp instanceof DrumsDSP) { this.dsp.setSamples(m.samples); this.dsp.samplesRate = m.samplesRate ?? sampleRate; }
+        else if (this.dsp instanceof SamplerDSP) this.dsp.setSamples(m.samples, m.rates ?? []);
+        break;
+      case "wavetable":
+        if (this.dsp instanceof WavetableDSP) this.dsp.setMips(m.mips);
         break;
       case "stop":
         this.queue.length = 0;

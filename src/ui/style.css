@@ -45,6 +45,10 @@
   --inst-poly: #4aa8ff;    /* Chordette: blue */
   --inst-pad: #ff8fd0;     /* Haze: pink */
   --inst-lead: #2fd6c6;    /* Razor: teal */
+  --inst-chip: #8c7dff;    /* Pixel: indigo */
+  --inst-fm: #e9d8b4;      /* Glint: sand */
+  --inst-wave: #5ce07a;    /* Morph: green */
+  --inst-sampler: #c3cbe0; /* Grab: steel */
 
   /* ---- shape ---- */
   --r-s: 4px;
@@ -186,6 +190,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .chip[class*="kind-"] { color: var(--kc); box-shadow: inset 2px 0 0 var(--kc); }
 .kind-drums { --kc: var(--inst-drums); } .kind-analog { --kc: var(--inst-analog); } .kind-acid { --kc: var(--inst-acid); }
 .kind-wobble { --kc: var(--inst-wobble); } .kind-poly { --kc: var(--inst-poly); } .kind-pad { --kc: var(--inst-pad); } .kind-lead { --kc: var(--inst-lead); }
+.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); }
 .dice-actions { display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap; justify-content: center; }
 .roll-btn { font-size: 28px; font-weight: 900; padding: 16px 36px; border-radius: 16px; background: var(--raise); border: 2px solid var(--accent); display: flex; flex-direction: column; align-items: center; }
 .roll-btn small, .go-btn small { font-size: 11px; color: var(--dim); font-weight: 400; }
@@ -483,3 +488,11 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
   .dice-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
   .dice-grid .die:nth-child(5), .dice-grid .die:nth-child(6), .dice-grid .die:nth-child(7) { grid-column: span 2; }
 }
+
+/* Grab / Morph extras */
+.panel.kind-sampler .panel-body { flex-direction: row; flex-wrap: wrap; gap: 16px; }
+.sound-btn { display: flex; flex-direction: column; align-items: flex-start; min-width: 140px; padding: 6px 10px; }
+.pad.drop-target { outline: 2px dashed var(--yellow); outline-offset: 2px; }
+.drop-hint { align-self: center; margin-left: 8px; }
+.wt-view { width: 168px; height: 64px; border-radius: var(--r-m); border: 1px solid var(--line); align-self: center; margin-right: 6px; }
+.panel.kind-chip .inst-name { letter-spacing: .14em; }

@@ -233,3 +233,23 @@ Deno.test("rolls give a band of 2-4 tracks, never the whole catalogue", () => {
     assert(s.lineup.length >= 2 && s.lineup.length <= 4, `seed ${seed}: ${s.lineup.length} tracks`);
   }
 });
+
+import { buildMips, fft } from "../src/engine/wavetable.ts";
+
+Deno.test("FFT round-trips and wavetable mips are band-limited", () => {
+  const n = 2048, re = new Float64Array(n), im = new Float64Array(n);
+  for (let i = 0; i < n; i++) re[i] = Math.sin((2 * Math.PI * 5 * i) / n) + 0.5 * Math.sin((2 * Math.PI * 300 * i) / n);
+  const orig = re.slice();
+  fft(re, im); fft(re, im, true);
+  assert(orig.every((v, i) => Math.abs(v - re[i]) < 1e-9));
+  // A saw in every frame: the top level (<= 4 harmonics) must hold nothing above harmonic 4.
+  const table = new Float32Array(33 * n);
+  for (let f = 0; f < 33; f++) for (let i = 0; i < n; i++) table[f * n + i] = 2 * (i / n) - 1;
+  const mips = buildMips(table);
+  assertEquals(mips.length, 9);
+  const r2 = Float64Array.from(mips[8].subarray(0, n)), i2 = new Float64Array(n);
+  fft(r2, i2);
+  let high = 0, low = 0;
+  for (let k = 1; k < n / 2; k++) { const m = Math.hypot(r2[k], i2[k]); if (k > 4) high += m; else low += m; }
+  assert(high < low * 1e-6, `energy above harmonic 4: ${high}`);
+});

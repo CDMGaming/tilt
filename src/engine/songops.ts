@@ -5,6 +5,7 @@ import {
   type AutoPoint, type Clip, type InstrumentKind, type Note, type Scene, type Song, type Track,
 } from "./model";
 import { INSTRUMENTS, presetParams } from "./instruments";
+import { DEFAULT_SAMPLER_REFS } from "./instruments3";
 
 export const SCENE_NAMES = ["Intro", "Verse", "Build", "Chorus", "Drop", "Break", "Bridge", "Outro"];
 
@@ -24,6 +25,7 @@ export function addTrack(song: Song, kind: InstrumentKind, preset = 0, at = song
     params: presetParams(kind, preset),
     volume: 0.8, pan: 0, send: 0.15, fx: emptyFx(), mute: false, solo: false, clips: {}, color: shadeFor(song, kind),
   };
+  if (kind === "sampler") t.samples = [...DEFAULT_SAMPLER_REFS];
   song.tracks.splice(at, 0, t);
   return t;
 }
@@ -46,6 +48,7 @@ export function changeInstrument(track: Track, kind: InstrumentKind, preset = 0)
   track.name = def.name;
   track.preset = def.presets[preset % def.presets.length].name;
   track.params = presetParams(kind, preset);
+  if (kind === "sampler" && !track.samples) track.samples = [...DEFAULT_SAMPLER_REFS];
 }
 
 export function loadPreset(track: Track, index: number) {

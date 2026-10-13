@@ -3,6 +3,7 @@
 
 import { normalizeSong, type Song } from "../engine/model";
 import { importMidi } from "../engine/smf";
+import { fromB64, getSample, putSample, toB64 } from "./samples";
 import { NOTE_NAMES } from "../engine/music";
 import type { App } from "./app";
 import { STORE_PREFIX } from "./storage";
@@ -56,8 +57,15 @@ export async function deleteFromLibrary(id: string) {
 
 // ------------------------------------------------------------ files
 
-export function exportSongFile(song: Song) {
-  const data = JSON.stringify({ format: FILE_FORMAT, version: 1, song }, null, 1);
+/** Song file: the song plus any of your own samples it uses, so it plays the same elsewhere. */
+export async function exportSongFile(song: Song) {
+  const samples: Record<string, { name: string; rate: number; pcm16: string }> = {};
+  for (const t of song.tracks) for (const ref of t.samples ?? []) {
+    if (!ref?.startsWith("user:") || samples[ref.slice(5)]) continue;
+    const s = await getSample(ref.slice(5));
+    if (s) samples[s.id] = { name: s.name, rate: s.rate, pcm16: toB64(s.data) };
+  }
+  const data = JSON.stringify({ format: FILE_FORMAT, version: 1, song, samples }, null, 1);
   download(`${safeName(song.title)}.rollbox.json`, data, "application/json");
 }
 
@@ -76,6 +84,10 @@ export function pickSongFile(): Promise<Song | null> {
         const j = JSON.parse(await f.text());
         const song = (j.format === FILE_FORMAT ? j.song : j) as Song;
         if (!song?.tracks || !song?.scenes) throw new Error("not a song");
+        // Restore embedded user samples (they keep their ids, which are content hashes).
+        for (const [id, s] of Object.entries((j.samples ?? {}) as Record<string, { name: string; rate: number; pcm16: string }>)) {
+          await putSample(s.name, fromB64(s.pcm16), s.rate, id);
+        }
         song.libId = newLibId();
         resolve(normalizeSong(song));
       } catch {

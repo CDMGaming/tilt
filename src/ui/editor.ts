@@ -96,6 +96,7 @@ export class EditorScreen implements Screen {
     el?.redraw?.();
     // Drum sound names and chord labels live outside the knob.
     if (/^p\dsmp$|^chord$|^spread$/.test(id)) this.render();
+    if (id === "pos" || id === "table") this.panelWrap.querySelector<HTMLElement & { redraw?: () => void }>(".wt-view")?.redraw?.();
   }
 
   // ------------------------------------------------------------ navigation

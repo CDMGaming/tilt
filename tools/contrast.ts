@@ -14,7 +14,7 @@ const pairs: [string, string, string, number][] = [
   ["on-button text (cyan)", "--accent-ink", "--cyan", 4.5], ["record button / LOCKED text", "--key-ink", "--coral", 4.5], ["mute on", "--bg", "--ink", 4.5],
   ["solo on", "--key-ink", "--yellow", 4.5], ["key labels", "--key-ink", "--key-white", 4.5], ["chord label on key", "--key-chord", "--key-white", 4.5],
   ["playing button (mint)", "--accent-ink", "--mint", 4.5], ["cyan text on surface", "--cyan", "--panel", 4.5], ["focus ring vs bg", "--yellow", "--bg", 3],
-  ...["drums", "analog", "acid", "wobble", "poly", "pad", "lead"].flatMap((k): [string, string, string, number][] => [
+  ...["drums", "analog", "acid", "wobble", "poly", "pad", "lead", "chip", "fm", "wave", "sampler"].flatMap((k): [string, string, string, number][] => [
     [`${k}: name on surface`, `--inst-${k}`, "--panel", 4.5],
     [`${k}: label on lit pad/key`, "--key-ink", `--inst-${k}`, 4.5],
   ]),

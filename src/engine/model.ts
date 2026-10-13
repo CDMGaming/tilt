@@ -1,6 +1,8 @@
 // Song data model. Plain JSON-serialisable objects only. The engine never
 // touches the DOM, so this model (and everything in src/engine) can be ported.
 
+import { DEFAULT_SAMPLER_REFS } from "./instruments3";
+
 export const PPQ = 96; // ticks per quarter note; divisible by 2, 3, 4 (16ths and triplets)
 export const BEATS_PER_BAR = 4; // 4/4 only, on purpose
 export const TICKS_PER_BAR = PPQ * BEATS_PER_BAR;
@@ -8,7 +10,7 @@ export const MAX_BARS = 8;
 export const MAX_TRACKS = 8;
 export const MAX_SCENES = 32;
 
-export type InstrumentKind = "drums" | "acid" | "poly" | "lead" | "analog" | "wobble" | "pad";
+export type InstrumentKind = "drums" | "acid" | "poly" | "lead" | "analog" | "wobble" | "pad" | "chip" | "fm" | "wave" | "sampler";
 
 export interface Note {
   id: number;
@@ -54,6 +56,8 @@ export interface Track {
   pan: number; // -1..1
   send: number; // master reverb send 0..1
   fx: FxSlot[]; // FX_SLOTS insert effects, "off" when empty
+  samples?: string[]; // sampler pads: "sfx:<name>" (built in) or "user:<id>" (stored in the browser)
+  sampleNames?: string[]; // display names for the pads (user samples)
   mute: boolean;
   solo: boolean;
   clips: Record<number, Clip>; // keyed by scene id; a missing key is an empty cell
@@ -156,6 +160,7 @@ export function normalizeSong(song: Song): Song {
   song.midiMap ??= [];
   for (const t of song.tracks) {
     t.send ??= 0.15;
+    if (t.kind === "sampler" && !t.samples) t.samples = [...DEFAULT_SAMPLER_REFS];
     t.fx ??= emptyFx();
     while (t.fx.length < FX_SLOTS) t.fx.push({ type: "off", a: 0.5, b: 0.5 });
   }

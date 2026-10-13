@@ -7,6 +7,8 @@ import type { InstrumentMessage, InstrumentOptions, TimedEvent } from "./dsp/pro
 import { KIT_SAMPLES } from "./instruments";
 import { PPQ, sceneTicks, sceneTempo, type Master, type Song, type Track } from "./model";
 import { workletParams } from "./params";
+import { buildMips, parseWav } from "./wavetable";
+import { DEFAULT_SAMPLER_REFS } from "./instruments3";
 import {
   eventsInWindow, expandPitch, firstInstance, nextInstance, secPerTick, wholeSong,
   type NoteEvent, type PlayMode, type SceneInstance,
@@ -23,6 +25,8 @@ interface TrackNodes {
   sendGain: GainNode;
   meter: AnalyserNode;
   paramsJson: string;
+  sampleKey?: string; // sampler: which sounds the worklet has
+  tableIdx?: number; // wavetable: which table the worklet has
 }
 
 export interface Position { sceneId: number; tick: number; ticks: number; repeat: number; repeats: number; instStart: number }
@@ -84,6 +88,7 @@ export class AudioEngine {
         }, this.master);
         this.tracks.set(t.id, tn);
       }
+      this.feed(t, tn);
       const params = workletParams(t);
       const json = JSON.stringify(params);
       if (json !== tn.paramsJson) {
@@ -97,6 +102,62 @@ export class AudioEngine {
     for (const [id, tn] of this.tracks) if (!seen.has(id)) { this.dispose(tn); this.tracks.delete(id); }
     applyMaster(this.master, song.master, this.ctx.currentTime);
     if (this.playing) this.reanchor();
+  }
+
+  // ------------------------------------------------------------ wavetables and samples
+
+  private mipCache = new Map<number, Promise<Float32Array[]>>();
+  private sampleCache = new Map<string, Promise<{ data: Float32Array; rate: number } | null>>();
+  /** Set by the UI: loads a user sample ("user:<id>") from browser storage. */
+  userSampleLoader: ((id: string) => Promise<{ data: Float32Array; rate: number } | null>) | null = null;
+
+  /** Band-limited levels for factory wavetable `idx` (built once, then cached). */
+  mips(idx: number): Promise<Float32Array[]> {
+    let p = this.mipCache.get(idx);
+    if (!p) {
+      p = fetch(`${import.meta.env.BASE_URL}wavetables/wavetable0${idx + 1}.wav`)
+        .then((r) => r.arrayBuffer())
+        .then((b) => buildMips(parseWav(b).data));
+      this.mipCache.set(idx, p);
+    }
+    return p;
+  }
+
+  /** A pad sound by reference: "sfx:<name>" ships with the app, "user:<id>" is stored in the browser. */
+  sample(ref: string): Promise<{ data: Float32Array; rate: number } | null> {
+    let p = this.sampleCache.get(ref);
+    if (!p) {
+      if (ref.startsWith("sfx:")) {
+        p = fetch(`${import.meta.env.BASE_URL}sfx/${ref.slice(4)}.wav`).then((r) => r.arrayBuffer()).then((b) => parseWav(b)).catch(() => null);
+      } else if (ref.startsWith("user:") && this.userSampleLoader) {
+        p = this.userSampleLoader(ref.slice(5)).catch(() => null);
+      } else p = Promise.resolve(null);
+      this.sampleCache.set(ref, p);
+    }
+    return p;
+  }
+
+  private async padSounds(t: Track): Promise<{ samples: Float32Array[]; rates: number[] }> {
+    const refs = t.samples ?? DEFAULT_SAMPLER_REFS;
+    const got = await Promise.all(refs.map((r) => (r ? this.sample(r) : Promise.resolve(null))));
+    return { samples: got.map((g) => g?.data ?? new Float32Array(0)), rates: got.map((g) => g?.rate ?? 48000) };
+  }
+
+  /** Keep a wavetable / sampler track's worklet supplied with its table or sounds. */
+  private feed(t: Track, tn: TrackNodes) {
+    if (t.kind === "wave") {
+      const idx = Math.round(t.params.table ?? 0);
+      if (tn.tableIdx !== idx) {
+        tn.tableIdx = idx;
+        void this.mips(idx).then((m) => { if (tn.tableIdx === idx) this.post(tn, { t: "wavetable", mips: m }); });
+      }
+    } else if (t.kind === "sampler") {
+      const key = JSON.stringify(t.samples ?? DEFAULT_SAMPLER_REFS);
+      if (tn.sampleKey !== key) {
+        tn.sampleKey = key;
+        void this.padSounds(t).then((s) => { if (tn.sampleKey === key) this.post(tn, { t: "samples", ...s }); });
+      }
+    }
   }
 
   /** Peak level (0..1) of a track's output, for meters. */
@@ -365,9 +426,11 @@ export class AudioEngine {
     const samples = this.samplesRate === sr ? this.samples : await resample(this.samples, this.samplesRate, sr);
     for (const t of song.tracks) {
       if (opts.onlyTrack !== undefined && t.id !== opts.onlyTrack) continue;
+      const extra = t.kind === "wave" ? { mips: await this.mips(Math.round(t.params.table ?? 0)) }
+        : t.kind === "sampler" ? await this.padSounds(t) : {};
       const tn = createTrackNodes(off, t, {
         kind: t.kind, params: workletParams(t), samples: t.kind === "drums" ? samples : undefined, samplesRate: sr,
-        events: byTrack.get(t.id) ?? [], clock: { bpm: song.tempo, zero: 0 },
+        events: byTrack.get(t.id) ?? [], clock: { bpm: song.tempo, zero: 0 }, ...extra,
       }, m);
       const audible = opts.onlyTrack !== undefined || (!t.mute && (!soloing || t.solo)) ? 1 : 0;
       tn.gain.gain.value = audible;

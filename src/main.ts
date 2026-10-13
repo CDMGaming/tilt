@@ -11,6 +11,7 @@ import { MixerScreen } from "./ui/mixer";
 import { bindTopbar } from "./ui/topbar";
 import { bindRightClick } from "./ui/rightclick";
 import { Scope } from "./ui/scope";
+import { getSample } from "./ui/samples";
 
 const root = document.getElementById("app")!;
 const app = new App(root);
@@ -28,6 +29,7 @@ const scope = new Scope(app);
 app.toggleScope = () => scope.toggle();
 app.stuck = () => phraseGridDialog(app, { sceneId: app.currentSceneId(), onDone: () => app.refresh() });
 
+app.engine.userSampleLoader = async (id) => { const s = await getSample(id); return s && { data: s.data, rate: s.rate }; };
 await app.boot(App.savedSong() ?? newSong());
 app.show("dice");
 

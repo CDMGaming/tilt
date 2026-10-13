@@ -3,6 +3,7 @@
 
 import type { InstrumentKind } from "./model";
 import { ANALOG, LEAD, PAD, WOBBLE } from "./instruments2";
+import { CHIP, FM, SAMPLER, WAVE } from "./instruments3";
 
 export interface ParamDef {
   id: string;
@@ -20,7 +21,7 @@ export interface InstrumentDef {
   name: string; // our original instrument names
   role: string;
   /** Musical job, used by the auto-arranger and the phrase grid. */
-  group: "drums" | "bass" | "harmony" | "lead";
+  group: "drums" | "bass" | "harmony" | "lead" | "fx";
   /** Drum machines: number of pads (notes from DRUM_BASE_NOTE up). */
   drumParts?: number;
   partNames?: string[];
@@ -173,10 +174,11 @@ export const POLY: InstrumentDef = {
 
 export const INSTRUMENTS: Record<InstrumentKind, InstrumentDef> = {
   drums: DRUMS, acid: ACID, poly: POLY, lead: LEAD, analog: ANALOG, wobble: WOBBLE, pad: PAD,
+  chip: CHIP, fm: FM, wave: WAVE, sampler: SAMPLER,
 };
 
 /** Every instrument, in picker order. */
-export const ALL_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "poly", "pad", "lead"];
+export const ALL_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "poly", "pad", "fm", "wave", "lead", "chip", "sampler"];
 
 export const isDrumKind = (k: InstrumentKind) => !!INSTRUMENTS[k].drumParts;
 export const drumCount = (k: InstrumentKind) => INSTRUMENTS[k].drumParts ?? 0;
@@ -222,7 +224,8 @@ export function formatParam(p: ParamDef, v: number): string {
 }
 
 /** Display name of the sound loaded in a drum part, e.g. "Kick punch". */
-export function drumPartName(params: Record<string, number>, part: number, kind: InstrumentKind = "drums"): string {
+export function drumPartName(params: Record<string, number>, part: number, kind: InstrumentKind = "drums", names?: string[]): string {
+  if (names) return names[part] ?? `Pad ${part + 1}`;
   if (INSTRUMENTS[kind].partNames) return INSTRUMENTS[kind].partNames![part] ?? "";
   const s = KIT_SAMPLES[Math.round(params[`p${part}smp`] ?? 0)] ?? "";
   const t = s.replace(/-/g, " ");

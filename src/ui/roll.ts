@@ -4,6 +4,7 @@
 
 import { DRUM_BASE_NOTE, drumCount, drumPartName, formatParam, fromUnit, isDrumKind, toUnit } from "../engine/instruments";
 import { getParam, paramInfo } from "../engine/params";
+import { sampleLabel } from "./samples";
 import { PPQ, TICKS_PER_BAR, type Clip, type Note, type Track } from "../engine/model";
 import { inScale, noteName } from "../engine/music";
 import { addNote, ensureClip, laneValue, noteAt, setAutoPoint } from "../engine/songops";
@@ -183,7 +184,7 @@ export class PianoRoll {
       g.textBaseline = "middle";
       if (drums) {
         const part = pitch - DRUM_BASE_NOTE;
-        g.fillText(drumPartName(track.params, part, track.kind), 6, y + rowH / 2 - (rowH > 26 ? 6 : 0));
+        g.fillText(track.kind === "sampler" ? sampleLabel(track.samples?.[part], track.sampleNames, part) : drumPartName(track.params, part, track.kind), 6, y + rowH / 2 - (rowH > 26 ? 6 : 0));
         if (rowH > 26) { g.fillStyle = col("--dim"); g.font = "10px system-ui"; g.fillText(`pad ${part + 1}`, 6, y + rowH / 2 + 8); }
       } else if ((((pitch % 12) + 12) % 12) === 0 || rowH >= 15) {
         g.fillText(noteName(pitch), 6, y + rowH / 2);

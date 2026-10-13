@@ -7,7 +7,7 @@ export function mtof(m: number): number {
 }
 
 /** PolyBLEP residual for band-limited saw/square. */
-function blep(t: number, dt: number): number {
+export function blep(t: number, dt: number): number {
   if (t < dt) { t /= dt; return t + t - t * t - 1; }
   if (t > 1 - dt) { t = (t - 1) / dt; return t * t + t + t + 1; }
   return 0;

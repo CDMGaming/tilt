@@ -4,15 +4,15 @@
 import { INSTRUMENTS } from "./instruments";
 import { TICKS_PER_BAR, newId, sceneTicks, type Scene, type Song, type Track } from "./model";
 
-type Role = "drums" | "bass" | "harmony" | "lead";
+type Role = "drums" | "bass" | "harmony" | "lead" | "fx";
 const roleOf = (t: Track): Role => INSTRUMENTS[t.kind].group;
 
 interface Section { name: string; bars: number; play: Role[]; fadeIn?: boolean; fadeOut?: boolean; thin?: boolean }
 
 const PLAN: Section[] = [
   { name: "Intro", bars: 8, play: ["harmony"], fadeIn: true },
-  { name: "Build", bars: 8, play: ["harmony", "drums"], thin: true },
-  { name: "Drop", bars: 16, play: ["drums", "bass", "harmony", "lead"] },
+  { name: "Build", bars: 8, play: ["harmony", "drums", "fx"], thin: true },
+  { name: "Drop", bars: 16, play: ["drums", "bass", "harmony", "lead", "fx"] },
   { name: "Break", bars: 8, play: ["harmony", "bass", "lead"] },
   { name: "Drop 2", bars: 16, play: ["drums", "bass", "harmony", "lead"] },
   { name: "Outro", bars: 8, play: ["drums", "harmony"], fadeOut: true },

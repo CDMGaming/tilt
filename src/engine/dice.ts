@@ -22,7 +22,8 @@ export type Locks = Record<LockKey, boolean>;
 export const NO_LOCKS: Locks = { key: false, scale: false, tempo: false, swing: false, lineup: false, presets: false, cards: false };
 
 // Instruments the dice may pick. Grows as later phases add instruments.
-export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "poly", "pad", "lead"];
+// The sampler stays out of the dice (it is for sounds you bring); everything else can be rolled.
+export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "poly", "pad", "fm", "wave", "lead", "chip"];
 
 const SCALE_WEIGHTS: [string, number][] = [
   ["minor", 6], ["major", 4], ["dorian", 3], ["minpenta", 3], ["majpenta", 2], ["phrygian", 2],
@@ -91,7 +92,7 @@ export function usedPresets(song: Song, kind: InstrumentKind, exceptTrackId?: nu
 
 const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"; // Crockford base32: no I, L, O, U
 // Order is part of the share-code format: only ever append.
-const KIND_CODE: InstrumentKind[] = ["drums", "acid", "poly", "lead", "analog", "wobble", "pad"];
+const KIND_CODE: InstrumentKind[] = ["drums", "acid", "poly", "lead", "analog", "wobble", "pad", "chip", "fm", "wave", "sampler"];
 
 export function encodeSetup(s: Setup): string {
   const bytes = [

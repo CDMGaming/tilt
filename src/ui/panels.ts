@@ -4,6 +4,8 @@
 import { DRUM_BASE_NOTE, INSTRUMENTS, drumPartName, isDrumKind, paramDef } from "../engine/instruments";
 import type { Track } from "../engine/model";
 import { chordName, noteName, scaleById } from "../engine/music";
+import { decodeFile, listSamples, putSample, sampleLabel } from "./samples";
+import { SFX, WT_FRAMES, WT_SIZE } from "../engine/instruments3";
 import { allPresets, applyPreset, deleteUserPreset, presetPosition, saveUserPreset, userPresets, USER_MARK } from "./presets";
 import { getParam } from "../engine/params";
 import { expandPitch } from "../engine/timeline";
@@ -95,6 +97,54 @@ export function buildPanel(app: App, track: Track): HTMLElement {
         ctl("width", "Width", "s"), ctl("level", "Out", "s")),
       keyboard(app, track),
     );
+  } else if (track.kind === "chip") {
+    body = h("div", { class: "panel-body pixel" },
+      h("div", { class: "knob-row" },
+        h("div", { class: "section-title small" }, "Osc"), ctl("wave", "Wave"),
+        h("div", { class: "section-title small" }, "Jump"), ctl("jump", "Jump"), ctl("jumpRate", "Rate", "l"),
+        h("div", { class: "section-title small" }, "Pitch"), ctl("sweep", "Sweep"), ctl("sweepTime", "Time"), ctl("vibDepth", "Vibrato"), ctl("vibRate", "Vib rate")),
+      h("div", { class: "knob-row" },
+        h("div", { class: "section-title small" }, "Env"), ctl("attack", "A", "s"), ctl("decay", "D", "s"), ctl("sustain", "S", "s"), ctl("release", "R", "s"),
+        h("div", { class: "section-title small" }, "Out"), ctl("crush", "CRUSH", "l"), ctl("level", "Level", "s")),
+      keyboard(app, track),
+    );
+  } else if (track.kind === "fm") {
+    body = h("div", { class: "panel-body glint" },
+      h("div", { class: "knob-row" },
+        h("div", { class: "section-title small" }, "Ratios"), ctl("ratioC", "Carrier"), ctl("ratioM", "Modulator"),
+        h("div", { class: "section-title small" }, "FM"), ctl("index", "FM AMOUNT", "l"), ctl("indexDecay", "FM decay"), ctl("indexSus", "FM sustain"), ctl("feedback", "Feedback"), ctl("velIndex", "Vel → FM")),
+      h("div", { class: "knob-row" },
+        h("div", { class: "section-title small" }, "Amp"), ctl("attack", "A", "s"), ctl("decay", "D", "s"), ctl("sustain", "S", "s"), ctl("release", "R", "s"),
+        h("div", { class: "section-title small" }, "Out"), ctl("detune", "Stereo", "s"), ctl("level", "Level", "s")),
+      keyboard(app, track),
+    );
+  } else if (track.kind === "wave") {
+    body = h("div", { class: "panel-body morph" },
+      h("div", { class: "knob-row" },
+        wavetableView(app, track),
+        h("div", { class: "section-title small" }, "Table"), ctl("table", "Table"), ctl("pos", "POSITION", "l"), ctl("envAmt", "Pos env"), ctl("envDecay", "Env decay"), ctl("lfoAmt", "Pos LFO"), ctl("lfoRate", "LFO rate")),
+      h("div", { class: "knob-row" },
+        h("div", { class: "section-title small" }, "Voice"), ctl("unison", "Voices"), ctl("detune", "Detune", "s"),
+        h("div", { class: "section-title small" }, "Filter"), ctl("cutoff", "Cutoff"), ctl("reso", "Reso", "s"),
+        h("div", { class: "section-title small" }, "Amp"), ctl("attack", "A", "s"), ctl("decay", "D", "s"), ctl("sustain", "S", "s"), ctl("release", "R", "s"), ctl("level", "Level", "s")),
+      keyboard(app, track),
+    );
+  } else if (track.kind === "sampler") {
+    const part = Math.min(app.ed.drumPart, 7);
+    body = h("div", { class: "panel-body grab" },
+      h("div", { class: "pads" }, Array.from({ length: 8 }, (_, i) => pad(app, track, i))),
+      h("div", { class: "part-edit" },
+        h("div", { class: "section-title" }, `Pad ${part + 1} · ${sampleLabel(track.samples?.[part], track.sampleNames, part)}`),
+        h("div", { class: "knob-row" },
+          h("button", { class: "sound-btn", "data-nav": "sound", onclick: (e: Event) => soundMenu(app, track, part, e.currentTarget as HTMLElement) },
+            h("div", { class: "switch-label" }, "Sound"), h("div", { class: "switch-value" }, sampleLabel(track.samples?.[part], track.sampleNames, part) + " ▾")),
+          ctl(`p${part}tune`, "Tune"), ctl(`p${part}start`, "Start"), ctl(`p${part}decay`, "Decay"), ctl(`p${part}level`, "Level"), ctl(`p${part}pan`, "Pan")),
+        h("div", { class: "knob-row" },
+          ctl(`p${part}rev`, "Reverse"), ctl(`p${part}mode`, "Mode"),
+          h("div", { class: "section-title small" }, "Master"), ctl("level", "Level"),
+          h("div", { class: "note drop-hint" }, "Drop an audio file on a pad to load it.")),
+      ),
+    );
   } else if (track.kind === "acid") {
     body = h("div", { class: "panel-body squelch" },
       h("div", { class: "knob-row" },
@@ -166,7 +216,19 @@ function pad(app: App, track: Track, i: number): HTMLElement {
   const note = DRUM_BASE_NOTE + i;
   const el = h("button", {
     class: "pad" + (app.ed.drumPart === i ? " selected" : ""), "data-nav": `pad${i}`, "data-note": note,
-  }, h("span", { class: "pad-num" }, String(i + 1)), h("span", { class: "pad-label" }, drumPartName(track.params, i, track.kind)));
+  }, h("span", { class: "pad-num" }, String(i + 1)), h("span", { class: "pad-label" },
+    track.kind === "sampler" ? sampleLabel(track.samples?.[i], track.sampleNames, i) : drumPartName(track.params, i, track.kind)));
+  if (track.kind === "sampler") {
+    // Drag an audio file onto a pad to load it there.
+    el.addEventListener("dragover", (e) => { e.preventDefault(); el.classList.add("drop-target"); });
+    el.addEventListener("dragleave", () => el.classList.remove("drop-target"));
+    el.addEventListener("drop", (e) => {
+      e.preventDefault();
+      el.classList.remove("drop-target");
+      const f = e.dataTransfer?.files?.[0];
+      if (f) void loadFileToPad(app, track, i, f);
+    });
+  }
   el.addEventListener("pointerdown", (e) => {
     e.preventDefault();
     app.noteInput(note, 110, true);
@@ -209,4 +271,74 @@ function keyboard(app: App, track: Track): HTMLElement {
       })),
     h("button", { class: "oct-btn", "data-nav": "oct-up", onclick: () => octave(1) }, "▶"),
   );
+}
+
+// ---------------------------------------------------------------- sampler helpers
+
+function setPadSound(app: App, track: Track, pad: number, ref: string, name: string) {
+  app.edit("Load sample", () => {
+    track.samples = [...(track.samples ?? [])];
+    track.sampleNames = [...(track.sampleNames ?? [])];
+    track.samples[pad] = ref;
+    track.sampleNames[pad] = name;
+  });
+}
+
+async function loadFileToPad(app: App, track: Track, pad: number, file: File) {
+  try {
+    const s = await decodeFile(app.engine.ctx, file);
+    const id = await putSample(s.name, s.data, s.rate);
+    setPadSound(app, track, pad, `user:${id}`, s.name);
+    app.overlays.toast(`Loaded "${s.name}" (${(s.data.length / s.rate).toFixed(1)} s) on pad ${pad + 1}`);
+    app.engine.preview(track.id, DRUM_BASE_NOTE + pad, 110, 0.6);
+  } catch (e) {
+    app.overlays.toast(`Couldn't read that file: ${e}`);
+  }
+}
+
+function pickFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = h("input", { type: "file", accept: "audio/*,.wav,.mp3,.ogg,.flac,.aif,.aiff" });
+    input.onchange = () => resolve(input.files?.[0] ?? null);
+    input.click();
+  });
+}
+
+async function soundMenu(app: App, track: Track, pad: number, anchor: HTMLElement) {
+  const mine = await listSamples().catch(() => []);
+  const r = anchor.getBoundingClientRect();
+  const current = track.samples?.[pad];
+  app.overlays.menu(`Pad ${pad + 1} sound`, () => [
+    { label: "Load audio file…", hint: "WAV, MP3, OGG…", run: async () => { const f = await pickFile(); if (f) await loadFileToPad(app, track, pad, f); } },
+    ...SFX.map((name) => ({ label: sampleLabel(`sfx:${name}`), hint: "built in", checked: current === `sfx:${name}`, run: () => { setPadSound(app, track, pad, `sfx:${name}`, ""); app.engine.preview(track.id, DRUM_BASE_NOTE + pad, 110, 0.6); } })),
+    ...mine.map((m) => ({ label: m.name, hint: `${m.seconds.toFixed(1)} s`, checked: current === `user:${m.id}`, run: () => { setPadSound(app, track, pad, `user:${m.id}`, m.name); app.engine.preview(track.id, DRUM_BASE_NOTE + pad, 110, 0.6); } })),
+  ], { x: r.left, y: r.bottom });
+}
+
+// ---------------------------------------------------------------- wavetable view
+
+/** The current frame of a Morph track's table, redrawn when the table or position changes. */
+function wavetableView(app: App, track: Track): HTMLElement {
+  const cv = h("canvas", { class: "wt-view", width: 168, height: 64 });
+  const draw = async () => {
+    const mips = await app.engine.mips(Math.round(track.params.table ?? 0));
+    const g = cv.getContext("2d")!;
+    const css = getComputedStyle(document.documentElement);
+    g.fillStyle = css.getPropertyValue("--well").trim();
+    g.fillRect(0, 0, cv.width, cv.height);
+    const frame = Math.round((track.params.pos ?? 0) * (WT_FRAMES - 1));
+    const t = mips[0];
+    g.strokeStyle = getComputedStyle(cv).getPropertyValue("--track").trim() || "#5ce07a";
+    g.lineWidth = 2;
+    g.beginPath();
+    for (let x = 0; x < cv.width; x++) {
+      const v = t[frame * WT_SIZE + Math.floor((x / cv.width) * WT_SIZE)];
+      const y = cv.height / 2 - v * (cv.height / 2 - 4);
+      if (x) g.lineTo(x, y); else g.moveTo(x, y);
+    }
+    g.stroke();
+  };
+  (cv as HTMLCanvasElement & { redraw?: () => void }).redraw = () => void draw();
+  requestAnimationFrame(() => void draw());
+  return cv;
 }
