@@ -3,7 +3,7 @@
 
 import { AudioEngine } from "../engine/audio";
 import { History } from "../engine/history";
-import { INSTRUMENTS, fromUnit, toUnit, paramDef } from "../engine/instruments";
+import { INSTRUMENTS, drumCount, fromUnit, isDrumKind, paramDef, toUnit } from "../engine/instruments";
 import { getParam, paramInfo, setParamValue } from "../engine/params";
 import { AUTO_STEP } from "../engine/timeline";
 import { DRUM_BASE_NOTE } from "../engine/instruments";
@@ -59,11 +59,15 @@ export interface Settings {
   countIn: boolean; // one bar of clicks before recording starts from stopped
   recQuantize: boolean;
   padLayout: "auto" | "xbox" | "nintendo";
+  transport: { play?: { ch: number; cc: number }; record?: { ch: number; cc: number } };
   outputDevice: string;
 }
 
-const SONG_KEY = "rollbox.song.v1";
-const SETTINGS_KEY = "rollbox.settings.v1";
+import { STORE_PREFIX } from "./storage";
+import { saveToLibrary } from "./library";
+export { STORE_PREFIX };
+const SONG_KEY = STORE_PREFIX + "song.v1";
+const SETTINGS_KEY = STORE_PREFIX + "settings.v1";
 
 export class App {
   engine = new AudioEngine();
@@ -80,7 +84,7 @@ export class App {
     stepInput: false, stepTick: 0, sel: new Set(), selAnchor: null, placing: null, grabbing: false, clipboard: [],
     octave: 3, drumPart: 0, topPitch: 72,
   };
-  settings: Settings = { notePreview: true, scaleLock: true, fold: false, countIn: true, recQuantize: true, padLayout: "auto", outputDevice: "" };
+  settings: Settings = { notePreview: true, scaleLock: true, fold: false, countIn: true, recQuantize: true, padLayout: "auto", outputDevice: "", transport: {} };
   dice: { setup: Setup; locks: Locks; minutes: number } = { setup: roll(null, NO_LOCKS), locks: { ...NO_LOCKS }, minutes: 20 };
   timer = { total: 0, endsAt: 0, running: false, done: false };
   locked = false;
@@ -109,6 +113,7 @@ export class App {
       onTrackVolume: (i, v) => this.trackVolume(i, v),
       onTransport: () => this.togglePlay(),
       onDevicesChanged: () => this.renderHeader(),
+      onCC: (ch, cc, raw, v) => this.onCC(ch, cc, raw, v),
     });
     this.pad = new GamepadInput({ action: (a) => this.dispatch(a), musicKey: () => {} });
     bindKeyboard({ action: (a) => this.dispatch(a), musicKey: (k, on) => this.musicKey(k, on) }, () => {
@@ -192,7 +197,10 @@ export class App {
   }
 
   replaceSong(song: Song, clearHistory = true) {
+    // Undo/redo snapshots may predate the library id: keep the song's identity.
+    const keepId = !clearHistory ? this.song?.libId : undefined;
     this.song = normalizeSong(song);
+    if (keepId) this.song.libId = keepId;
     if (clearHistory) this.history.clear();
     this.ed.sel.clear();
     this.fixCursors();
@@ -229,6 +237,7 @@ export class App {
     if (this.locked) return;
     const key = `${track.id}:${id}`;
     const now = performance.now();
+    if (gesture && this.learning) this.noteLearnTarget(track.id, id);
     if (!this.recording && (gesture || this.lastParam.key !== key || now - this.lastParam.time > 1500)) {
       this.history.push(this.song, `${INSTRUMENTS[track.kind].name}: ${paramInfo(track, id)?.label ?? id}`);
     }
@@ -362,7 +371,7 @@ export class App {
     let len = pos.tick - start.tick;
     if (pos.sceneId !== start.sceneId || len <= 0) len = this.grid();
     const note = { pitch, start: ((Math.round(start.tick) % clipTicks) + clipTicks) % clipTicks, len: Math.max(6, Math.round(len)), vel: start.vel };
-    if (track.kind === "drums") note.len = this.grid();
+    if (isDrumKind(track.kind)) note.len = this.grid();
     if (this.settings.recQuantize) {
       quantizeNotes([note as never], this.grid());
       note.start %= clipTicks;
@@ -426,8 +435,8 @@ export class App {
     const track = this.selectedTrack();
     if (!track) return;
     let pitch: number;
-    if (track.kind === "drums") {
-      if (k.row !== "low" || k.index > 7) return;
+    if (isDrumKind(track.kind)) {
+      if (k.row !== "low" || k.index >= drumCount(track.kind)) return;
       pitch = DRUM_BASE_NOTE + k.index;
     } else if (this.settings.scaleLock) {
       const steps = scaleById(this.song.scale).steps;
@@ -449,7 +458,7 @@ export class App {
     // Remember what each key played, so note-off matches even if lock changes mid-hold.
     let p = pitch;
     if (on) {
-      if (track.kind === "drums") p = DRUM_BASE_NOTE + ((((pitch - DRUM_BASE_NOTE) % 8) + 8) % 8);
+      if (isDrumKind(track.kind)) { const n = drumCount(track.kind); p = DRUM_BASE_NOTE + ((((pitch - DRUM_BASE_NOTE) % n) + n) % n); }
       else if (this.settings.scaleLock) p = snapToScale(pitch, this.song.key, this.song.scale);
       this.midiHeld.set(pitch, p);
     } else {
@@ -461,8 +470,8 @@ export class App {
 
   private midiPad(index: number, vel: number, on: boolean, t: number) {
     const track = this.selectedTrack();
-    if (track?.kind === "drums") {
-      this.noteInput(DRUM_BASE_NOTE + (index % 8), vel, on, t);
+    if (track && isDrumKind(track.kind)) {
+      this.noteInput(DRUM_BASE_NOTE + (index % drumCount(track.kind)), vel, on, t);
       return;
     }
     // Other tracks: pads launch scenes.
@@ -492,6 +501,92 @@ export class App {
     // Through setParam, so the move is recorded as volume automation while recording.
     this.setParam(t, "mix:vol", Math.max(0, Math.min(1, v.abs ?? t.volume + (v.delta ?? 0) * 0.01)));
     this.overlays.toast(`${t.name} ${i + 1} volume ${Math.round(t.volume * 100)}`, 700);
+  }
+
+  // ------------------------------------------------------------ MIDI learn
+
+  learning = false;
+  learnTarget: { trackId: number; key: string } | null = null;
+  learnTransport: "play" | "record" | null = null;
+  private learnBanner: HTMLElement | null = null;
+
+  setLearning(on: boolean) {
+    this.learning = on;
+    this.learnTarget = null;
+    this.learnBanner?.remove();
+    this.learnBanner = null;
+    if (on) {
+      this.learnBanner = h("div", { class: "learn-banner" });
+      document.body.appendChild(this.learnBanner);
+      this.updateLearnBanner();
+    }
+    this.screens[this.screenName]?.render();
+  }
+
+  /** The knob the user just touched (mouse grab, or gamepad focus) becomes the learn target. */
+  noteLearnTarget(trackId: number, key: string) {
+    if (!this.learning) return;
+    this.learnTarget = { trackId, key };
+    this.updateLearnBanner();
+    for (const el of document.querySelectorAll(".learn-target")) el.classList.remove("learn-target");
+    document.querySelector(`[data-track="${trackId}"] [data-param="${key}"], .panel [data-param="${key}"]`)?.classList.add("learn-target");
+  }
+
+  private updateLearnBanner() {
+    if (!this.learnBanner) return;
+    const t = this.learnTarget ? this.song.tracks.find((x) => x.id === this.learnTarget!.trackId) : undefined;
+    const label = t ? `${INSTRUMENTS[t.kind].name}: ${paramInfo(t, this.learnTarget!.key)?.label ?? this.learnTarget!.key}` : null;
+    this.learnBanner.replaceChildren(
+      h("b", null, "MIDI learn"),
+      h("span", null, label ? ` → move a control on your MIDI device to bind it to ${label}` : " → touch a knob or fader (mouse, or move the gamepad focus onto it), then move a MIDI control"),
+      h("span", { class: "learn-count" }, ` · ${this.song.midiMap?.length ?? 0} binding${this.song.midiMap?.length === 1 ? "" : "s"} in this song`),
+      h("button", { class: "mini", onclick: () => { this.edit("Clear MIDI learn", () => (this.song.midiMap = [])); this.updateLearnBanner(); } }, "Clear all"),
+      h("button", { class: "mini on", onclick: () => this.setLearning(false) }, "Done"),
+    );
+  }
+
+  private onCC(ch: number, cc: number, raw: number, v: { abs?: number; delta?: number }): boolean {
+    if (this.learnTransport) {
+      this.settings.transport[this.learnTransport] = { ch, cc };
+      this.saveSettings();
+      this.overlays.toast(`CC ${cc} (ch ${ch + 1}) now triggers ${this.learnTransport === "play" ? "play / stop" : "record"}`);
+      this.learnTransport = null;
+      return true;
+    }
+    if (this.learning && this.learnTarget) {
+      const map = (this.song.midiMap ??= []);
+      const b = { ch, cc, ...this.learnTarget };
+      this.song.midiMap = map.filter((m) => !(m.ch === ch && m.cc === cc) && !(m.trackId === b.trackId && m.key === b.key));
+      this.song.midiMap.push(b);
+      this.changed(false);
+      const t = this.song.tracks.find((x) => x.id === b.trackId);
+      this.overlays.toast(`CC ${cc} → ${t ? INSTRUMENTS[t.kind].name : "?"} ${t ? paramInfo(t, b.key)?.label ?? b.key : b.key}`, 1500);
+      this.learnTarget = null;
+      this.updateLearnBanner();
+      this.screens[this.screenName]?.render();
+      return true;
+    }
+    const tp = this.settings.transport;
+    if (tp.play && tp.play.cc === cc && tp.play.ch === ch) { if (raw > 0) this.togglePlay(); return true; }
+    if (tp.record && tp.record.cc === cc && tp.record.ch === ch) { if (raw > 0) this.toggleRecord(); return true; }
+    const bind = this.song.midiMap?.find((m) => m.ch === ch && m.cc === cc);
+    if (!bind) return false;
+    const track = this.song.tracks.find((t) => t.id === bind.trackId);
+    const def = track && paramInfo(track, bind.key);
+    if (!track || !def) return true;
+    if (v.abs !== undefined) this.setParam(track, bind.key, fromUnit(def, v.abs));
+    else this.nudgeParam(track, bind.key, v.delta ?? 0);
+    return true;
+  }
+
+  /** Mark knobs that have a MIDI binding (and the current learn target) inside `root`. */
+  markLearned(root: HTMLElement, trackId: number) {
+    for (const m of this.song.midiMap ?? []) {
+      if (m.trackId !== trackId) continue;
+      root.querySelector(`[data-param="${m.key}"]`)?.classList.add("learned");
+    }
+    if (this.learnTarget?.trackId === trackId) root.querySelector(`[data-param="${this.learnTarget.key}"]`)?.classList.add("learn-target");
+    root.classList.toggle("learning", this.learning);
   }
 
   // ------------------------------------------------------------ dispatch
@@ -557,7 +652,9 @@ export class App {
     clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => {
       try { localStorage.setItem(SONG_KEY, JSON.stringify(this.song)); } catch { /* storage full or blocked */ }
-    }, 400) as unknown as number;
+      // Songs with content also live in the library (assigned an id on first save).
+      if (this.song.tracks.length) saveToLibrary(this.song).catch((e) => console.warn("library save failed", e));
+    }, 600) as unknown as number;
   }
 
   static savedSong(): Song | null {

@@ -3,15 +3,19 @@
 
 import { autoArrange, canArrange } from "../engine/arranger";
 import { pickPreset, usedPresets } from "../engine/dice";
-import { INSTRUMENTS } from "../engine/instruments";
+import { ALL_KINDS, INSTRUMENTS } from "../engine/instruments";
 import type { InstrumentKind } from "../engine/model";
 import { NOTE_NAMES, SCALES, scaleById } from "../engine/music";
 import { encodeWav, peakDb } from "../engine/wav";
 import type { App } from "./app";
 import { download, h } from "./dom";
+import { libraryDialog, safeName } from "./library";
+import { phraseGridDialog } from "./phrasegrid";
+import { exportMidi } from "../engine/smf";
+import { zip } from "../engine/zip";
 import { stepper } from "./overlay";
 
-const KINDS: InstrumentKind[] = ["drums", "acid", "poly"];
+const KINDS: InstrumentKind[] = ALL_KINDS;
 
 export function instrumentPicker(app: App, title: string, pick: (kind: InstrumentKind, preset: number) => void) {
   app.overlays.dialog(title, (close) => h("div", { class: "picker" },
@@ -68,42 +72,64 @@ export function songSettings(app: App) {
 
 // ------------------------------------------------------------ export
 
+type ExportWhat = "mix" | "stems" | "midi" | number;
+
 export function exportDialog(app: App, then?: () => void) {
-  const opts = { what: "mix" as "mix" | number, tail: 2, bits: 16 as 16 | 24, rate: 44100 };
+  const opts = { what: "mix" as ExportWhat, tail: 2, bits: 16 as 16 | 24, rate: 44100 };
   let status = "";
   let busy = false;
-  app.overlays.dialog("Export WAV", (close, rerender) => {
+  app.overlays.dialog("Export", (close, rerender) => {
     const s = app.song;
-    const whatLabel = opts.what === "mix" ? "Full mix" : `${s.tracks.findIndex((t) => t.id === opts.what) + 1} ${s.tracks.find((t) => t.id === opts.what)?.name ?? ""}`;
-    const choices: ("mix" | number)[] = ["mix", ...s.tracks.map((t) => t.id)];
+    const label = (w: ExportWhat) =>
+      w === "mix" ? "Full mix (WAV)" : w === "stems" ? "All stems (zip of WAVs)" : w === "midi" ? "MIDI file (.mid)"
+        : `Track ${s.tracks.findIndex((t) => t.id === w) + 1}: ${INSTRUMENTS[s.tracks.find((t) => t.id === w)!.kind].name} (WAV)`;
+    const choices: ExportWhat[] = ["mix", "stems", "midi", ...s.tracks.map((t) => t.id)];
+    const audio = opts.what !== "midi";
+    const base = safeName(s.title);
+    const run = async () => {
+      if (busy) return;
+      busy = true; status = "Rendering…"; rerender();
+      try {
+        const t0 = performance.now();
+        const took = () => `${((performance.now() - t0) / 1000).toFixed(1)} s`;
+        if (opts.what === "midi") {
+          download(`${base}.mid`, exportMidi(s), "audio/midi");
+          status = `Done: MIDI file with ${s.tracks.length} tracks (drums on channel 10, General MIDI notes).`;
+        } else if (opts.what === "stems") {
+          const files: { name: string; data: Uint8Array }[] = [];
+          for (let i = 0; i < s.tracks.length; i++) {
+            const t = s.tracks[i];
+            status = `Rendering stem ${i + 1} of ${s.tracks.length}…`; rerender();
+            const buf = await app.engine.render(s, { tail: opts.tail, sampleRate: opts.rate, onlyTrack: t.id });
+            files.push({ name: `${String(i + 1).padStart(2, "0")} ${INSTRUMENTS[t.kind].name} - ${safeName(t.preset)}.wav`, data: encodeWav(buf, opts.bits) });
+          }
+          status = "Rendering the full mix…"; rerender();
+          const mix = await app.engine.render(s, { tail: opts.tail, sampleRate: opts.rate });
+          files.push({ name: `00 Full mix.wav`, data: encodeWav(mix, opts.bits) });
+          files.push({ name: `${base}.mid`, data: exportMidi(s) });
+          download(`${base} stems.zip`, zip(files), "application/zip");
+          status = `Done: ${s.tracks.length} stems + full mix + MIDI in one zip, ${mix.duration.toFixed(1)} s long, rendered in ${took()}. All stems start at 0:00, so they line up when dropped into a DAW.`;
+        } else {
+          const buf = await app.engine.render(s, { tail: opts.tail, sampleRate: opts.rate, onlyTrack: opts.what === "mix" ? undefined : opts.what });
+          const suffix = opts.what === "mix" ? "" : ` - track ${s.tracks.findIndex((t) => t.id === opts.what) + 1}`;
+          download(`${base}${suffix}.wav`, encodeWav(buf, opts.bits), "audio/wav");
+          status = `Done: ${buf.duration.toFixed(1)} s, peak ${peakDb(buf).toFixed(1)} dBFS, rendered in ${took()}.`;
+        }
+      } catch (e) {
+        status = `Export failed: ${e}`;
+      }
+      busy = false;
+      rerender();
+      then?.();
+    };
     return h("div", { class: "form" },
-      stepper("what", "Export", whatLabel, (d) => { opts.what = choices[(choices.indexOf(opts.what) + d + choices.length) % choices.length]; rerender(); }),
-      stepper("tail", "Reverb tail", `${opts.tail} s`, (d) => { opts.tail = [0, 1, 2, 5][([0, 1, 2, 5].indexOf(opts.tail) + d + 4) % 4]; rerender(); }),
-      stepper("bits", "Format", `${opts.bits}-bit`, () => { opts.bits = opts.bits === 16 ? 24 : 16; rerender(); }),
-      stepper("rate", "Sample rate", `${opts.rate / 1000} kHz`, () => { opts.rate = opts.rate === 44100 ? 48000 : 44100; rerender(); }),
+      stepper("what", "Export", label(opts.what), (d) => { opts.what = choices[(choices.indexOf(opts.what) + d + choices.length) % choices.length]; rerender(); }),
+      audio ? stepper("tail", "Reverb tail", `${opts.tail} s`, (d) => { opts.tail = [0, 1, 2, 5][([0, 1, 2, 5].indexOf(opts.tail) + d + 4) % 4]; rerender(); }) : null,
+      audio ? stepper("bits", "Format", `${opts.bits}-bit`, () => { opts.bits = opts.bits === 16 ? 24 : 16; rerender(); }) : null,
+      audio ? stepper("rate", "Sample rate", `${opts.rate / 1000} kHz`, () => { opts.rate = opts.rate === 44100 ? 48000 : 44100; rerender(); }) : null,
       h("p", { class: "note" }, `Plays the song once top to bottom (scene repeats included), ${s.scenes.length} scene${s.scenes.length > 1 ? "s" : ""}.`),
       status ? h("p", { class: "status" }, status) : null,
-      h("button", {
-        class: "row-btn primary", "data-nav": "go", disabled: busy,
-        onclick: async () => {
-          if (busy) return;
-          busy = true; status = "Rendering…"; rerender();
-          try {
-            const t0 = performance.now();
-            const buf = await app.engine.render(s, { tail: opts.tail, sampleRate: opts.rate, onlyTrack: opts.what === "mix" ? undefined : opts.what });
-            const wav = encodeWav(buf, opts.bits);
-            const base = (s.title || "rollbox").replace(/[^\w\- ]+/g, "").trim() || "rollbox";
-            const suffix = opts.what === "mix" ? "" : `-${whatLabel.replace(/\s+/g, "-")}`;
-            download(`${base}${suffix}.wav`, wav, "audio/wav");
-            status = `Done: ${buf.duration.toFixed(1)} s, peak ${peakDb(buf).toFixed(1)} dBFS, rendered in ${((performance.now() - t0) / 1000).toFixed(1)} s.`;
-          } catch (e) {
-            status = `Export failed: ${e}`;
-          }
-          busy = false;
-          rerender();
-          then?.();
-        },
-      }, busy ? "Rendering…" : "Render & download"),
+      h("button", { class: "row-btn primary", "data-nav": "go", disabled: busy, onclick: run }, busy ? "Working…" : "Export & download"),
       h("button", { class: "row-btn", "data-nav": "close", onclick: close }, "Close"),
     );
   });
@@ -143,6 +169,11 @@ export function settingsDialog(app: App) {
       mini ? h("p", { class: "note ok" }, "MiniLab mkII detected: keys play the selected track (scale-locked), knobs 1-8 = the track's 8 macros, knobs 9-16 = track volumes, pads = drum parts on a drum track, otherwise scene launch. Knob 1 click = play/stop.") : null,
       app.midi.knobModes().length ? h("p", { class: "note" }, `Knob modes seen: ${app.midi.knobModes().join(", ")}`) : null,
       h("button", { class: "row-btn", "data-nav": "monitor", onclick: () => midiMonitor(app) }, "MIDI monitor…"),
+      h("button", { class: "row-btn", "data-nav": "learn-play", onclick: () => { app.learnTransport = "play"; app.overlays.toast("Press the button on your MIDI device for play / stop"); } },
+        `Transport CC, play / stop: ${st.transport.play ? `CC ${st.transport.play.cc} ch ${st.transport.play.ch + 1}` : "not set"} (click, then press a button)`),
+      h("button", { class: "row-btn", "data-nav": "learn-rec", onclick: () => { app.learnTransport = "record"; app.overlays.toast("Press the button on your MIDI device for record"); } },
+        `Transport CC, record: ${st.transport.record ? `CC ${st.transport.record.cc} ch ${st.transport.record.ch + 1}` : "not set"}`),
+      h("button", { class: "row-btn", "data-nav": "learn", onclick: () => { close(); app.setLearning(true); } }, "MIDI learn for knobs…"),
       h("div", { class: "section-title" }, "Controller"),
       h("p", { class: "note" }, app.pad.connected ? `Gamepad: ${app.pad.connected}` : "No gamepad seen yet. Press a button on it."),
       stepper("layout", "Button layout", { auto: "Auto-detect", xbox: "Xbox (A bottom)", nintendo: "Nintendo (A right)" }[st.padLayout], (d) => {
@@ -211,13 +242,16 @@ export function timeUpDialog(app: App) {
 export function systemMenu(app: App, newJam: () => void) {
   app.overlays.menu("Rollbox", () => [
     { label: "New jam (dice)…", run: newJam },
+    { label: "Songs (library)…", run: () => libraryDialog(app, { onOpen: () => app.show("song") }) },
+    { label: "Phrase grid (fill this scene)…", disabled: app.locked, run: () => phraseGridDialog(app, { sceneId: app.currentSceneId(), onDone: () => app.refresh() }) },
     { label: "Song settings…", run: () => songSettings(app) },
-    { label: "Export WAV…", run: () => exportDialog(app) },
+    { label: "Export (WAV, stems, MIDI)…", run: () => exportDialog(app) },
     { label: "Song screen", hint: "F2", run: () => app.show("song") },
     { label: "Mixer", hint: "F4", run: () => app.show("mix") },
     { label: "Play mode: scene loop", checked: app.songMode === "scene", run: () => { app.songMode = "scene"; app.renderHeader(); } },
     { label: "Play mode: whole song", checked: app.songMode === "song", run: () => { app.songMode = "song"; app.renderHeader(); } },
     { label: "Auto-arrange (one-scene songs)", disabled: !canArrange(app.song), run: () => app.edit("Auto-arrange", () => autoArrange(app.song)) },
+    { label: app.learning ? "MIDI learn: finish" : "MIDI learn…", run: () => app.setLearning(!app.learning) },
     { label: "Settings…", run: () => settingsDialog(app) },
     { label: "Controls…", run: () => helpDialog(app) },
   ]);
@@ -249,6 +283,8 @@ export function helpDialog(app: App) {
       row(", .  /  - =", "Knob / note length  ·  velocity"),
       row("Ctrl+Z / Y / C / X / V / D / A", "Undo, redo, copy, cut, paste, duplicate clip, select all"),
       row("Delete", "Delete notes.  F1: app menu.  F2/F3/F4: song / editor / mixer"),
+      h("tr", null, h("th", null, "MIDI"), h("th", null, "")),
+      row("MIDI learn", "App menu → MIDI learn: touch a knob, move a hardware control. Transport CCs in Settings"),
     ),
     h("button", { class: "row-btn primary", "data-nav": "done", onclick: close }, "Done"),
   ), { wide: true });

@@ -5,7 +5,7 @@ import { MAX_BARS, TICKS_PER_BAR, type Clip } from "../engine/model";
 import { inScale, NOTE_NAMES, scaleById, snapToScale, stepInScale } from "../engine/music";
 import { getParam, paramInfo } from "../engine/params";
 import { fxDef } from "../engine/params";
-import { toUnit } from "../engine/instruments";
+import { drumCount, isDrumKind, toUnit } from "../engine/instruments";
 import { addNote, duplicateClip, ensureClip, laneValue, noteAt, quantizeClip, setAutoPoint, setClipBars } from "../engine/songops";
 import { mods, type Action } from "./actions";
 import type { App, Screen } from "./app";
@@ -66,12 +66,13 @@ export class EditorScreen implements Screen {
         btn("Velocity", ed.velView && !ed.autoKey, () => { ed.velView = !(ed.velView && !ed.autoKey); ed.autoKey = null; this.render(); }),
         btn(ed.autoKey ? `Auto: ${paramInfo(track, ed.autoKey)?.label ?? ed.autoKey} ▾` : "Automation ▾", !!ed.autoKey, () => this.lanePicker(), "Show an automation lane: draw volume, filter, FX... across the clip"),
         btn("Step", ed.stepInput, () => this.toggleStep(), "Step input: play notes while stopped, the cursor advances"),
-        track.kind !== "drums" ? btn(app.settings.scaleLock ? "Scale lock ●" : "Scale lock ○", app.settings.scaleLock, () => this.toggleLock()) : null,
-        track.kind !== "drums" ? btn("Hide out-of-key", app.settings.fold, () => this.toggleFold(), "Show only the notes of the song's scale") : null,
+        !isDrumKind(track.kind) ? btn(app.settings.scaleLock ? "Scale lock ●" : "Scale lock ○", app.settings.scaleLock, () => this.toggleLock()) : null,
+        !isDrumKind(track.kind) ? btn("Hide out-of-key", app.settings.fold, () => this.toggleFold(), "Show only the notes of the song's scale") : null,
         btn("Quantize", null, () => this.quantize(), "Snap this clip's notes to the grid")),
       h("button", { class: "tb-btn menu-btn", onclick: () => this.openMenu() }, "☰ Menu"),
     );
     this.panelWrap.replaceChildren(buildPanel(app, track));
+    app.markLearned(this.panelWrap, track.id);
     this.roll.invalidate();
     this.paintFocus();
   }
@@ -131,12 +132,12 @@ export class EditorScreen implements Screen {
     if (this.lastTrack !== track.id) {
       const saved = this.rows.get(track.id);
       if (saved) { ed.pitch = saved.pitch; ed.octave = saved.octave; }
-      else if (track.kind === "drums") ed.pitch = DRUM_BASE_NOTE;
-      else { ed.pitch = (track.kind === "acid" ? 36 : 60) + app.song.key; ed.octave = track.kind === "acid" ? 2 : 4; }
+      else if (isDrumKind(track.kind)) ed.pitch = DRUM_BASE_NOTE;
+      else { const bass = INSTRUMENTS[track.kind].group === "bass"; ed.pitch = (bass ? 36 : 60) + app.song.key; ed.octave = bass ? 2 : 4; }
       ed.topPitch = ed.pitch + 8;
       this.lastTrack = track.id;
     }
-    if (track.kind === "drums") ed.pitch = Math.max(DRUM_BASE_NOTE, Math.min(DRUM_BASE_NOTE + 7, ed.pitch));
+    if (isDrumKind(track.kind)) ed.pitch = Math.max(DRUM_BASE_NOTE, Math.min(DRUM_BASE_NOTE + drumCount(track.kind) - 1, ed.pitch));
     this.roll.scrollToCursor();
   }
 
@@ -245,6 +246,7 @@ export class EditorScreen implements Screen {
     switch (a.type) {
       case "dir":
         if (!this.nav.move(a.dir) && a.dir === "up") { app.ed.focus = "roll"; this.paintFocus(); }
+        if (app.learning && this.nav.focused?.dataset.param) app.noteLearnTarget(track.id, this.nav.focused.dataset.param);
         return true;
       case "knob": {
         const id = f?.dataset.param;
@@ -275,7 +277,7 @@ export class EditorScreen implements Screen {
     if (!track) return false;
     const grid = app.grid();
     const clip = this.clip;
-    const drums = track.kind === "drums";
+    const drums = isDrumKind(track.kind);
     const ticks = (clip?.bars ?? 1) * TICKS_PER_BAR;
     const vstep = (p: number, dir: 1 | -1) =>
       drums || (!app.settings.scaleLock && !app.settings.fold) ? this.roll.clampPitch(p + dir) : this.roll.clampPitch(stepInScale(p, dir, app.song.key, app.song.scale));
@@ -456,15 +458,16 @@ export class EditorScreen implements Screen {
         ] },
         { label: "Velocity view", checked: ed.velView && !ed.autoKey, keepOpen: true, run: () => { ed.velView = !(ed.velView && !ed.autoKey); ed.autoKey = null; this.render(); } },
         { label: "Automation lane…", run: () => this.lanePicker() },
-        { label: "Hide out-of-key rows", checked: app.settings.fold, keepOpen: true, disabled: track.kind === "drums", run: () => this.toggleFold() },
+        { label: "Hide out-of-key rows", checked: app.settings.fold, keepOpen: true, disabled: isDrumKind(track.kind), run: () => this.toggleFold() },
         { label: "Step input", checked: ed.stepInput, keepOpen: true, run: () => this.toggleStep() },
         { label: "Scale lock", checked: app.settings.scaleLock, keepOpen: true, run: () => this.toggleLock() },
         { label: "Note preview", checked: app.settings.notePreview, keepOpen: true, run: () => { app.settings.notePreview = !app.settings.notePreview; app.saveSettings(); } },
         { label: "Count-in before recording", checked: app.settings.countIn, keepOpen: true, run: () => { app.settings.countIn = !app.settings.countIn; app.saveSettings(); } },
         { label: "Record quantize", checked: app.settings.recQuantize, keepOpen: true, run: () => { app.settings.recQuantize = !app.settings.recQuantize; app.saveSettings(); } },
         { label: "Quantize notes", run: () => this.quantize() },
-        { label: "Transpose", disabled: track.kind === "drums", sub: () => [12, 1, -1, -12].map((d) => ({ label: d > 0 ? `+${d}` : String(d), run: () => this.transpose(d) })) },
+        { label: "Transpose", disabled: isDrumKind(track.kind), sub: () => [12, 1, -1, -12].map((d) => ({ label: d > 0 ? `+${d}` : String(d), run: () => this.transpose(d) })) },
         { label: "Clear clip", disabled: !clip?.notes.length, run: () => app.edit("Clear clip", () => { clip!.notes = []; ed.sel.clear(); }) },
+        { label: app.learning ? "MIDI learn: finish" : "MIDI learn…", run: () => app.setLearning(!app.learning) },
         { label: "Undo", disabled: !app.history.canUndo, run: () => app.undo(), hint: app.history.undoLabel ?? "" },
         { label: "Redo", disabled: !app.history.canRedo, run: () => app.redo() },
         { label: "Undo history…", disabled: !app.history.canUndo, sub: () => app.history.labels().slice(0, 20).map((l, i) => ({ label: l, run: () => { for (let k = 0; k <= i; k++) app.undo(); } })) },

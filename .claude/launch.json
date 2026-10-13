@@ -4,7 +4,7 @@
     {
       "name": "rollbox",
       "runtimeExecutable": "deno",
-      "runtimeArgs": ["run", "-A", "npm:vite"],
+      "runtimeArgs": ["run", "-A", "tools/dev.ts"],
       "port": 5178
     }
   ]

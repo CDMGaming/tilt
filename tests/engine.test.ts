@@ -171,3 +171,58 @@ Deno.test("rolls never give two tracks the same instrument and preset", () => {
   assertEquals(b.lineup[0].preset, 3);
   assert(b.lineup[1].preset !== 3);
 });
+
+import { exportMidi, importMidi, guessKey } from "../src/engine/smf.ts";
+import { zip } from "../src/engine/zip.ts";
+
+Deno.test("MIDI export then import keeps notes, tempo and drums", () => {
+  const song = songFromSetup({ key: 9, scale: "minor", tempo: 128, swing: 0, lineup: [{ kind: "drums", preset: 0 }, { kind: "acid", preset: 0 }, { kind: "poly", preset: 0 }] });
+  const sc = song.scenes[0].id;
+  const [dr, ac, po] = song.tracks;
+  for (let b = 0; b < 4; b++) addNote(song, ensureClip(song, dr, sc), { pitch: 36, start: b * 96, len: 24, vel: 100 });
+  for (const [i, p] of [45, 48, 52, 55].entries()) addNote(song, ensureClip(song, ac, sc), { pitch: p, start: i * 96, len: 48, vel: 90 });
+  po.params.chord = 0;
+  addNote(song, ensureClip(song, po, sc), { pitch: 69, start: 0, len: 384, vel: 80 });
+  const bytes = exportMidi(song);
+  assertEquals(String.fromCharCode(...bytes.slice(0, 4)), "MThd");
+  const back = importMidi(bytes.buffer, "rt");
+  assertEquals(back.tempo, 128);
+  assertEquals(back.tracks.map((t) => t.kind), ["drums", "acid", "poly"]);
+  const notes = back.tracks.map((t) => t.clips[back.scenes[0].id].notes);
+  assertEquals(notes[0].map((n) => n.start), [0, 96, 192, 288]);
+  assertEquals(notes[0][0].pitch, 36); // GM kick back onto pad 1
+  assertEquals(notes[1].map((n) => n.pitch), [45, 48, 52, 55]);
+  assertEquals(notes[2][0].len, 384);
+  assertEquals(`${back.key}:${back.scale}`, "9:minor"); // A minor guessed back
+});
+
+Deno.test("key guess and zip container", () => {
+  assertEquals(guessKey([60, 62, 64, 65, 67, 69, 71, 72, 60, 64, 67]), { key: 0, scale: "major" });
+  const z = zip([{ name: "a.txt", data: new TextEncoder().encode("hello") }]);
+  assertEquals(new DataView(z.buffer).getUint32(0, true), 0x04034b50);
+  assertEquals(new DataView(z.buffer).getUint32(z.length - 22, true), 0x06054b50);
+});
+
+import { makeGrid } from "../src/engine/phrases.ts";
+
+Deno.test("phrase grid: deterministic, in key, sane lengths", () => {
+  assertEquals(JSON.stringify(makeGrid(2, "dorian", 124, 99)), JSON.stringify(makeGrid(2, "dorian", 124, 99)));
+  for (const [key, scale, tempo] of [[2, "dorian", 124], [9, "minor", 90], [0, "major", 128], [5, "minpenta", 140], [7, "phrygian", 75]] as const) {
+    for (let seed = 1; seed < 40; seed++) {
+      const g = makeGrid(key, scale, tempo, seed);
+      assertEquals(g.cells.length, 5);
+      for (const row of g.cells) {
+        assertEquals(row.map((p) => p.role), ["drums", "bass", "chords", "lead", "arp"]);
+        for (const ph of row) {
+          assert(ph.notes.length > 0, `${ph.role} ${ph.name} empty`);
+          for (const n of ph.notes) {
+            assert(n.len > 0 && n.start >= 0 && n.start < ph.bars * 384, `${ph.name} bad timing`);
+            // Melodies stay in the song's own scale; chords/bass/arps in its parent 7-note scale.
+            if (ph.role === "lead") assert(inScale(n.pitch, key, scale), `${scale} lead ${ph.name}: ${n.pitch}`);
+            if (ph.role !== "drums" && ph.role !== "lead") assert(inScale(n.pitch, key, scale === "minpenta" ? "minor" : scale), `${scale} ${ph.role} ${ph.name}: ${n.pitch}`);
+          }
+        }
+      }
+    }
+  }
+});

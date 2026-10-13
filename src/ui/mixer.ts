@@ -37,6 +37,10 @@ export class MixerScreen implements Screen {
       ...song.tracks.map((t, i) => this.strip(t, i)),
       this.masterStrip(song.master),
     );
+    for (const t of song.tracks) {
+      const strip = this.el.querySelector<HTMLElement>(`[data-track="${t.id}"]`);
+      if (strip) app.markLearned(strip, t.id);
+    }
     this.nav.paint();
   }
 
@@ -125,7 +129,12 @@ export class MixerScreen implements Screen {
   handle(a: Action): boolean {
     const app = this.app;
     switch (a.type) {
-      case "dir": this.nav.move(a.dir); return true;
+      case "dir": {
+        this.nav.move(a.dir);
+        const t = this.focusedTrack(), id = this.nav.focused?.dataset.param;
+        if (app.learning && t && id && !id.startsWith("master:")) app.noteLearnTarget(t.id, id);
+        return true;
+      }
       case "confirm": this.nav.focused?.click(); return true;
       case "knob": {
         const f = this.nav.focused;

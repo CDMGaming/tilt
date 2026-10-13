@@ -9,6 +9,8 @@ import type { Action } from "./actions";
 import { App, type Screen } from "./app";
 import { h } from "./dom";
 import { SpatialNav } from "./nav";
+import { libraryDialog } from "./library";
+import { phraseGridDialog } from "./phrasegrid";
 
 const TIMERS = [0, 10, 20, 30];
 const FACES = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
@@ -57,6 +59,7 @@ export class DiceScreen implements Screen {
         h("button", { class: "small-btn", "data-nav": "copy", onclick: () => this.copyCode() }, "Copy code"),
         h("button", { class: "small-btn", "data-nav": "enter", onclick: () => this.enterCode() }, "Enter a friend's code…"),
         saved?.tracks.length ? h("button", { class: "small-btn", "data-nav": "continue", onclick: () => this.continueSaved() }, `Continue “${saved.title}”`) : null,
+        h("button", { class: "small-btn", "data-nav": "library", onclick: () => libraryDialog(this.app, { onOpen: () => this.app.show("song") }) }, "Songs…"),
         h("button", { class: "small-btn", "data-nav": "blank", onclick: () => this.blank() }, "Blank song, no dice"),
       ),
     );
@@ -112,13 +115,20 @@ export class DiceScreen implements Screen {
     song.title = `Jam ${new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${NOTE_NAMES[song.key]} ${scaleById(song.scale).name}`;
     app.engine.stop();
     app.replaceSong(song);
-    app.startTimer(app.dice.minutes);
+    app.startTimer(0);
     app.songCur = { row: 0, col: 0 };
     app.ed.trackId = song.tracks[0]?.id ?? 0;
     app.ed.sceneId = song.scenes[0].id;
     app.ed.focus = "roll";
-    app.show("edit");
-    app.overlays.toast(app.dice.minutes ? `${app.dice.minutes} minutes. Go!` : "Go!");
+    app.show("song");
+    // Offer the phrase grid first; the timer starts when it closes, so browsing it is free.
+    phraseGridDialog(app, {
+      onDone: () => {
+        app.startTimer(app.dice.minutes);
+        app.show(app.song.tracks.some((t) => t.clips[app.song.scenes[0].id]?.notes.length) ? "song" : "edit");
+        app.overlays.toast(app.dice.minutes ? `${app.dice.minutes} minutes. Go!` : "Go!");
+      },
+    });
   }
 
   private continueSaved() {

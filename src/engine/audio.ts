@@ -395,9 +395,18 @@ function buildMaster(ctx: BaseAudioContext): MasterNodes {
   const makeup = ctx.createGain();
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 2048;
+  // Last stage: a soft clipper, so peaks the limiter lets through round off below 0 dBFS.
+  const clip = ctx.createWaveShaper();
+  const curve = new Float32Array(2048);
+  for (let i = 0; i < curve.length; i++) {
+    const x = (i / (curve.length - 1)) * 2 - 1, a = Math.abs(x);
+    curve[i] = a < 0.8 ? x : Math.sign(x) * (0.8 + 0.19 * Math.tanh((a - 0.8) / 0.19));
+  }
+  clip.curve = curve;
+  clip.oversample = "2x";
   input.connect(volume);
   reverbIn.connect(convolver).connect(reverbReturn).connect(volume);
-  volume.connect(fade).connect(limiter).connect(makeup).connect(analyser).connect(ctx.destination);
+  volume.connect(fade).connect(limiter).connect(makeup).connect(clip).connect(analyser).connect(ctx.destination);
   return { ctx, input, reverbIn, convolver, reverbReturn, volume, fade, limiter, makeup, analyser, irTime: -1 };
 }
 

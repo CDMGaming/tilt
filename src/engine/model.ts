@@ -8,7 +8,7 @@ export const MAX_BARS = 8;
 export const MAX_TRACKS = 8;
 export const MAX_SCENES = 32;
 
-export type InstrumentKind = "drums" | "acid" | "poly";
+export type InstrumentKind = "drums" | "acid" | "poly" | "lead" | "analog" | "wobble" | "pad";
 
 export interface Note {
   id: number;
@@ -28,6 +28,8 @@ export interface Clip {
   /** Automation lanes keyed by param key (see params.ts): instrument ids, "mix:vol", "fx0:a"... */
   auto?: Record<string, AutoPoint[]>;
 }
+
+export interface MidiBinding { ch: number; cc: number; trackId: number; key: string }
 
 export const FX_SLOTS = 3;
 
@@ -81,6 +83,9 @@ export interface Song {
   master: Master;
   nextId: number;
   setupCode?: string; // DICE share code this song was started from
+  libId?: string; // id in the song library (set on first save)
+  /** MIDI learn: hardware CC -> a parameter of a track. */
+  midiMap?: MidiBinding[];
 }
 
 export function newId(song: Song): number {
@@ -135,6 +140,7 @@ export function emptyFx(): FxSlot[] {
 /** Fill in fields added after a song was saved (older autosaves, shared files). */
 export function normalizeSong(song: Song): Song {
   song.master = { ...defaultMaster(), ...(song.master ?? {}) };
+  song.midiMap ??= [];
   for (const t of song.tracks) {
     t.send ??= 0.15;
     t.fx ??= emptyFx();

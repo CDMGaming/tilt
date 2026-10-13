@@ -245,7 +245,7 @@ class BpmDelay implements Fx {
 }
 
 /** Small Freeverb-style reverb: 4 combs + 2 allpasses per side. */
-class Reverb implements Fx {
+export class Reverb implements Fx {
   private combs: { d: Float32Array; i: number; f: number }[][];
   private aps: { d: Float32Array; i: number }[][];
   constructor(sr: number, size: number) {

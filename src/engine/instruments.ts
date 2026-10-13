@@ -2,6 +2,7 @@
 // knobs map to, and factory presets. Shared by the UI and the audio worklet.
 
 import type { InstrumentKind } from "./model";
+import { ANALOG, LEAD, PAD, WOBBLE } from "./instruments2";
 
 export interface ParamDef {
   id: string;
@@ -18,6 +19,11 @@ export interface InstrumentDef {
   kind: InstrumentKind;
   name: string; // our original instrument names
   role: string;
+  /** Musical job, used by the auto-arranger and the phrase grid. */
+  group: "drums" | "bass" | "harmony" | "lead";
+  /** Drum machines: number of pads (notes from DRUM_BASE_NOTE up). */
+  drumParts?: number;
+  partNames?: string[];
   params: ParamDef[];
   macros: string[]; // exactly 8 param ids
   presets: { name: string; params: Record<string, number> }[];
@@ -63,6 +69,8 @@ export const DRUMS: InstrumentDef = {
   kind: "drums",
   name: "Kitbox",
   role: "Sample drum machine, 8 parts",
+  group: "drums",
+  drumParts: 8,
   params: drumParams,
   macros: ["p0tune", "p0decay", "p1tune", "p1decay", "p3decay", "p4decay", "p0drive", "level"],
   presets: [
@@ -88,6 +96,7 @@ export const ACID: InstrumentDef = {
   kind: "acid",
   name: "Squelch",
   role: "Mono acid bass with bite and arp",
+  group: "bass",
   params: [
     { id: "wave", label: "Wave", min: 0, max: 1, def: 0, options: ["Saw", "Square"] },
     { id: "cutoff", label: "Cutoff", min: 60, max: 6000, def: 500, curve: "exp", unit: "Hz" },
@@ -127,6 +136,7 @@ export const POLY: InstrumentDef = {
   kind: "poly",
   name: "Chordette",
   role: "Poly synth; one key plays a chord in the song's scale",
+  group: "harmony",
   params: [
     { id: "chord", label: "Chord", min: 0, max: 2, def: 0, options: ["Off", "Triad", "7th"] },
     { id: "spread", label: "Spread", min: 0, max: 1, def: 0, options: ["Close", "Open"] },
@@ -161,7 +171,15 @@ export const POLY: InstrumentDef = {
   ],
 };
 
-export const INSTRUMENTS: Record<InstrumentKind, InstrumentDef> = { drums: DRUMS, acid: ACID, poly: POLY };
+export const INSTRUMENTS: Record<InstrumentKind, InstrumentDef> = {
+  drums: DRUMS, acid: ACID, poly: POLY, lead: LEAD, analog: ANALOG, wobble: WOBBLE, pad: PAD,
+};
+
+/** Every instrument, in picker order. */
+export const ALL_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "poly", "pad", "lead"];
+
+export const isDrumKind = (k: InstrumentKind) => !!INSTRUMENTS[k].drumParts;
+export const drumCount = (k: InstrumentKind) => INSTRUMENTS[k].drumParts ?? 0;
 
 export function defaultParams(kind: InstrumentKind): Record<string, number> {
   const out: Record<string, number> = {};
@@ -204,7 +222,8 @@ export function formatParam(p: ParamDef, v: number): string {
 }
 
 /** Display name of the sound loaded in a drum part, e.g. "Kick punch". */
-export function drumPartName(params: Record<string, number>, part: number): string {
+export function drumPartName(params: Record<string, number>, part: number, kind: InstrumentKind = "drums"): string {
+  if (INSTRUMENTS[kind].partNames) return INSTRUMENTS[kind].partNames![part] ?? "";
   const s = KIT_SAMPLES[Math.round(params[`p${part}smp`] ?? 0)] ?? "";
   const t = s.replace(/-/g, " ");
   return t.charAt(0).toUpperCase() + t.slice(1);

@@ -11,6 +11,8 @@ export interface MidiSink {
   onTrackVolume(index: number, v: { abs?: number; delta?: number }): void;
   onTransport(what: "play"): void;
   onDevicesChanged(): void;
+  /** Any CC, before the device profile. Return true if it was used (learn / learned binding / transport). */
+  onCC(ch: number, cc: number, raw: number, v: { abs?: number; delta?: number }): boolean;
 }
 
 export interface MonitorLine { time: number; device: string; text: string }
@@ -87,10 +89,11 @@ export class Midi {
     if (status === 0xb0) {
       const cc = d[1], val = d[2];
       this.log(name, `${hex}  CC ch${ch + 1} #${cc} = ${val}`);
+      const v = this.knobValue(`${name}:${cc}`, val);
+      if (this.sink.onCC(ch, cc, val, v)) return;
       if (mini && cc === MINILAB_KNOB1_CLICK) { if (val > 0) this.sink.onTransport("play"); return; }
       const top = MINILAB_TOP.indexOf(cc), bottom = MINILAB_BOTTOM.indexOf(cc);
-      if (!mini || (top < 0 && bottom < 0)) return; // other CCs: MIDI learn arrives in Phase 2
-      const v = this.knobValue(`${name}:${cc}`, val);
+      if (!mini || (top < 0 && bottom < 0)) return;
       if (top >= 0) this.sink.onMacro(top, v);
       else this.sink.onTrackVolume(bottom, v);
       return;

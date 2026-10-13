@@ -1,19 +1,20 @@
 // Auto-arranger: from a one-scene song, build intro / build / drop / break /
 // drop / outro by copying the scene and muting clips per section.
 
+import { INSTRUMENTS } from "./instruments";
 import { TICKS_PER_BAR, newId, sceneTicks, type Scene, type Song, type Track } from "./model";
 
-type Role = "drums" | "bass" | "harmony";
-const roleOf = (t: Track): Role => (t.kind === "drums" ? "drums" : t.kind === "acid" ? "bass" : "harmony");
+type Role = "drums" | "bass" | "harmony" | "lead";
+const roleOf = (t: Track): Role => INSTRUMENTS[t.kind].group;
 
 interface Section { name: string; bars: number; play: Role[]; fadeIn?: boolean; fadeOut?: boolean; thin?: boolean }
 
 const PLAN: Section[] = [
   { name: "Intro", bars: 8, play: ["harmony"], fadeIn: true },
   { name: "Build", bars: 8, play: ["harmony", "drums"], thin: true },
-  { name: "Drop", bars: 16, play: ["drums", "bass", "harmony"] },
-  { name: "Break", bars: 8, play: ["harmony", "bass"] },
-  { name: "Drop 2", bars: 16, play: ["drums", "bass", "harmony"] },
+  { name: "Drop", bars: 16, play: ["drums", "bass", "harmony", "lead"] },
+  { name: "Break", bars: 8, play: ["harmony", "bass", "lead"] },
+  { name: "Drop 2", bars: 16, play: ["drums", "bass", "harmony", "lead"] },
   { name: "Outro", bars: 8, play: ["drums", "harmony"], fadeOut: true },
 ];
 

@@ -3,7 +3,8 @@
 
 import { AcidDSP, DrumsDSP, PolyDSP, type Clock, type InstrumentDSP } from "./instruments-dsp";
 import { makeFx, type Fx } from "./fx-dsp";
-import { FX_SLOTS } from "../model";
+import { FX_SLOTS, type InstrumentKind } from "../model";
+import { AnalogDrumsDSP, LeadDSP, PadDSP, WobbleDSP } from "./instruments2-dsp";
 
 declare const sampleRate: number;
 declare const currentTime: number;
@@ -17,7 +18,7 @@ declare function registerProcessor(name: string, ctor: unknown): void;
 export interface TimedEvent { time: number; type: "on" | "off" | "param"; pitch: number; vel: number; key?: string; value?: number }
 
 export interface InstrumentOptions {
-  kind: "drums" | "acid" | "poly";
+  kind: InstrumentKind;
   params: Record<string, number>;
   samples?: Float32Array[];
   samplesRate?: number;
@@ -52,6 +53,10 @@ class RbInstrument extends AudioWorkletProcessor {
       d.samplesRate = o.samplesRate ?? sampleRate;
       this.dsp = d;
     } else if (o.kind === "acid") this.dsp = new AcidDSP(o.params, sampleRate, this.clock);
+    else if (o.kind === "lead") this.dsp = new LeadDSP(o.params, sampleRate);
+    else if (o.kind === "analog") this.dsp = new AnalogDrumsDSP(o.params, sampleRate);
+    else if (o.kind === "wobble") this.dsp = new WobbleDSP(o.params, sampleRate, this.clock);
+    else if (o.kind === "pad") this.dsp = new PadDSP(o.params, sampleRate);
     else this.dsp = new PolyDSP(o.params, sampleRate);
     if (o.events) this.enqueue(o.events);
     this.port.onmessage = (e: MessageEvent<InstrumentMessage>) => this.onMessage(e.data);

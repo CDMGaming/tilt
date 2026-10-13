@@ -1,6 +1,6 @@
 import "./ui/style.css";
 import { newSong } from "./engine/model";
-import { App } from "./ui/app";
+import { App, STORE_PREFIX } from "./ui/app";
 import { DiceScreen } from "./ui/dice";
 import { helpDialog, songSettings, systemMenu, timeUpDialog } from "./ui/dialogs";
 import { EditorScreen } from "./ui/editor";
@@ -26,8 +26,8 @@ app.show("dice");
 
 // First visit: show the controls once.
 try {
-  if (!localStorage.getItem("rollbox.seenHelp")) {
-    localStorage.setItem("rollbox.seenHelp", "1");
+  if (!localStorage.getItem(STORE_PREFIX + "seenHelp")) {
+    localStorage.setItem(STORE_PREFIX + "seenHelp", "1");
     helpDialog(app);
   }
 } catch { /* storage blocked */ }

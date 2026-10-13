@@ -2,7 +2,7 @@
 
 import { canArrange, autoArrange } from "../engine/arranger";
 import { pickPreset, usedPresets } from "../engine/dice";
-import { INSTRUMENTS } from "../engine/instruments";
+import { ALL_KINDS, INSTRUMENTS } from "../engine/instruments";
 import { MAX_BARS, TICKS_PER_BAR, type Clip, type Scene, type Track } from "../engine/model";
 import {
   SCENE_NAMES, addScene, changeInstrument, deleteScene, deleteTrack, duplicateClip, duplicateScene,
@@ -211,8 +211,8 @@ export class SongScreen implements Screen {
     return [
       { label: "Edit sound", run: () => this.openEditor(t, song.scenes[Math.max(0, app.songCur.row)] ?? song.scenes[0], "panel") },
       { label: "Change instrument", sub: () => [
-        ...(["drums", "acid", "poly"] as const).map((k) => ({ label: INSTRUMENTS[k].name, checked: t.kind === k, run: () => app.edit("Change instrument", () => changeInstrument(t, k)) })),
-        { label: "🎲 Random", run: () => app.edit("Change instrument", () => { const k = (["drums", "acid", "poly"] as const)[Math.floor(Math.random() * 3)]; changeInstrument(t, k, pickPreset(k, usedPresets(song, k, t.id))); }) },
+        ...ALL_KINDS.map((k) => ({ label: INSTRUMENTS[k].name, checked: t.kind === k, run: () => app.edit("Change instrument", () => changeInstrument(t, k)) })),
+        { label: "🎲 Random", run: () => app.edit("Change instrument", () => { const k = ALL_KINDS[Math.floor(Math.random() * ALL_KINDS.length)]; changeInstrument(t, k, pickPreset(k, usedPresets(song, k, t.id))); }) },
       ] },
       { label: "🎲 Random preset", run: () => app.edit("Random preset", () => loadPreset(t, pickPreset(t.kind, [...usedPresets(song, t.kind, t.id), presetIndex(t)]))) },
       { label: "Volume", sub: () => [100, 80, 60, 40, 20].map((v) => ({ label: String(v), checked: Math.round(t.volume * 100) === v, run: () => app.edit("Volume", () => (t.volume = v / 100)) })) },

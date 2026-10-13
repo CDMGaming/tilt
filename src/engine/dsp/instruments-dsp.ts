@@ -180,7 +180,7 @@ export class AcidDSP implements InstrumentDSP {
     const reso = Math.min(0.97, p.reso ?? 0.6);
     const bite = p.bite ?? 0.3;
     const accent = (p.accent ?? 0.5) * this.accentNow;
-    const level = (p.level ?? 0.7) * 0.8;
+    const level = (p.level ?? 0.7) * 0.4;
     const subLv = p.sub ?? 0;
     const arp = p.arpOn >= 0.5;
     for (let i = i0; i < i1; i++) {
@@ -255,7 +255,7 @@ export class PolyDSP implements InstrumentDSP {
     const fK = Math.exp(-4.6 / ((p.fdecay ?? 0.5) * sr));
     const a = p.attack ?? 0.01, d = p.decay ?? 0.4, s = p.sustain ?? 0.7, r = p.release ?? 0.4;
     const width = p.width ?? 0.5;
-    const level = (p.level ?? 0.55) * 0.35;
+    const level = (p.level ?? 0.55) * 0.45;
     for (let i = i0; i < i1; i++) {
       this.cut = smooth(this.cut, p.cutoff ?? 2500, 0.002);
       for (const v of this.voices) {

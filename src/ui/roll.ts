@@ -2,7 +2,7 @@
 // with "fold"), an optional bottom lane shows velocity or one automation
 // lane, the cursor is driven by gamepad/keyboard and the mouse edits directly.
 
-import { DRUM_BASE_NOTE, drumPartName, formatParam, fromUnit, toUnit } from "../engine/instruments";
+import { DRUM_BASE_NOTE, drumCount, drumPartName, formatParam, fromUnit, isDrumKind, toUnit } from "../engine/instruments";
 import { getParam, paramInfo } from "../engine/params";
 import { PPQ, TICKS_PER_BAR, type Clip, type Note, type Track } from "../engine/model";
 import { inScale, noteName } from "../engine/music";
@@ -63,7 +63,8 @@ export class PianoRoll {
 
   private get track(): Track | undefined { return this.app.track(); }
   private get clip(): Clip | undefined { return this.track?.clips[this.app.ed.sceneId]; }
-  isDrums() { return this.track?.kind === "drums"; }
+  isDrums() { return !!this.track && isDrumKind(this.track.kind); }
+  private parts() { return this.track ? drumCount(this.track.kind) : 8; }
   clipTicks() { return (this.clip?.bars ?? 1) * TICKS_PER_BAR; }
 
   private size() {
@@ -84,14 +85,14 @@ export class PianoRoll {
 
   /** All rows top to bottom (pitches). Folded: only in-key pitches. */
   allRows(): number[] {
-    if (this.isDrums()) return [7, 6, 5, 4, 3, 2, 1, 0].map((i) => DRUM_BASE_NOTE + i);
+    if (this.isDrums()) return Array.from({ length: this.parts() }, (_, i) => DRUM_BASE_NOTE + this.parts() - 1 - i);
     const song = this.app.song, out: number[] = [];
     for (let p = 108; p >= 12; p--) if (!this.folded() || inScale(p, song.key, song.scale)) out.push(p);
     return out;
   }
 
-  rowH() { return this.isDrums() ? Math.max(14, this.laneH() / 8) : ROW_H; }
-  visibleRows() { return this.isDrums() ? 8 : Math.max(4, Math.floor(this.laneH() / ROW_H)); }
+  rowH() { return this.isDrums() ? Math.max(14, Math.min(60, this.laneH() / this.parts())) : ROW_H; }
+  visibleRows() { return this.isDrums() ? this.parts() : Math.max(4, Math.floor(this.laneH() / ROW_H)); }
 
   /** Index (in allRows) of the top visible row. */
   private topIdx(): number {
@@ -182,7 +183,7 @@ export class PianoRoll {
       g.textBaseline = "middle";
       if (drums) {
         const part = pitch - DRUM_BASE_NOTE;
-        g.fillText(drumPartName(track.params, part), 6, y + rowH / 2 - (rowH > 26 ? 6 : 0));
+        g.fillText(drumPartName(track.params, part, track.kind), 6, y + rowH / 2 - (rowH > 26 ? 6 : 0));
         if (rowH > 26) { g.fillStyle = col("--dim"); g.font = "10px system-ui"; g.fillText(`pad ${part + 1}`, 6, y + rowH / 2 + 8); }
       } else if ((((pitch % 12) + 12) % 12) === 0 || rowH >= 15) {
         g.fillText(noteName(pitch), 6, y + rowH / 2);
@@ -360,7 +361,7 @@ export class PianoRoll {
     const grid = app.grid();
     const rawTick = Math.max(0, Math.min(this.clipTicks() - 1, this.tickAt(x)));
     let pitch = this.pitchAt(y);
-    if (this.isDrums()) pitch = Math.max(DRUM_BASE_NOTE, Math.min(DRUM_BASE_NOTE + 7, pitch));
+    if (this.isDrums()) pitch = Math.max(DRUM_BASE_NOTE, Math.min(DRUM_BASE_NOTE + this.parts() - 1, pitch));
     const clip = this.clip;
     const hit = clip ? noteAt(clip, rawTick, pitch) : undefined;
     ed.tick = Math.floor(rawTick / grid) * grid;
@@ -535,7 +536,7 @@ export class PianoRoll {
   }
 
   clampPitch(p: number) {
-    return this.isDrums() ? Math.max(DRUM_BASE_NOTE, Math.min(DRUM_BASE_NOTE + 7, p)) : Math.max(12, Math.min(108, p));
+    return this.isDrums() ? Math.max(DRUM_BASE_NOTE, Math.min(DRUM_BASE_NOTE + this.parts() - 1, p)) : Math.max(12, Math.min(108, p));
   }
 
   selectRange(t0: number, t1: number, p0: number, p1: number, add: boolean) {
