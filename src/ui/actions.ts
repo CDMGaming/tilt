@@ -14,6 +14,7 @@ export type Action =
   | { type: "record" } // Y hold / Shift+Space
   | { type: "shortcut"; down: boolean } // L/LB hold / backtick
   | { type: "focusSwap" } // R/RB / Tab: piano roll <-> instrument panel
+  | { type: "layout" } // RB held / \\ : piano roll only / split / panel only (desktop editor)
   | { type: "knob"; dx: number; dy: number } // right stick / [ ] - =
   | { type: "selectHold"; down: boolean } // ZR/RT / Shift: range select
   | { type: "undo" } | { type: "redo" }

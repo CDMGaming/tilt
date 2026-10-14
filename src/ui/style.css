@@ -724,3 +724,22 @@ body:not(.phone) .backbox { grid-column: 2; grid-row: 1; display: flex; align-it
 .dmd-info.showing-msg .dmd-line { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) { .dmd-msg .dmd { transform: none !important; } }
 @media (max-width: 1000px) { .dmd-info { min-width: 240px; } }
+
+/* ---------- D: the editor in one toolbar row, three layouts ---------- */
+body:not(.phone) .editor:not(.couch-ed) .ed-toolbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 6px; }
+body:not(.phone) .editor:not(.couch-ed) .ed-toolbar > * { flex: none; }
+.ed-toolbar .spacer { flex: 1 1 0 !important; min-width: 0; }
+.layout-seg .tb-btn.seg { min-width: 0; padding-left: 9px; padding-right: 9px; }
+.editor.layout-roll:not(.couch-ed) { grid-template-rows: auto minmax(160px, 1fr); }
+.editor.layout-roll:not(.couch-ed) .panel-wrap { display: none; }
+.editor.layout-panel:not(.couch-ed) { grid-template-rows: auto minmax(0, 1fr); }
+.editor.layout-panel:not(.couch-ed) .roll-wrap { display: none; }
+.editor.layout-panel:not(.couch-ed) .panel-wrap { max-height: none; }
+@media (max-width: 1150px) { body:not(.phone) .editor:not(.couch-ed) .tb-label { display: none; } }
+.lbl-short { display: none; }
+@media (max-width: 1150px) {
+  body:not(.phone) .editor:not(.couch-ed) .lbl-long { display: none; }
+  body:not(.phone) .editor:not(.couch-ed) .lbl-short { display: inline; }
+  body:not(.phone) .editor:not(.couch-ed) .ed-toolbar { gap: 4px; padding-left: 6px; padding-right: 6px; }
+  body:not(.phone) .editor:not(.couch-ed) .tb-btn { padding-left: 7px; padding-right: 7px; }
+}

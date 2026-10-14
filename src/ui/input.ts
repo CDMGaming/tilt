@@ -90,6 +90,7 @@ function keyAction(e: KeyboardEvent, ctrl: boolean): Action | null {
     case "Delete": return { type: "delete" };
     case "Space": return e.shiftKey ? { type: "record" } : { type: "play" };
     case "Tab": return { type: "focusSwap" };
+    case "Backslash": return { type: "layout" };
     case "KeyM": case "ContextMenu": return { type: "menu" };
     case "F1": return { type: "system" };
     case "Backquote": return e.repeat ? null : { type: "shortcut", down: true };
@@ -121,6 +122,8 @@ export class GamepadInput {
   private dirHeld: Record<Dir, number> = { up: 0, down: 0, left: 0, right: 0 };
   private dirNext: Record<Dir, number> = { up: 0, down: 0, left: 0, right: 0 };
   private yDown = 0;
+  private rbDown = 0;
+  private rbFired = false;
   private yFired = false;
   private knobAcc = 0;
   private knobAccY = 0;
@@ -159,7 +162,10 @@ export class GamepadInput {
     if (up(map.A)) { mods.confirmHeld = false; s.action({ type: "confirmUp" }); }
     if (down(map.B)) s.action({ type: "back" });
     if (down(map.X)) s.action({ type: "menu" });
-    if (down(map.RB)) s.action({ type: "focusSwap" });
+    // RB: tap = swap roll / panel (as before, now on release); hold = editor layout.
+    if (down(map.RB)) { this.rbDown = now; this.rbFired = false; }
+    if (b(map.RB) && !this.rbFired && now - this.rbDown > Y_HOLD_MS) { this.rbFired = true; s.action({ type: "layout" }); }
+    if (up(map.RB) && !this.rbFired) s.action({ type: "focusSwap" });
     if (down(map.LB)) s.action({ type: "shortcut", down: true });
     if (up(map.LB)) s.action({ type: "shortcut", down: false });
     if (down(map.MENU)) s.action({ type: "system" });

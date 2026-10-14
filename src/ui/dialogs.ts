@@ -357,7 +357,7 @@ export function helpDialog(app: App) {
       row("Right stick", "Turn knob. In the roll: length (←→), velocity (↑↓), or draw the automation lane (↑↓) when one is open. Delete removes the lane point at the cursor"),
       row("LT / ZL (hold)", "Fine adjust"),
       row("RT / ZR (hold) + move", "Select a range"),
-      row("RB / R", "Switch piano roll ↔ instrument panel"),
+      row("RB / R", "Switch piano roll ↔ instrument panel. Hold: roll only / split / panel only"),
       row("LB / L (hold)", "Jump to any track / scene"),
       row("Start / +", "App menu.  Back / −: undo"),
       h("tr", null, h("th", null, "Keyboard"), h("th", null, "")),

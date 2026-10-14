@@ -35,6 +35,9 @@ export interface Screen {
   paramChanged?(trackId: number, id: string): void;
 }
 
+/** Desktop editor: the piano roll only, roll + instrument panel, or the panel only. */
+export type EditorLayout = "roll" | "split" | "panel";
+
 export interface EditorState {
   trackId: number;
   sceneId: number;
@@ -57,6 +60,7 @@ export interface EditorState {
   octave: number; // computer/on-screen keyboard octave (MIDI octave number)
   drumPart: number;
   topPitch: number; // highest visible row
+  layout?: EditorLayout; // desktop editor layout (default split)
 }
 
 /** Per-player input state that isn't editor state: notes being recorded, held step chords, held keys. */

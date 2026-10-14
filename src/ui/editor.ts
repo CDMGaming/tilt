@@ -8,7 +8,7 @@ import { fxDef } from "../engine/params";
 import { drumCount, isDrumKind, toUnit } from "../engine/instruments";
 import { addNote, duplicateClip, ensureClip, laneValue, noteAt, quantizeClip, setAutoPoint, setClipBars } from "../engine/songops";
 import { mods, type Action } from "./actions";
-import type { App, Screen } from "./app";
+import type { App, EditorLayout, Screen } from "./app";
 import { h } from "./dom";
 import { trackColor } from "./theme";
 import type { MenuItem } from "./overlay";
@@ -44,6 +44,17 @@ export class EditorScreen implements Screen {
     this.panelWrap.addEventListener("pointerdown", () => { if (app.ed.focus === "roll" && !couch) { app.ed.focus = "panel"; this.paintFocus(); } });
   }
 
+  /** Desktop editor layout: piano roll only, both, or the instrument panel only (\\ key, RB held). */
+  setLayout(v?: EditorLayout) {
+    const ed = this.app.ed, order: EditorLayout[] = ["split", "roll", "panel"];
+    ed.layout = v ?? order[(order.indexOf(ed.layout ?? "split") + 1) % order.length];
+    if (ed.layout === "roll" && ed.focus !== "roll") ed.focus = "roll";
+    if (ed.layout === "panel") ed.focus = "panel";
+    if (ed.layout === "split" && ed.focus === "mix") ed.focus = "roll";
+    this.render();
+    this.app.overlays.toast(ed.layout === "roll" ? "Piano roll only" : ed.layout === "panel" ? "Instrument panel only" : "Roll + panel", 900);
+  }
+
   /** One view at a time (notes / sound / mix): couch quarters and phones. */
   private get compact() { return !!this.couch || isPhone(); }
 
@@ -64,40 +75,43 @@ export class EditorScreen implements Screen {
     const si = app.song.scenes.indexOf(scene!);
     const btn = (label: string, on: boolean | null, onclick: () => void, title?: string) =>
       h("button", { class: "tb-btn" + (on ? " on" : ""), onclick, title }, label);
+    // One row: where you are, the clip's length, the grid, the everyday tools, the layout, and ⋯ for the rest.
+    const lay = ed.layout ?? "split";
+    // Narrow windows show the short label (CSS picks), so the row never runs off the screen.
+    const twin = (long: string, short: string, on: boolean, onclick: () => void, title: string) =>
+      h("button", { class: "tb-btn" + (on ? " on" : ""), onclick, title }, h("span", { class: "lbl-long" }, long), h("span", { class: "lbl-short" }, short));
+    const layBtn = (v: EditorLayout, label: string, title: string) =>
+      h("button", { class: "tb-btn seg" + (lay === v ? " on" : ""), onclick: () => this.setLayout(v), title }, label);
     this.toolbar.replaceChildren(
-      h("button", { class: "tb-btn", onclick: () => app.show("song"), title: "Back to the song (B / Esc)" }, "◀ Song"),
       h("div", { class: "tb-track", style: `--track:${trackColor(track)}` },
-        h("button", { class: "tb-arrow", onclick: () => this.switchTrack(-1) }, "‹"),
+        h("button", { class: "tb-arrow", onclick: () => this.switchTrack(-1), title: "Previous instrument" }, "‹"),
         h("span", { class: "tb-trackname" }, `${ti + 1} · ${INSTRUMENTS[track.kind].name}`),
-        h("button", { class: "tb-arrow", onclick: () => this.switchTrack(1) }, "›")),
+        h("button", { class: "tb-arrow", onclick: () => this.switchTrack(1), title: "Next instrument" }, "›")),
       h("div", { class: "tb-scene" },
-        h("button", { class: "tb-arrow", onclick: () => this.switchScene(-1) }, "‹"),
+        h("button", { class: "tb-arrow", onclick: () => this.switchScene(-1), title: "Previous scene" }, "‹"),
         h("span", null, `${si + 1} · ${scene?.name ?? ""}`),
-        h("button", { class: "tb-arrow", onclick: () => this.switchScene(1) }, "›")),
-      h("div", { class: "tb-group" },
+        h("button", { class: "tb-arrow", onclick: () => this.switchScene(1), title: "Next scene" }, "›")),
+      h("div", { class: "tb-group", title: "Clip length in bars" },
         h("span", { class: "tb-label" }, "Bars"),
         btn("−", null, () => this.setBars((clip?.bars ?? 1) - 1)),
         h("span", { class: "tb-value" }, String(clip?.bars ?? "—")),
-        btn("+", null, () => this.setBars((clip?.bars ?? 1) + 1)),
-        btn("Duplicate", null, () => this.duplicate(), "Double the clip, notes included (Ctrl+D)")),
-      h("div", { class: "tb-group", title: "Zoom (Ctrl + mouse wheel). Shift + wheel scrolls sideways." },
-        h("span", { class: "tb-label" }, "Zoom"),
-        btn("−", null, () => { this.roll.zoom(-1); this.render(); }),
-        h("span", { class: "tb-value zoom-value" }, this.roll.zoomLabel()),
-        btn("+", null, () => { this.roll.zoom(1); this.render(); })),
+        btn("+", null, () => this.setBars((clip?.bars ?? 1) + 1))),
       h("div", { class: "tb-group" },
         btn("1/8", ed.grid === 48, () => this.setGrid(48)),
         btn("1/16", ed.grid === 24, () => this.setGrid(24)),
         btn("3", ed.triplet, () => { ed.triplet = !ed.triplet; this.snapCursor(); this.render(); }, "Triplets")),
       h("div", { class: "tb-group" },
-        btn("Velocity", ed.velView && !ed.autoKey, () => { ed.velView = !(ed.velView && !ed.autoKey); ed.autoKey = null; this.render(); }),
-        btn(ed.autoKey ? `Auto: ${paramInfo(track, ed.autoKey)?.label ?? ed.autoKey} ▾` : "Automation ▾", !!ed.autoKey, () => this.lanePicker(), "Show an automation lane: draw volume, filter, FX... across the clip"),
         btn("Step", ed.stepInput, () => this.toggleStep(), "Step input: play notes while stopped, the cursor advances"),
-        !isDrumKind(track.kind) ? btn(app.settings.scaleLock ? "Scale lock ●" : "Scale lock ○", app.settings.scaleLock, () => this.toggleLock()) : null,
-        !isDrumKind(track.kind) ? btn("Hide out-of-key", app.settings.fold, () => this.toggleFold(), "Show only the notes of the song's scale") : null,
-        btn("Quantize", null, () => this.quantize(), "Snap this clip's notes to the grid")),
-      h("button", { class: "tb-btn menu-btn", onclick: () => this.openMenu() }, "☰ Menu"),
+        twin("Velocity", "Vel", ed.velView && !ed.autoKey, () => { ed.velView = !(ed.velView && !ed.autoKey); ed.autoKey = null; this.render(); }, "Velocity lane"),
+        twin(ed.autoKey ? `Auto: ${paramInfo(track, ed.autoKey)?.label ?? ed.autoKey} ▾` : "Automation ▾", "Auto ▾", !!ed.autoKey, () => this.lanePicker(), "Show an automation lane: draw volume, filter, FX... across the clip"),
+        !isDrumKind(track.kind) ? twin(app.settings.scaleLock ? "Scale lock ●" : "Scale lock ○", app.settings.scaleLock ? "Lock ●" : "Lock ○", app.settings.scaleLock, () => this.toggleLock(), "Scale lock: only notes in the song's key") : null),
+      h("div", { class: "spacer" }),
+      h("div", { class: "tb-group layout-seg", title: "Roll only / split / panel only (\\ key, or hold RB)" },
+        layBtn("roll", "Roll", "Piano roll only"), layBtn("split", "Split", "Piano roll and instrument panel"), layBtn("panel", "Panel", "Instrument panel only")),
+      h("button", { class: "tb-btn menu-btn", onclick: () => this.openMenu(), title: "More: quantize, duplicate, zoom, hide out-of-key... (X / M)" }, "⋯"),
     );
+    this.el.classList.toggle("layout-roll", lay === "roll");
+    this.el.classList.toggle("layout-panel", lay === "panel");
     this.panelWrap.replaceChildren(buildPanel(app, track));
     app.markLearned(this.panelWrap, track.id);
     this.roll.invalidate();
@@ -335,9 +349,11 @@ export class EditorScreen implements Screen {
     const app = this.app, ed = app.ed;
     if (a.type === "focusSwap") {
       if (this.compact) { this.setView(ed.focus === "roll" ? "panel" : ed.focus === "panel" ? "mix" : "roll"); return true; }
+      if ((ed.layout ?? "split") !== "split") return true; // one half showing: nothing to swap to
       ed.focus = ed.focus === "roll" ? "panel" : "roll"; this.paintFocus(); return true;
     }
     if (a.type === "menu") { this.openMenu(); return true; }
+    if (a.type === "layout") { if (!this.compact) this.setLayout(); return true; }
     if (a.type === "shortcut") return false;
     if (ed.focus !== "roll") return this.handlePanel(a);
     return this.handleRoll(a);
@@ -556,13 +572,17 @@ export class EditorScreen implements Screen {
       const clip = this.clip;
       const sel = this.roll.selectedNotes().length;
       return [
+        { label: "Quantize notes", run: () => this.quantize(), hint: "snap to the grid" },
+        { label: "Duplicate clip (x2)", run: () => this.duplicate(), hint: "Ctrl+D" },
+        { label: "Zoom in", keepOpen: true, run: () => { this.roll.zoom(1); this.render(); }, hint: "Ctrl+wheel" },
+        { label: "Zoom out", keepOpen: true, run: () => { this.roll.zoom(-1); this.render(); }, hint: this.roll.zoomLabel() },
+        { label: "Hide out-of-key rows", checked: app.settings.fold, keepOpen: true, disabled: isDrumKind(track.kind), run: () => this.toggleFold() },
         { label: "Paste", disabled: !ed.clipboard.length, run: () => this.paste(), hint: "Ctrl+V" },
         { label: "Copy selection", disabled: !sel, run: () => this.copy(false), hint: "Ctrl+C" },
         { label: "Cut selection", disabled: !sel, run: () => this.copy(true), hint: "Ctrl+X" },
         { label: "Delete selection", disabled: !sel, run: () => this.handleRoll({ type: "delete" }) },
         { label: "Select all", run: () => { if (clip) ed.sel = new Set(clip.notes.map((n) => n.id)); this.roll.invalidate(); }, hint: "Ctrl+A" },
         { label: "Clip length", sub: () => Array.from({ length: MAX_BARS }, (_, i) => ({ label: `${i + 1} bar${i ? "s" : ""}`, checked: (clip?.bars ?? 1) === i + 1, run: () => this.setBars(i + 1) })) },
-        { label: "Duplicate clip (x2)", run: () => this.duplicate(), hint: "Ctrl+D" },
         { label: `Zoom: ${this.roll.zoomLabel()}`, sub: () => [0, 4, 2, 1].map((b) => ({
           label: b ? `${b} bar${b > 1 ? "s" : ""}` : "Fit the whole clip",
           checked: (ed.viewBars || 0) === b,
@@ -575,13 +595,11 @@ export class EditorScreen implements Screen {
         ] },
         { label: "Velocity view", checked: ed.velView && !ed.autoKey, keepOpen: true, run: () => { ed.velView = !(ed.velView && !ed.autoKey); ed.autoKey = null; this.render(); } },
         { label: "Automation lane…", run: () => this.lanePicker() },
-        { label: "Hide out-of-key rows", checked: app.settings.fold, keepOpen: true, disabled: isDrumKind(track.kind), run: () => this.toggleFold() },
         { label: "Step input", checked: ed.stepInput, keepOpen: true, run: () => this.toggleStep() },
         { label: "Scale lock", checked: app.settings.scaleLock, keepOpen: true, run: () => this.toggleLock() },
         { label: "Note preview", checked: app.settings.notePreview, keepOpen: true, run: () => { app.settings.notePreview = !app.settings.notePreview; app.saveSettings(); } },
         { label: "Count-in before recording", checked: app.settings.countIn, keepOpen: true, run: () => { app.settings.countIn = !app.settings.countIn; app.saveSettings(); } },
         { label: "Record quantize", checked: app.settings.recQuantize, keepOpen: true, run: () => { app.settings.recQuantize = !app.settings.recQuantize; app.saveSettings(); } },
-        { label: "Quantize notes", run: () => this.quantize() },
         { label: "Transpose", disabled: isDrumKind(track.kind), sub: () => [12, 1, -1, -12].map((d) => ({ label: d > 0 ? `+${d}` : String(d), run: () => this.transpose(d) })) },
         { label: "Clear clip", disabled: !clip?.notes.length, run: () => app.edit("Clear clip", () => { clip!.notes = []; ed.sel.clear(); }) },
         { label: ed.autoKey ? `Clear lane: ${paramInfo(track, ed.autoKey)?.label ?? ed.autoKey}` : "Clear lane (open one first)", disabled: !ed.autoKey || !clip?.auto?.[ed.autoKey]?.length, run: () => app.edit("Clear lane", () => { delete clip!.auto![ed.autoKey!]; }) },
