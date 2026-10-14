@@ -292,7 +292,7 @@ async function loadFileToPad(app: App, track: Track, pad: number, file: File) {
     app.overlays.toast(`Loaded "${s.name}" (${(s.data.length / s.rate).toFixed(1)} s) on pad ${pad + 1}`);
     app.engine.preview(track.id, DRUM_BASE_NOTE + pad, 110, 0.6);
   } catch (e) {
-    app.overlays.toast(`Couldn't read that file: ${e}`);
+    app.overlays.toast(`Couldn't read that file: ${e}`, 4000, { error: true });
   }
 }
 

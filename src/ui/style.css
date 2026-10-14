@@ -716,3 +716,11 @@ body:not(.phone) .backbox { grid-column: 2; grid-row: 1; display: flex; align-it
 .backbox .transport { flex: none; }
 .backbox .chip-btn { flex: none; }
 .rail-btn.brand { color: var(--dmd); }
+
+/* ---------- C: messages scroll across the backbox display ---------- */
+.dmd-info { min-width: 300px; }
+.dmd-msg { position: absolute; inset: 0; display: flex; align-items: center; overflow: hidden; pointer-events: none; }
+.dmd-msg .dmd { flex: none; }
+.dmd-info.showing-msg .dmd-line { visibility: hidden; }
+@media (prefers-reduced-motion: reduce) { .dmd-msg .dmd { transform: none !important; } }
+@media (max-width: 1000px) { .dmd-info { min-width: 240px; } }

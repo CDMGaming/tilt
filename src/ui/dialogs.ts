@@ -159,7 +159,7 @@ export function settingsDialog(app: App) {
         const ids = ["", ...devices.map((x) => x.deviceId)];
         st.outputDevice = ids[(ids.indexOf(st.outputDevice) + d + ids.length) % ids.length];
         app.saveSettings();
-        await eng.setOutputDevice(st.outputDevice).catch((e) => app.overlays.toast(`Can't switch output: ${e}`));
+        await eng.setOutputDevice(st.outputDevice).catch((e) => app.overlays.toast(`Can't switch output: ${e}`, 4000, { error: true }));
         rerender();
       }),
       h("button", { class: "row-btn", "data-nav": "names", onclick: async () => {

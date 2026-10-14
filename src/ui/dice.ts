@@ -152,7 +152,7 @@ export class DiceScreen implements Screen {
     const go = () => {
       app.startTimer(app.dice.minutes);
       app.show(app.song.tracks.some((t) => t.clips[app.song.scenes[0].id]?.notes.length) ? "song" : "edit");
-      app.overlays.toast(app.dice.minutes ? `${app.dice.minutes} minutes. Go! (Stuck? hit 💡)` : "Go! (Stuck? hit 💡)");
+      app.overlays.toast(app.dice.minutes ? `${app.dice.minutes} minutes. Go!  Stuck? Hit the bulb` : "Go!  Stuck? Hit the bulb", 3500);
     };
     // Start from a blank page; the phrase grid waits behind the 💡 Stuck? button
     // (or opens here first if the player turned that on in Settings).

@@ -34,6 +34,8 @@ export class OverlayHost {
   area: (owner: string) => DOMRect | null = () => null;
   toastHost: () => HTMLElement | null = () => null;
   onOwnerPointer: (owner: string) => void = () => {};
+  /** The backbox display (desktop): shows a message as a scrolling dot-matrix line. False when it isn't on screen. */
+  marquee: ((text: string, ms: number) => boolean) | null = null;
 
   /** The acting seat's top overlay (solo: the top one). Other seats' menus don't block them. */
   get top(): Overlay | undefined {
@@ -183,8 +185,10 @@ export class OverlayHost {
     return ov;
   }
 
-  toast(text: string, ms = 2200) {
+  /** A message: across the backbox display when there is one; floating otherwise, and always for errors. */
+  toast(text: string, ms = 2200, opts: { error?: boolean } = {}) {
     const inQuad = this.toastHost();
+    if (!opts.error && !inQuad && this.marquee?.(text, ms)) return;
     const t = h("div", { class: "toast" + (inQuad ? " in-quad" : "") }, text);
     (inQuad ?? document.body).appendChild(t);
     setTimeout(() => t.classList.add("out"), ms);

@@ -367,7 +367,7 @@ export class App {
     await net.connect(this.relayUrl(), { room: code });
     // The song arrives as a snapshot (joinedOnline).
     this.pendingNet = net;
-    setTimeout(() => { if (this.pendingNet === net) { net.close(); this.pendingNet = null; this.overlays.toast("The host didn't answer"); } }, 8000);
+    setTimeout(() => { if (this.pendingNet === net) { net.close(); this.pendingNet = null; this.overlays.toast("The host didn't answer", 4000, { error: true }); } }, 8000);
   }
   private pendingNet: Online | null = null;
 
@@ -421,7 +421,7 @@ export class App {
     this.localMutes.clear();
     this.stopLocal();
     this.endCouch();
-    if (why) this.overlays.toast(why, 3500);
+    if (why) this.overlays.toast(why, 4000, { error: true });
   }
 
   /** On a screen where notes go into a clip (the editor, or couch mode's quarters). */

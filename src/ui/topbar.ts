@@ -45,6 +45,30 @@ export function bindTopbar(app: App, el: HTMLElement) {
    */
   const timerCell = h("div", { class: "dmd-timer" });
   const infoCell = h("div", { class: "dmd-info" });
+  const msgCell = h("div", { class: "dmd-msg" });
+
+  /**
+   * Messages scroll across the display like a pinball machine's: in from the right, through,
+   * and the display goes back to its lines. A new message replaces the one showing.
+   */
+  let msgTimer = 0, msgAnim: Animation | null = null;
+  app.overlays.marquee = (text, ms) => {
+    if (isPhone() || !infoCell.isConnected || app.screenName === "dice") return false;
+    const art = dmdText(text, { height: 14 });
+    msgAnim?.cancel();
+    clearTimeout(msgTimer);
+    msgCell.replaceChildren(art);
+    infoCell.classList.add("showing-msg");
+    const boxW = infoCell.clientWidth, textW = parseFloat(art.style.width) || 0;
+    // Short messages slide in and sit centred; long ones scroll right through to their end.
+    const end = textW <= boxW ? (boxW - textW) / 2 : boxW - textW - 6;
+    const travel = boxW - end, speed = 260; // px per second
+    const slide = Math.max(450, (travel / speed) * 1000);
+    const hold = Math.max(900, ms - slide);
+    msgAnim = art.animate([{ transform: `translateX(${boxW}px)` }, { transform: `translateX(${end}px)` }], { duration: slide, easing: "linear", fill: "forwards" });
+    msgTimer = setTimeout(() => { infoCell.classList.remove("showing-msg"); msgCell.replaceChildren(); }, slide + hold) as unknown as number;
+    return true;
+  };
   const display = () => {
     const s = app.song;
     const tempo = app.engine.externalTempo ? `EXT ${app.engine.externalTempo.toFixed(1)}` : `${s.tempo}`;
@@ -54,7 +78,8 @@ export function bindTopbar(app: App, el: HTMLElement) {
     const line2 = app.locked ? "LOCKED" : [scene?.name, track && INSTRUMENTS[track.kind].name].filter(Boolean).join(" . ");
     infoCell.replaceChildren(
       h("div", { class: "dmd-line" }, dmdText(line1, { height: 11 })),
-      h("div", { class: "dmd-line" + (app.locked ? " locked" : "") }, dmdText(line2, { height: 11 })));
+      h("div", { class: "dmd-line" + (app.locked ? " locked" : "") }, dmdText(line2, { height: 11 })),
+      msgCell);
     return h("button", { class: "dmd-display", onclick: () => songSettings(app), title: `${s.title}: key, scale, tempo, swing (click to change)` }, timerCell, infoCell);
   };
 
