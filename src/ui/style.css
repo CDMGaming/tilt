@@ -743,3 +743,20 @@ body:not(.phone) .editor:not(.couch-ed) .ed-toolbar > * { flex: none; }
   body:not(.phone) .editor:not(.couch-ed) .ed-toolbar { gap: 4px; padding-left: 6px; padding-right: 6px; }
   body:not(.phone) .editor:not(.couch-ed) .tb-btn { padding-left: 7px; padding-right: 7px; }
 }
+
+/* ---------- E: song screen insert lamps, queued blink, bigger add targets ---------- */
+.cell .lamp { position: absolute; left: 6px; top: 6px; width: 9px; height: 9px; border-radius: 50%; z-index: 1;
+  background: color-mix(in srgb, var(--track) 22%, #000); box-shadow: inset 0 1px 1px #0008; }
+.cell.playing:not(.empty) .lamp { background: radial-gradient(circle at 40% 35%, #fff 0 18%, var(--track) 55%); box-shadow: 0 0 6px var(--track), 0 0 14px color-mix(in srgb, var(--track) 70%, transparent); }
+.cell.playing:not(.empty) { border-left-color: color-mix(in srgb, var(--track) 70%, #fff); }
+.cell.queued:not(.empty) .lamp { animation: lamp-blink .5s steps(1) infinite; }
+.cell.queued:not(.empty) { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--track) 60%, transparent); }
+@keyframes lamp-blink { 0% { background: var(--track); box-shadow: 0 0 8px var(--track); } 50% { background: color-mix(in srgb, var(--track) 22%, #000); box-shadow: none; } }
+.scene-head.queued .scene-play { animation: lamp-blink .5s steps(1) infinite; --track: var(--mint); }
+@media (prefers-reduced-motion: reduce) { .cell.queued .lamp, .scene-head.queued .scene-play { animation: none; } }
+.add-track, .add-scene { display: flex; flex-direction: column; gap: 2px; align-items: center; justify-content: center; border-radius: var(--r-m); transition: border-color var(--t-fast), color var(--t-fast), background-color var(--t-fast); }
+.add-track:hover, .add-scene:hover, .add-track.cursor, .add-scene.cursor { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.add-plus { font-size: 28px; line-height: 1; font-weight: 300; }
+.add-label { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+.add-scene { min-height: 64px; flex-direction: row; gap: 8px; }
+.add-scene .add-plus { font-size: 24px; }

@@ -29,7 +29,7 @@ export class SongScreen implements Screen {
   render() {
     const app = this.app, song = app.song, cur = app.songCur;
     const cols = song.tracks.length;
-    this.grid.style.gridTemplateColumns = `170px repeat(${cols}, minmax(120px, 1fr)) 64px`;
+    this.grid.style.gridTemplateColumns = `170px repeat(${cols}, minmax(120px, 1fr)) 96px`;
     const cells: HTMLElement[] = [];
     const isCur = (r: number, c: number) => cur.row === r && cur.col === c;
     const at = (r: number, c: number, el: HTMLElement) => {
@@ -48,7 +48,7 @@ export class SongScreen implements Screen {
       h("div", { class: "song-title" }, song.title),
       h("div", { class: "corner-sub" }, song.setupCode ? `🎲 ${song.setupCode}` : "")));
     song.tracks.forEach((t, c) => at(-1, c, this.trackHeader(t, c)));
-    at(-1, cols, h("div", { class: "add-track", title: "Add track" }, "+"));
+    at(-1, cols, h("div", { class: "add-track", title: "Add an instrument" }, h("span", { class: "add-plus" }, "+"), h("span", { class: "add-label" }, "Track")));
 
     // scene rows
     song.scenes.forEach((s, r) => {
@@ -56,7 +56,7 @@ export class SongScreen implements Screen {
       song.tracks.forEach((t, c) => at(r, c, this.cell(t, s)));
       at(r, cols, h("div", { class: "filler" }));
     });
-    at(song.scenes.length, -1, h("div", { class: "add-scene" }, "+ Scene"));
+    at(song.scenes.length, -1, h("div", { class: "add-scene", title: "Add a scene" }, h("span", { class: "add-plus" }, "+"), h("span", { class: "add-label" }, "Scene")));
     for (let c = 0; c <= cols; c++) at(song.scenes.length, c, h("div", { class: "filler" }));
 
     this.grid.replaceChildren(...cells);
@@ -95,7 +95,8 @@ export class SongScreen implements Screen {
     if (!clip) return el;
     el.addEventListener("pointerdown", (e) => { if (e.button === 0) this.startDrag(e, t, s); });
     const cv = h("canvas", { class: "cell-preview" });
-    el.append(cv, h("span", { class: "cell-bars" }, `${clip.bars}`));
+    // The insert lamp: lit while this clip plays, blinking while its scene waits its turn.
+    el.append(cv, h("span", { class: "cell-bars" }, `${clip.bars}`), h("span", { class: "lamp", "aria-hidden": "true" }));
     requestAnimationFrame(() => drawPreview(cv, clip, t));
     return el;
   }
@@ -105,7 +106,9 @@ export class SongScreen implements Screen {
   private lastBeat = -1;
 
   frame() {
-    const pos = this.app.engine.position();
+    const pos = this.app.engine.position(), mode = this.app.engine.playMode;
+    // A scene queued to play next (scene loop mode): its clips blink until it starts.
+    const queued = pos && mode.kind === "scene" && mode.sceneId !== pos.sceneId ? mode.sceneId : -1;
     // A beat pulse on the playing row (restarted each beat; CSS does the decay).
     const beat = pos ? Math.floor(pos.tick / 96) + pos.repeat * 1000 : -1;
     const pulse = beat !== this.lastBeat && beat >= 0;
@@ -113,6 +116,7 @@ export class SongScreen implements Screen {
     for (const el of this.grid.querySelectorAll<HTMLElement>("[data-scene]")) {
       const on = !!pos && Number(el.dataset.scene) === pos.sceneId;
       el.classList.toggle("playing", on);
+      el.classList.toggle("queued", Number(el.dataset.scene) === queued);
       if (on && pulse) { el.classList.remove("beat"); void el.offsetWidth; el.classList.add("beat"); }
       if (!on) el.classList.remove("beat");
       if (el.classList.contains("scene-head")) {
