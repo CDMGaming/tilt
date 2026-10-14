@@ -193,6 +193,7 @@ export class PianoRoll {
     const pos = this.app.engine.position();
     const playTick = pos && pos.sceneId === this.app.ed.sceneId ? pos.tick % this.clipTicks() : -1;
     if (playTick !== this.lastPlayTick) { this.lastPlayTick = playTick; this.dirty = true; }
+    if (this.app.rollGhosts) this.dirty = true; // the outlines pulse
     if (playTick >= 0 && this.zoomed() && (this.app.recording || performance.now() - this.lastNav > 3000)) {
       const vt = this.viewTicks(), s = this.scroll();
       if (playTick < s || playTick >= s + vt) { this.app.ed.scrollTick = this.clampScroll(Math.floor(playTick / vt) * vt); this.dirty = true; }
@@ -309,6 +310,26 @@ export class PianoRoll {
         // the part that hangs past the clip end (it wraps when looping)
         if (n.start + n.len > ct) { g.fillStyle = color; g.globalAlpha = 0.25; g.fillRect(this.xOf(0), y + 2, (n.start + n.len - ct) * this.pxPerTick(), rowH - 4); g.globalAlpha = 1; }
       }
+    }
+
+    // Outlines where notes should go (the tutorial), pulsing until a note fills them.
+    const gh = app.rollGhosts;
+    if (gh && gh.trackId === track.id && gh.sceneId === ed.sceneId) {
+      const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 260);
+      g.save();
+      g.setLineDash([4, 3]);
+      g.lineWidth = 2;
+      g.strokeStyle = color;
+      for (const n of gh.notes) {
+        if (clip?.notes.some((x) => x.pitch === n.pitch && x.start === n.start)) continue;
+        const r = this.rowOf(n.pitch) - top;
+        if (r < 0 || r >= rows) continue;
+        const x = this.xOf(n.start), y = this.yOf(n.pitch), nw = Math.max(8, n.len * this.pxPerTick() - 1);
+        g.globalAlpha = pulse;
+        roundRect(g, x + 2, y + 2, nw - 3, rowH - 4, 3);
+        g.stroke();
+      }
+      g.restore();
     }
 
     // range selection rectangle

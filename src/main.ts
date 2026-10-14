@@ -15,6 +15,7 @@ import { Scope } from "./ui/scope";
 import { getSample } from "./ui/samples";
 import { audioSessionPlayback, keepStorage, watchPhone } from "./ui/phone";
 import { takeCodeFromUrl } from "./ui/share";
+import { Tutorial, offerTutorial } from "./ui/tutorial";
 
 const root = document.getElementById("app")!;
 audioSessionPlayback();
@@ -32,6 +33,9 @@ watchPhone(() => app.refresh());
 bindRightClick(app);
 app.openDice = () => { app.engine.stop(); app.show("dice"); };
 app.openSystemMenu = () => systemMenu(app, () => app.openDice!());
+app.openHelp = () => { if (!app.overlays.open) helpDialog(app); };
+const tutorial = new Tutorial(app);
+app.openTutorial = () => { document.querySelector(".coach-offer")?.remove(); void tutorial.start(true); };
 app.songSettings = () => songSettings(app);
 app.onTimeUp = () => timeUpDialog(app);
 app.openShortcut = () => openShortcut(app);
@@ -43,14 +47,10 @@ app.engine.userSampleLoader = async (id) => { const s = await getSample(id); ret
 await app.boot(App.savedSong() ?? newSong());
 app.show("dice");
 takeCodeFromUrl(app);
+// New here: a card on the setup screen offers the tutorial (never a forced dialog).
+void offerTutorial(app, tutorial, document.body);
+app.frameHooks.push(() => { if (app.screenName !== "dice") document.querySelector(".coach-offer")?.remove(); });
 
-// First visit: show the controls once.
-try {
-  if (!localStorage.getItem(STORE_PREFIX + "seenHelp")) {
-    localStorage.setItem(STORE_PREFIX + "seenHelp", "1");
-    helpDialog(app);
-  }
-} catch { /* storage blocked */ }
 
 // For automated checks in the browser console.
 (window as unknown as { tilt: App }).tilt = app;

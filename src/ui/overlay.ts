@@ -20,6 +20,7 @@ export interface MenuItem {
   run?: () => void;
   sub?: () => MenuItem[];
   keepOpen?: boolean; // toggles: leave the menu up
+  color?: string; // a colour swatch before the label (scene names)
 }
 
 /** Steppers inside dialogs: left/right adjust instead of moving focus. */
@@ -91,7 +92,9 @@ export class OverlayHost {
     const host = this;
     const build = (get: () => MenuItem[], depth: number, at?: { x: number; y: number }, focus = 0): Overlay => {
       const list = get();
-      const box = h("div", { class: "menu", role: "menu" },
+      // Phones: menus rise from the bottom as a sheet, big enough for thumbs.
+      const sheet = document.body.classList.contains("phone") && !host.rect();
+      const box = h("div", { class: "menu" + (sheet ? " sheet" : ""), role: "menu" },
         title && depth === 0 ? h("div", { class: "menu-title" }, title) : null,
         list.map((it, i) => h("button", {
           class: "menu-item" + (it.checked ? " checked" : ""),
@@ -100,6 +103,7 @@ export class OverlayHost {
           onclick: () => activate(it),
         },
         h("span", { class: "menu-check" }, it.checked === undefined ? "" : it.checked ? "●" : "○"),
+        it.color ? h("span", { class: "menu-swatch", style: `background:${it.color}` }) : null,
         h("span", { class: "menu-label" }, it.label),
         h("span", { class: "menu-hint" }, it.sub ? "▸" : it.hint ?? ""))),
       );
@@ -141,7 +145,7 @@ export class OverlayHost {
       };
       const area = host.rect();
       requestAnimationFrame(() => {
-        place(box, at, area);
+        if (!sheet) place(box, at, area);
         nav.focusId(`m${focus}`);
         nav.paint();
       });

@@ -81,6 +81,7 @@ function keyAction(e: KeyboardEvent, ctrl: boolean): Action | null {
     }
     return null;
   }
+  if (e.key === "?") return { type: "help" };
   switch (e.code) {
     case "Enter": case "NumpadEnter":
       if (e.repeat) { e.preventDefault(); return null; }
@@ -93,6 +94,7 @@ function keyAction(e: KeyboardEvent, ctrl: boolean): Action | null {
     case "Backslash": return { type: "layout" };
     case "KeyM": case "ContextMenu": return { type: "menu" };
     case "F1": return { type: "system" };
+    case "KeyC": return { type: "playMode" };
     case "Backquote": return e.repeat ? null : { type: "shortcut", down: true };
     case "Comma": return { type: "knob", dx: -1, dy: 0 };
     case "Period": return { type: "knob", dx: 1, dy: 0 };
@@ -110,7 +112,7 @@ function keyAction(e: KeyboardEvent, ctrl: boolean): Action | null {
 // ------------------------------------------------------------------ gamepad
 
 // Standard-mapping button indices (by position, Xbox names).
-const BTN = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8, MENU: 9, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
+const BTN = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8, MENU: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
 const REPEAT_DELAY = 280;
 const REPEAT_RATE = 70;
 const Y_HOLD_MS = 450;
@@ -170,6 +172,7 @@ export class GamepadInput {
     if (up(map.LB)) s.action({ type: "shortcut", down: false });
     if (down(map.MENU)) s.action({ type: "system" });
     if (down(map.VIEW)) s.action({ type: "undo" });
+    if (down(map.L3)) s.action({ type: "playMode" });
 
     // Y: tap = play/stop, hold = record.
     if (down(map.Y)) { this.yDown = now; this.yFired = false; }

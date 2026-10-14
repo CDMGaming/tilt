@@ -9,6 +9,36 @@ import { DEFAULT_SAMPLER_REFS } from "./instruments3";
 
 export const SCENE_NAMES = ["Intro", "Verse", "Build", "Chorus", "Drop", "Break", "Bridge", "Outro"];
 
+/** The quick names (one tap on the Song screen), each with its own colour. */
+export const QUICK_SCENES: { name: string; color: string }[] = [
+  { name: "Intro", color: "#5fb3ff" },
+  { name: "Verse", color: "#7ee08a" },
+  { name: "Chorus", color: "#ffb347" },
+  { name: "Bridge", color: "#c792ff" },
+  { name: "Drop", color: "#ff5f7a" },
+  { name: "Outro", color: "#8fa3b8" },
+];
+const OTHER_SCENE_COLORS: Record<string, string> = { Build: "#ffe066", Break: "#4fd1c5" };
+
+/** A scene's colour, from its name ("Chorus", "Chorus copy", "Chorus 2" all match), or null. */
+export function sceneColor(name: string): string | null {
+  const base = name.replace(/( copy)+$/i, "").replace(/\s*\d+$/, "").trim().toLowerCase();
+  const q = QUICK_SCENES.find((x) => x.name.toLowerCase() === base);
+  if (q) return q.color;
+  const o = Object.keys(OTHER_SCENE_COLORS).find((k) => k.toLowerCase() === base);
+  return o ? OTHER_SCENE_COLORS[o] : null;
+}
+
+/** Move the scene at `from` to index `to` (clips go with it: they're keyed by scene id). */
+export function moveScene(song: Song, from: number, to: number) {
+  const n = song.scenes.length;
+  if (from < 0 || from >= n) return;
+  to = Math.max(0, Math.min(n - 1, to));
+  if (from === to) return;
+  const [s] = song.scenes.splice(from, 1);
+  song.scenes.splice(to, 0, s);
+}
+
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 
 /** Shade for a new track of `kind` (the count of that instrument already in the song). */

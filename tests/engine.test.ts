@@ -348,3 +348,28 @@ Deno.test("setupFromSong: a song's code as it is now", async () => {
   song.tracks[2].preset = "My own pad";
   assertEquals(setupFromSong(song)!.lineup[2].preset, 0);
 });
+
+Deno.test("moveScene: scenes reorder and keep their clips", async () => {
+  const { moveScene, addScene, ensureClip: ec } = await import("../src/engine/songops.ts");
+  const song = songFromSetup({ key: 0, scale: "minor", tempo: 120, swing: 0, lineup: [{ kind: "drums", preset: 0 }] });
+  addScene(song); addScene(song);
+  const ids = song.scenes.map((s) => s.id);
+  ec(song, song.tracks[0], ids[2]).notes.push({ id: 999, pitch: 36, start: 0, len: 24, vel: 100 });
+  moveScene(song, 2, 0);
+  assertEquals(song.scenes.map((s) => s.id), [ids[2], ids[0], ids[1]]);
+  assertEquals(song.tracks[0].clips[ids[2]].notes.length, 1);
+  moveScene(song, 0, 99); // past the end: to the last place
+  assertEquals(song.scenes.map((s) => s.id), [ids[0], ids[1], ids[2]]);
+  moveScene(song, 5, 0); // no such scene: nothing happens
+  assertEquals(song.scenes.length, 3);
+});
+
+Deno.test("sceneColor: quick names have colours, copies and numbers keep them", async () => {
+  const { sceneColor, QUICK_SCENES } = await import("../src/engine/songops.ts");
+  const chorus = QUICK_SCENES.find((q) => q.name === "Chorus")!.color;
+  assertEquals(sceneColor("Chorus"), chorus);
+  assertEquals(sceneColor("Chorus copy"), chorus);
+  assertEquals(sceneColor("chorus 2"), chorus);
+  assertEquals(sceneColor("Scene 3"), null);
+  assertEquals(new Set(QUICK_SCENES.map((q) => q.color)).size, QUICK_SCENES.length);
+});

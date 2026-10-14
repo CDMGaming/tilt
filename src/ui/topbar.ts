@@ -23,18 +23,18 @@ export function bindTopbar(app: App, el: HTMLElement) {
     if (isPhone()) { renderRails(); return; }
     const playing = app.engine.playing, none = !s.tracks.length;
     el.replaceChildren(
-      h("button", { class: "tilt-logo", onclick: () => app.openSystemMenu?.(), title: "Menu (Start / F1): dice, songs, together, export, settings...", "aria-label": "TILT menu" },
+      h("button", { class: "tilt-logo", "data-coach": "menu", onclick: () => app.openSystemMenu?.(), title: "Menu (Start / F1): dice, songs, together, export, settings...", "aria-label": "TILT menu" },
         dmdText("TILT", { height: 17, slant: 7, unlit: false })),
       h("div", { class: "dmd-wrap" },
         display(),
         h("button", { class: "dmd-bulb", onclick: () => app.stuck?.(), disabled: app.locked || none, title: "Stuck? Ideas for this scene (phrase grid)", "aria-label": "Stuck?" }, "💡")),
       screenSwitch(),
       h("div", { class: "transport" },
-        h("button", { class: "tp-btn" + (playing ? " on" : ""), onclick: () => app.togglePlay(), title: "Play / stop (Y, Space)" }, playing ? "■" : "▶"),
+        h("button", { class: "tp-btn" + (playing ? " on" : ""), "data-coach": "play", onclick: () => app.togglePlay(), title: "Play / stop (Y, Space)" }, playing ? "■" : "▶"),
         h("button", { class: "tp-btn rec" + (app.recording ? " on" : ""), onclick: () => app.toggleRecord(), title: "Record (hold Y, Shift+Space)" }, "●"),
-        h("button", { class: "tp-btn mode", onclick: () => { app.songMode = app.songMode === "scene" ? "song" : "scene"; render(); }, title: "Loop the scene, or play the whole song" },
-          app.songMode === "scene" ? "⟳" : s.songLoop ? "⟳" : "→", h("span", { class: "mode-label" }, app.songMode === "scene" ? " Scene" : " Song")),
-        h("button", { class: "tp-btn" + (s.metronome ? " on" : ""), onclick: () => app.edit("Metronome", () => (s.metronome = !s.metronome)), title: "Metronome" }, "♩")),
+        modeSwitch(),
+        h("button", { class: "tp-btn" + (s.metronome ? " on" : ""), onclick: () => app.edit("Metronome", () => (s.metronome = !s.metronome)), title: "Metronome" }, "♩"),
+        h("button", { class: "tp-btn help-btn", onclick: () => app.openHelp?.(), title: "Controls (?)", "aria-label": "Controls" }, "?")),
       s.challenges?.length && app.settings.gameMode ? (() => {
         const st = challengeStatus(s);
         return h("button", { class: "chip-btn", title: st.map((c) => `${c.met ? "✓" : "○"} ${c.text}`).join("\n"), onclick: () => app.overlays.dialog("Challenge cards", (close) => h("div", { class: "form" },
@@ -45,11 +45,23 @@ export function bindTopbar(app: App, el: HTMLElement) {
     updateTimer();
   };
 
+  /** SCENE | SONG: what Play does. SONG mode adds the loop switch (play the song again at its end). */
+  const modeSwitch = () => {
+    const s = app.song, m = app.songMode;
+    const seg = (id: "scene" | "song", label: string, title: string) =>
+      h("button", { class: "mode-tab" + (m === id ? " on" : ""), "aria-pressed": String(m === id), onclick: () => app.setSongMode(id), title }, label);
+    return h("div", { class: "mode-wrap" },
+      h("div", { class: "mode-seg", "data-coach": "mode", role: "group", "aria-label": "Play mode (C)" },
+        seg("scene", "SCENE", "Play loops the current scene (C)"),
+        seg("song", "SONG", "Play goes through the scenes in order (C)")),
+      m === "song" ? h("button", { class: "tp-btn loop-btn" + (s.songLoop ? " on" : ""), "aria-pressed": String(s.songLoop), onclick: () => app.edit("Song loop", () => (s.songLoop = !s.songLoop)), title: s.songLoop ? "Song loop on: the song starts again at its end" : "Song loop off: the song stops at its end" }, "⟳") : "");
+  };
+
   /** SONG | EDIT | MIX, the active one lit amber like an insert lamp (couch / online: the shared screen). */
   const screenSwitch = () => {
     const none = !app.song.tracks.length;
     const tab = (glyph: string, label: string, on: boolean, onclick: () => void, title: string, disabled = false) =>
-      h("button", { class: "scr-tab" + (on ? " on" : ""), onclick, title, disabled, "aria-pressed": String(on) },
+      h("button", { class: "scr-tab" + (on ? " on" : ""), "data-coach": `tab-${label.toLowerCase()}`, onclick, title, disabled, "aria-pressed": String(on) },
         h("span", { class: "scr-glyph", "aria-hidden": "true" }, glyph), h("span", { class: "scr-label" }, label));
     if (app.couch) {
       return h("div", { class: "scr-seg" }, tab(app.couch.online ? "🌐" : "🛋", app.couch.online ? app.couch.online.room : "COUCH", app.screenName === "couch", () => app.show("couch"), "Back to the shared screen"));
@@ -103,8 +115,20 @@ export function bindTopbar(app: App, el: HTMLElement) {
     const line1 = narrow
       ? `${NOTE_NAMES[s.key]} ${scaleText} ${tempo}`
       : `${NOTE_NAMES[s.key]} ${scaleName}  ${tempo} BPM${s.swing ? `  SW ${s.swing}%` : ""}`;
-    const where = [scene?.name, track && INSTRUMENTS[track.kind].name].filter(Boolean) as string[];
-    const line2 = app.locked ? "LOCKED" : narrow ? where.map((w) => w.slice(0, 7)).join(".") : where.join(" . ");
+    // What Play does (LOOP SCENE 2 / SONG 3/6), then the instrument you're on.
+    const inst = track ? INSTRUMENTS[track.kind].name : "";
+    const line2 = app.locked ? "LOCKED" : narrow ? [app.playState(true), inst.slice(0, 7)].filter(Boolean).join(".") : [app.playState() + (scene && app.songMode === "scene" ? ` ${scene.name}` : ""), inst].filter(Boolean).join(" . ");
+    if (app.coach) {
+      // The tutorial: which step, then the instruction (scrolling when it's longer than the display).
+      const c = app.coach, art = dmdText(c.text, { height: narrow ? 9 : 11 });
+      const box = h("div", { class: "dmd-line dmd-scroll" }, art);
+      infoCell.replaceChildren(h("div", { class: "dmd-line" }, dmdText(`FIRST SONG ${c.step}/${c.total}`, { height: narrow ? 9 : 11 })), box, msgCell);
+      requestAnimationFrame(() => {
+        const boxW = box.clientWidth, textW = parseFloat(art.style.width) || 0;
+        if (textW > boxW) art.animate([{ transform: `translateX(${boxW * 0.6}px)` }, { transform: `translateX(${-textW}px)` }], { duration: ((textW + boxW * 0.6) / 90) * 1000, iterations: Infinity });
+      });
+      return h("button", { class: "dmd-display coach", onclick: () => {}, title: c.text }, timerCell, infoCell);
+    }
     infoCell.replaceChildren(
       h("div", { class: "dmd-line" }, dmdText(line1, { height: narrow ? 9 : 11 })),
       h("div", { class: "dmd-line" + (app.locked ? " locked" : "") }, dmdText(line2, { height: narrow ? 9 : 11 })),
@@ -150,6 +174,7 @@ export function bindTopbar(app: App, el: HTMLElement) {
     el.replaceChildren(
       h("div", { class: "rail rail-left" },
         icon("☰", "Menu", () => app.openSystemMenu?.(), "brand"),
+        icon("?", "Help", () => app.openHelp?.(), "help-rail", false, "Controls"),
         h("button", { class: "rail-btn info", onclick: () => songSettings(app), title: "Key, scale, tempo" },
           h("span", { class: "rail-glyph small" }, NOTE_NAMES[s.key]),
           h("span", { class: "rail-label" }, scaleById(s.scale).name.slice(0, 5)),
@@ -158,7 +183,9 @@ export function bindTopbar(app: App, el: HTMLElement) {
         h("div", { class: "rail-gap" }),
         icon("↶", "Undo", () => app.undo()),
         icon("↷", "Redo", () => app.redo()),
-        icon("♩", "Click", () => app.edit("Metronome", () => (s.metronome = !s.metronome)), s.metronome ? "on" : ""),
+        // SCENE / SONG (the metronome lives in the menu on phones), and the song loop in SONG mode.
+        icon(app.songMode === "scene" ? "⟳" : "→", app.songMode === "scene" ? "Scene" : "Song", () => app.setSongMode(app.songMode === "scene" ? "song" : "scene"), "mode-rail" + (app.songMode === "song" ? " song" : ""), false, "Play mode: loop the scene or play the song (C)"),
+        app.songMode === "song" ? icon("⟳", "Loop", () => app.edit("Song loop", () => (s.songLoop = !s.songLoop)), s.songLoop ? "on" : "", false, "Song loop") : "",
         icon("●", "Rec", () => app.toggleRecord(), "rec" + (app.recording ? " on" : "")),
         icon(playing ? "■" : "▶", playing ? "Stop" : "Play", () => app.togglePlay(), "play" + (playing ? " on" : ""))),
       screenRail(),
@@ -184,9 +211,12 @@ export function bindTopbar(app: App, el: HTMLElement) {
   // The bar's contents depend on the width (short display text, phone / desktop): redraw on resize.
   let resizeFrame = 0;
   window.addEventListener("resize", () => { cancelAnimationFrame(resizeFrame); resizeFrame = requestAnimationFrame(render); });
-  let last = "";
+  let last = "", lastState = "";
   app.frameHooks.push(() => {
     const txt = app.timer.running ? fmtTime(app.timeLeft()) : "";
     if (txt !== last) { last = txt; updateTimer(); }
+    // The display follows the song as it plays (SONG 2/6 -> 3/6).
+    const st = app.song ? app.playState() : "";
+    if (st !== lastState) { lastState = st; if (!isPhone()) render(); }
   });
 }

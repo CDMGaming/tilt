@@ -893,8 +893,6 @@ button.rail-btn.rec.on .rail-label, button.rail-btn.play.on .rail-label { color:
   body:not(.phone) .editor:not(.couch-ed) .ed-toolbar .spacer { display: none; }
 }
 
-/* Song screen: + Track stays reachable at the end of the track header row, however many tracks. */
-.song-grid > .add-track { position: sticky; right: 0; z-index: 3; background: var(--bg); box-shadow: -8px 0 10px var(--bg); }
 
 /* Notes from the computer keyboard, MIDI, Push or a gamepad light the key / pad they play. */
 .key.lit { background: var(--track); color: var(--key-ink); box-shadow: inset 0 -1px 0 #00000022, 0 0 12px color-mix(in srgb, var(--track) 45%, transparent); }
@@ -965,3 +963,86 @@ body.phone .dice-bar .continue { grid-column: 1 / -1; justify-self: center; padd
 .share-block:not(.main) .share-code { font-size: 15px; color: var(--dim); }
 .share-btns { display: flex; flex-wrap: wrap; gap: 6px; }
 .lib-code { font-family: var(--font-mono); }
+
+/* ---------- Play mode: SCENE | SONG beside Play, the song loop only in SONG ---------- */
+.mode-wrap { display: flex; gap: 3px; align-items: stretch; }
+.mode-seg { display: flex; padding: 2px; gap: 2px; background: #0006; border-radius: calc(var(--r-m) + 1px); }
+.mode-tab { font: 700 11px var(--font-display); letter-spacing: .1em; padding: 4px 9px; min-width: 0; color: var(--dim); background: transparent; border-color: transparent; box-shadow: none; }
+.mode-tab.on, button.mode-tab.on:hover:not(:disabled) { color: #1a0f00; background: var(--dmd); border-color: transparent; box-shadow: 0 0 10px color-mix(in srgb, var(--dmd) 55%, transparent); }
+.loop-btn.on { color: var(--dmd); border-color: color-mix(in srgb, var(--dmd) 55%, var(--line)); }
+.help-btn { font-weight: 800; min-width: 32px; }
+.rail-btn.mode-rail.song .rail-glyph { color: var(--dmd); }
+
+/* ---------- Scenes: colour by name, a drag grip, drop line ---------- */
+.scene-head.tinted { box-shadow: inset 4px 0 0 var(--scene); }
+.scene-head.tinted .sh-name { color: color-mix(in srgb, var(--scene) 55%, var(--ink)); }
+.scene-head.tinted.playing { box-shadow: inset 4px 0 0 var(--scene), inset 7px 0 0 var(--mint); }
+.sh-name { background: none; border: none; box-shadow: none; padding: 0; text-align: left; text-transform: none; letter-spacing: 0; font-size: inherit; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.sh-name:hover:not(:disabled) { background: none; text-decoration: underline; text-underline-offset: 3px; }
+.sh-text { min-width: 0; }
+.sh-grip { cursor: grab; color: var(--dim); font-size: 13px; letter-spacing: -3px; padding: 4px 2px; user-select: none; touch-action: none; opacity: .55; }
+.scene-head:hover .sh-grip { opacity: 1; }
+.scene-play.from { color: var(--dmd); }
+.scene-head.dragging { opacity: .45; }
+.scene-head.drop-above { box-shadow: inset 0 3px 0 var(--accent) !important; }
+.scene-head.drop-below { box-shadow: inset 0 -3px 0 var(--accent) !important; }
+.scene-head.held, .cell.held, .track-head.held { outline: 2px solid var(--accent); outline-offset: 2px; transform: scale(.98); transition: transform var(--t-fast); }
+.menu-swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+/* ---------- Phone Song screen: a fixed scene column, clips scroll sideways ---------- */
+body.phone .song-grid { gap: 4px; }
+body.phone .song-grid > * { min-height: 52px; }
+body.phone .song-grid > .corner, body.phone .song-grid > .scene-head, body.phone .song-grid > .add-scene { position: sticky; left: 0; z-index: 2; }
+/* The strip left of the fixed column (the screen's padding) is painted over too, so clips don't peek through. */
+body.phone .song-grid > .corner, body.phone .song-grid > .scene-head { background: var(--panel); box-shadow: -16px 0 0 var(--bg), 6px 0 8px -4px #0009; }
+body.phone .song-grid > .scene-head.tinted { box-shadow: inset 4px 0 0 var(--scene), -16px 0 0 var(--bg), 6px 0 8px -4px #0009; }
+body.phone .song-grid > .add-scene { background: var(--bg); box-shadow: -16px 0 0 var(--bg); }
+body.phone .scene-head { gap: 4px; padding: 4px; }
+body.phone .scene-play { width: 28px; height: 28px; font-size: 12px; }
+body.phone .sh-name { font-size: 12px; white-space: normal; line-height: 1.15; }
+body.phone .sh-meta { font-size: 10px; min-height: 0; }
+body.phone .corner { padding: 6px; }
+body.phone .corner .song-title { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.phone .song-grid .cell, body.phone .song-grid .scene-head, body.phone .song-grid .track-head { -webkit-touch-callout: none; user-select: none; }
+
+/* Phone menus: a bottom sheet with thumb-sized rows. */
+.menu.sheet { left: 0 !important; right: 0; bottom: 0; top: auto !important; width: 100%; min-width: 0; max-height: 72vh; border-radius: 16px 16px 0 0; padding: 8px 8px calc(10px + env(safe-area-inset-bottom)); animation: sheet-up 160ms ease-out; }
+.menu.sheet .menu-title { text-align: center; }
+.menu.sheet .menu-item { min-height: 46px; font-size: 15px; }
+.menu-layer:has(.menu.sheet) { background: #0007; }
+@keyframes sheet-up { from { transform: translateY(30%); opacity: .4; } }
+@media (prefers-reduced-motion: reduce) { .menu.sheet { animation: none; } }
+
+/* Thump Lab between phone and wide desktop (~800-1100 px): pads in one row on top, so the
+   modules get the width and their knob labels don't run into each other. */
+@media (max-width: 1100px) {
+  body:not(.phone) .panel-body.thumplab { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "pads pads" "mods master"; row-gap: 10px; }
+  body:not(.phone) .thumplab .pads.four { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: minmax(52px, auto); }
+  body:not(.phone) .thumplab .module { padding: 6px 4px; }
+  body:not(.phone) .thumplab .module .knob-label { font-size: 10px; letter-spacing: 0; }
+  body:not(.phone) .thumplab .module .switch { min-width: 0; padding: 4px 2px; }
+}
+
+/* ---------- First-song tutorial: soft spotlight, a small card, the offer ---------- */
+.coach-spot { position: fixed; z-index: 40; pointer-events: none; border-radius: 12px; display: none;
+  box-shadow: 0 0 0 3px var(--dmd), 0 0 22px 4px color-mix(in srgb, var(--dmd) 55%, transparent), 0 0 0 9999px #0005;
+  transition: left 180ms ease, top 180ms ease, width 180ms ease, height 180ms ease; animation: coach-glow 1.4s ease-in-out infinite; }
+@keyframes coach-glow { 50% { box-shadow: 0 0 0 3px var(--dmd), 0 0 34px 8px color-mix(in srgb, var(--dmd) 40%, transparent), 0 0 0 9999px #0005; } }
+@media (prefers-reduced-motion: reduce) { .coach-spot { animation: none; transition: none; } }
+.coach-card, .coach-offer { position: fixed; z-index: 45; left: 16px; bottom: 16px; width: min(330px, calc(100vw - 32px)); padding: 12px 14px; border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 94%, transparent); border: 1px solid color-mix(in srgb, var(--dmd) 45%, var(--line)); box-shadow: 0 12px 34px var(--shadow); backdrop-filter: blur(6px); }
+.coach-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.coach-badge { font: 700 11px var(--font-display); letter-spacing: .12em; color: var(--dmd); }
+.coach-dots { display: flex; gap: 4px; }
+.coach-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.coach-dot.done { background: color-mix(in srgb, var(--dmd) 55%, var(--line)); }
+.coach-dot.now { background: var(--dmd); box-shadow: 0 0 6px var(--dmd); }
+.coach-do { margin-top: 8px; font: 800 15px var(--font-display); letter-spacing: .04em; color: var(--dmd); }
+.coach-text { margin: 6px 0 10px; font-size: 13px; line-height: 1.4; color: var(--ink); }
+.coach-btns { display: flex; gap: 8px; justify-content: flex-end; }
+.coach-list { margin: 8px 0 10px 18px; padding: 0; font-size: 13px; line-height: 1.45; }
+.coach-offer-title { font: 800 17px var(--font-display); margin-top: 4px; }
+.dmd-scroll { overflow: hidden; white-space: nowrap; }
+body.phone .coach-card, body.phone .coach-offer { bottom: calc(76px + env(safe-area-inset-bottom)); left: 12px; right: 12px; width: auto; }
+.coach-card.at-top { top: 72px; bottom: auto; }
+body.phone .coach-card.at-top { top: calc(70px + env(safe-area-inset-top)); bottom: auto; }

@@ -657,6 +657,35 @@ export class App {
     return { kind: "scene" as const, sceneId: this.currentSceneId() };
   }
 
+  /**
+   * SCENE (loop the current scene) or SONG (play the scenes in order). While playing, the
+   * switch takes effect at the end of the scene that's playing: SCENE keeps looping it,
+   * SONG carries on to the next one.
+   */
+  setSongMode(m: "scene" | "song") {
+    if (this.songMode === m) return;
+    this.songMode = m;
+    const pos = this.engine.position();
+    if (pos) {
+      const i = Math.max(0, this.song.scenes.findIndex((s) => s.id === pos.sceneId));
+      this.engine.queue(m === "scene" ? { kind: "scene", sceneId: pos.sceneId } : { kind: "song", fromIndex: i });
+    }
+    this.overlays.toast(m === "scene" ? "SCENE: play loops the scene" : this.song.songLoop ? "SONG: plays the scenes in order, then again" : "SONG: plays the scenes in order", 1400);
+    this.refresh();
+  }
+
+  /** What play does / is doing, for the display: LOOP SCENE 2, SONG 3/6. */
+  playState(narrow = false): string {
+    const song = this.song, n = song.scenes.length, pos = this.engine.position();
+    if (this.songMode === "song") {
+      const i = pos ? song.scenes.findIndex((s) => s.id === pos.sceneId) : (this.playMode() as { fromIndex: number }).fromIndex;
+      return `SONG ${Math.max(0, i) + 1}/${n}${song.songLoop ? (narrow ? "+" : " LOOP") : ""}`;
+    }
+    const id = pos ? pos.sceneId : this.currentSceneId();
+    const i = song.scenes.findIndex((s) => s.id === id);
+    return narrow ? `LOOP ${i + 1}` : `LOOP SCENE ${i + 1}`;
+  }
+
   currentSceneId(): number {
     if (this.screenName === "song") {
       const row = Math.max(0, Math.min(this.songCur.row, this.song.scenes.length - 1));
@@ -980,12 +1009,20 @@ export class App {
       case "octave": this.ed.octave = Math.max(0, Math.min(7, this.ed.octave + a.d)); this.overlays.toast(`Octave ${this.ed.octave}`, 700); this.screens[this.screenName]?.render(); return;
       case "screen": if (this.screenName !== "dice") this.show(a.to); return;
       case "system": this.openSystemMenu?.(); return;
+      case "playMode": if (this.screenName !== "dice") this.setSongMode(this.songMode === "scene" ? "song" : "scene"); return;
+      case "help": this.openHelp?.(); return;
       case "shortcut": if (a.down) this.openShortcut?.(); return;
     }
     this.screens[this.screenName]?.handle(a);
   }
 
   openSystemMenu?: () => void;
+  openHelp?: () => void;
+  openTutorial?: () => void;
+  /** The tutorial's current instruction (the dot-matrix display shows it), or null. */
+  coach: { step: number; total: number; text: string } | null = null;
+  /** Outlines the piano roll draws where notes should go (the tutorial's kicks), or null. */
+  rollGhosts: { trackId: number; sceneId: number; notes: { pitch: number; start: number; len: number }[] } | null = null;
   /** The DICE screen (a new jam): the rail's Dice button and the menu's "New jam". */
   openDice?: () => void;
   openShortcut?: () => void;

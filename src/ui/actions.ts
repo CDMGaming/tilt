@@ -21,7 +21,9 @@ export type Action =
   | { type: "copy" } | { type: "cut" } | { type: "paste" } | { type: "delete" }
   | { type: "duplicate" } | { type: "selectAll" }
   | { type: "octave"; d: -1 | 1 } // Z / X
-  | { type: "screen"; to: "song" | "edit" | "mix" };
+  | { type: "screen"; to: "song" | "edit" | "mix" }
+  | { type: "playMode" } // C / L3: SCENE <-> SONG
+  | { type: "help" }; // ?: the controls
 
 /** Held modifiers, kept by the input layer. */
 export const mods = {

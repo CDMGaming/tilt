@@ -3,18 +3,21 @@
 import { canArrange, autoArrange } from "../engine/arranger";
 import { encodeSetup, pickPreset, setupFromSong, usedPresets } from "../engine/dice";
 import { ALL_KINDS, INSTRUMENTS, isDrumKind } from "../engine/instruments";
-import { MAX_BARS, TICKS_PER_BAR, newId, type Clip, type Scene, type Track } from "../engine/model";
+import { MAX_BARS, MAX_SCENES, TICKS_PER_BAR, newId, type Clip, type Scene, type Track } from "../engine/model";
 import {
-  SCENE_NAMES, addScene, changeInstrument, deleteScene, deleteTrack, duplicateClip, duplicateScene,
-  duplicateTrack, ensureClip, insertBlankScene, loadPreset, presetIndex, setClipBars,
+  QUICK_SCENES, SCENE_NAMES, addScene, changeInstrument, deleteScene, deleteTrack, duplicateClip, duplicateScene,
+  duplicateTrack, ensureClip, insertBlankScene, loadPreset, moveScene, presetIndex, sceneColor, setClipBars,
 } from "../engine/songops";
-import type { Action } from "./actions";
+import { mods, type Action } from "./actions";
 import type { App, Screen } from "./app";
 import { instrumentPicker } from "./dialogs";
 import { h } from "./dom";
 import { trackColor } from "./theme";
 import type { MenuItem } from "./overlay";
 import { shareCodeDialog } from "./share";
+import { isPhone } from "./phone";
+
+const HOLD_MS = 450;
 
 export class SongScreen implements Screen {
   el = h("div", { class: "song-screen" });
@@ -23,14 +26,19 @@ export class SongScreen implements Screen {
   /** A clip picked up with "Move / copy to…" (controller-friendly drag and drop). */
   private carry: { trackId: number; sceneId: number } | null = null;
 
+  /** Touch: a long-press armed a gesture (menu, or a scene drag): the page mustn't scroll under it. */
+  private holding = false;
+
   constructor(private app: App) {
     this.el.appendChild(this.grid);
+    this.el.addEventListener("touchmove", (e) => { if (this.holding) e.preventDefault(); }, { passive: false });
   }
 
   render() {
     const app = this.app, song = app.song, cur = app.songCur;
     const cols = song.tracks.length;
-    this.grid.style.gridTemplateColumns = `170px repeat(${cols}, minmax(120px, 1fr)) 96px`;
+    // Phones: a narrow scene column that stays put while the clips scroll sideways.
+    this.grid.style.gridTemplateColumns = isPhone() ? `88px repeat(${cols}, 112px) 64px` : `170px repeat(${cols}, minmax(120px, 1fr)) 96px`;
     const cells: HTMLElement[] = [];
     const isCur = (r: number, c: number) => cur.row === r && cur.col === c;
     const at = (r: number, c: number, el: HTMLElement) => {
@@ -39,6 +47,9 @@ export class SongScreen implements Screen {
         if (cur.row !== r || cur.col !== c) { cur.row = r; cur.col = c; this.render(); }
         if (e.button === 2) { e.preventDefault(); this.openMenu({ x: e.clientX, y: e.clientY }); }
       });
+      // Touch: long-press opens the same menu as a right-click (a scene header can also be dragged).
+      if (r >= 0 && r < song.scenes.length && c === -1) this.holdGesture(el, () => this.openMenu(), r);
+      else if ((r === -1 && c >= 0 && c < cols) || (r >= 0 && r < song.scenes.length && c >= 0 && c < cols)) this.holdGesture(el, () => this.openMenu());
       el.addEventListener("contextmenu", (e) => e.preventDefault());
       el.addEventListener("dblclick", () => this.activate());
       cells.push(el);
@@ -53,7 +64,7 @@ export class SongScreen implements Screen {
         return now ? h("button", { class: "corner-sub code-btn", "data-nav": "share-code", title: "Share this song's setup code", onclick: (e: Event) => { e.stopPropagation(); shareCodeDialog(app); } }, `🎲 ${encodeSetup(now)}`) : "";
       })()));
     song.tracks.forEach((t, c) => at(-1, c, this.trackHeader(t, c)));
-    at(-1, cols, h("div", { class: "add-track", title: "Add an instrument" }, h("span", { class: "add-plus" }, "+"), h("span", { class: "add-label" }, "Track")));
+    at(-1, cols, h("div", { class: "add-track", title: "Add an instrument", onclick: () => this.addTrack() }, h("span", { class: "add-plus" }, "+"), h("span", { class: "add-label" }, "Track")));
 
     // scene rows
     song.scenes.forEach((s, r) => {
@@ -61,7 +72,7 @@ export class SongScreen implements Screen {
       song.tracks.forEach((t, c) => at(r, c, this.cell(t, s)));
       at(r, cols, h("div", { class: "filler" }));
     });
-    at(song.scenes.length, -1, h("div", { class: "add-scene", title: "Add a scene" }, h("span", { class: "add-plus" }, "+"), h("span", { class: "add-label" }, "Scene")));
+    at(song.scenes.length, -1, h("div", { class: "add-scene", title: "Add a scene", onclick: () => this.addSceneAtEnd() }, h("span", { class: "add-plus" }, "+"), h("span", { class: "add-label" }, "Scene")));
     for (let c = 0; c <= cols; c++) at(song.scenes.length, c, h("div", { class: "filler" }));
 
     this.grid.replaceChildren(...cells);
@@ -81,10 +92,14 @@ export class SongScreen implements Screen {
   }
 
   private sceneHeader(s: Scene, r: number): HTMLElement {
-    return h("div", { class: "scene-head", "data-scene": s.id },
-      h("button", { class: "scene-play", onclick: (e: Event) => { e.stopPropagation(); this.playScene(r); } }, "▶"),
+    const songMode = this.app.songMode === "song", color = sceneColor(s.name);
+    const grip = h("div", { class: "sh-grip", title: "Drag to move the scene (Alt+↑ / ↓)", "aria-hidden": "true" }, "⋮⋮");
+    grip.addEventListener("pointerdown", (e) => { if (e.button === 0) { e.stopPropagation(); e.preventDefault(); this.sceneDrag(r, e); } });
+    return h("div", { class: "scene-head" + (color ? " tinted" : ""), "data-scene": s.id, style: color ? `--scene:${color}` : "" },
+      isPhone() ? "" : grip,
+      h("button", { class: "scene-play" + (songMode ? " from" : ""), onclick: (e: Event) => { e.stopPropagation(); this.playScene(r); }, title: songMode ? "Play the song from here" : "Loop this scene" }, "▶"),
       h("div", { class: "sh-text" },
-        h("div", { class: "sh-name" }, `${r + 1} ${s.name}`),
+        h("button", { class: "sh-name", title: "Name it: Intro, Verse, Chorus…", onclick: (e: Event) => { e.stopPropagation(); this.nameMenu(s, e.currentTarget as HTMLElement); } }, `${r + 1} ${s.name}`),
         h("div", { class: "sh-meta" },
           s.repeat > 1 ? `×${s.repeat} ` : "", s.tempo ? `${s.tempo} bpm ` : "", s.transpose ? `key ${s.transpose > 0 ? "+" : ""}${s.transpose} ` : "", s.fadeIn ? "◢ " : "", s.fadeOut ? "◣" : "")),
       h("div", { class: "sh-progress" }));
@@ -98,7 +113,7 @@ export class SongScreen implements Screen {
       style: `--track:${trackColor(t)}`, "data-scene": s.id, "data-track": t.id,
     });
     if (!clip) return el;
-    el.addEventListener("pointerdown", (e) => { if (e.button === 0) this.startDrag(e, t, s); });
+    el.addEventListener("pointerdown", (e) => { if (e.button === 0 && e.pointerType === "mouse") this.startDrag(e, t, s); });
     const cv = h("canvas", { class: "cell-preview" });
     // The insert lamp: lit while this clip plays, blinking while its scene waits its turn.
     el.append(cv, h("span", { class: "cell-bars" }, `${clip.bars}`), h("span", { class: "lamp", "aria-hidden": "true" }));
@@ -138,6 +153,8 @@ export class SongScreen implements Screen {
     switch (a.type) {
       case "dir": {
         const maxR = song.scenes.length, maxC = song.tracks.length;
+        // Alt (or LT) + up / down on a scene row: move the scene.
+        if (mods.fine && (a.dir === "up" || a.dir === "down") && cur.row >= 0 && cur.row < maxR) { this.nudgeScene(cur.row, a.dir === "up" ? -1 : 1); return true; }
         if (a.dir === "up") cur.row = Math.max(-1, cur.row - 1);
         if (a.dir === "down") cur.row = Math.min(maxR, cur.row + 1);
         if (a.dir === "left") cur.col = Math.max(-1, cur.col - 1);
@@ -181,7 +198,7 @@ export class SongScreen implements Screen {
     const nT = song.tracks.length, nS = song.scenes.length;
     if (row === -1 && col === -1) { app.songSettings?.(); return; }
     if (row === -1 && col === nT) { this.addTrack(); return; }
-    if (row === nS && col === -1) { app.edit("Add scene", () => addScene(song)); app.songCur.row = song.scenes.length - 1; this.render(); return; }
+    if (row === nS && col === -1) { this.addSceneAtEnd(); return; }
     if (row === -1 && col < nT) { this.openEditor(song.tracks[col], song.scenes[0], "panel"); return; }
     if (col === -1 && row < nS) { this.playScene(row); return; }
     if (row >= 0 && row < nS && col >= 0 && col < nT) this.openEditor(song.tracks[col], song.scenes[row], "roll");
@@ -197,13 +214,118 @@ export class SongScreen implements Screen {
     app.show("edit");
   }
 
+  /** A scene's ▶: SCENE mode loops it (queued if something's playing); SONG mode plays the song from it. */
   private playScene(r: number) {
     const app = this.app, s = app.song.scenes[r];
     app.songCur.row = r;
-    app.songMode = "scene";
-    if (app.engine.playing) app.engine.queue({ kind: "scene", sceneId: s.id });
+    if (app.songMode === "song") app.engine.play({ kind: "song", fromIndex: r });
+    else if (app.engine.playing) app.engine.queue({ kind: "scene", sceneId: s.id });
     else app.engine.play({ kind: "scene", sceneId: s.id });
     app.refresh();
+  }
+
+  /** Quick names, each with its colour, plus the rest and a custom one. */
+  private nameMenu(s: Scene, anchor: HTMLElement) {
+    const app = this.app, r = anchor.getBoundingClientRect();
+    const set = (n: string) => app.edit("Rename scene", () => (s.name = n));
+    app.overlays.menu("Scene name", () => [
+      ...QUICK_SCENES.map((q) => ({ label: q.name, color: q.color, checked: s.name === q.name, run: () => set(q.name) })),
+      { label: "More names", sub: () => SCENE_NAMES.filter((n) => !QUICK_SCENES.some((q) => q.name === n)).map((n) => ({ label: n, color: sceneColor(n) ?? undefined, checked: s.name === n, run: () => set(n) })) },
+      { label: "Custom…", run: () => { const n = prompt("Scene name", s.name); if (n) set(n.slice(0, 24)); } },
+    ], { x: r.left, y: r.bottom + 4 });
+  }
+
+  /** Move scene `i` by `d` rows (Alt+↑ / ↓, LT + up / down, the menu). */
+  private nudgeScene(i: number, d: -1 | 1) {
+    const app = this.app, song = app.song, to = i + d;
+    if (to < 0 || to >= song.scenes.length) return;
+    app.edit("Move scene", () => moveScene(song, i, to));
+    app.songCur.row = to;
+    this.render();
+  }
+
+  // ------------------------------------------------------------ scene drag (grip / long-press)
+
+  /** Drag scene `from` up or down; a line shows where it will land. */
+  private sceneDrag(from: number, e: PointerEvent) {
+    const app = this.app, song = app.song;
+    const heads = [...this.grid.querySelectorAll<HTMLElement>(".scene-head")];
+    const src = heads[from];
+    if (!src) return;
+    src.classList.add("dragging");
+    this.holding = true;
+    let to = from;
+    const mark = (y: number) => {
+      const k = heads.filter((el) => { const b = el.getBoundingClientRect(); return b.top + b.height / 2 < y; }).length;
+      to = k > from ? k - 1 : k;
+      heads.forEach((el, i) => {
+        el.classList.toggle("drop-above", i === k && k !== from && k !== from + 1);
+        el.classList.toggle("drop-below", k === heads.length && i === heads.length - 1 && from !== heads.length - 1);
+      });
+      // Near the top / bottom edge: scroll along.
+      const box = this.el.getBoundingClientRect();
+      if (y < box.top + 40) this.el.scrollTop -= 12; else if (y > box.bottom - 40) this.el.scrollTop += 12;
+    };
+    const move = (ev: PointerEvent) => mark(ev.clientY);
+    const end = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      this.holding = false;
+      heads.forEach((el) => el.classList.remove("drop-above", "drop-below", "dragging"));
+      if (ev.type === "pointercancel" || to === from) return;
+      app.edit("Move scene", () => moveScene(song, from, to));
+      app.songCur = { row: to, col: -1 };
+      this.render();
+      app.overlays.toast(`Scene moved to ${to + 1}`, 900);
+    };
+    mark(e.clientY);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+  }
+
+  /**
+   * Touch long-press: hold still ~0.45 s. Let go: `onHold` (the menu). A scene header
+   * (`sceneRow`) that's then dragged moves instead.
+   */
+  private holdGesture(el: HTMLElement, onHold: () => void, sceneRow?: number) {
+    el.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "mouse") return;
+      const x0 = e.clientX, y0 = e.clientY;
+      let armed = false;
+      const timer = setTimeout(() => {
+        armed = true;
+        this.holding = true;
+        el.classList.add("held");
+        navigator.vibrate?.(15);
+      }, HOLD_MS);
+      const quit = () => {
+        clearTimeout(timer);
+        this.holding = false;
+        el.classList.remove("held");
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", quit);
+      };
+      const move = (ev: PointerEvent) => {
+        const far = Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8;
+        if (!armed) { if (far) quit(); return; }
+        if (far && sceneRow !== undefined) { quit(); this.sceneDrag(sceneRow, ev); }
+      };
+      const up = () => { const was = armed; quit(); if (was) onHold(); };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", quit);
+    });
+  }
+
+  private addSceneAtEnd() {
+    const app = this.app, song = app.song;
+    if (song.scenes.length >= MAX_SCENES) { app.overlays.toast("That's the most scenes a song can have"); return; }
+    app.edit("Add scene", () => addScene(song));
+    app.songCur = { row: song.scenes.length - 1, col: -1 };
+    this.render();
   }
 
   private addTrack() {
@@ -329,9 +451,9 @@ export class SongScreen implements Screen {
     const setTempo = (v: number | null) => app.edit("Scene tempo", () => (s.tempo = v));
     const cur = s.tempo ?? song.tempo;
     return [
-      { label: "Play this scene (loop)", run: () => this.playScene(i) },
+      app.songMode === "song" ? { label: "Play the song from here", run: () => this.playScene(i) } : { label: "Loop this scene", run: () => this.playScene(i) },
       { label: "Name", sub: () => [
-        ...SCENE_NAMES.map((n) => ({ label: n, checked: s.name === n, run: () => app.edit("Rename scene", () => (s.name = n)) })),
+        ...SCENE_NAMES.map((n) => ({ label: n, color: sceneColor(n) ?? undefined, checked: s.name === n, run: () => app.edit("Rename scene", () => (s.name = n)) })),
         { label: "Custom…", run: () => { const n = prompt("Scene name", s.name); if (n) app.edit("Rename scene", () => (s.name = n.slice(0, 24))); } },
       ] },
       { label: `Repeat ×${s.repeat}`, sub: () => [1, 2, 3, 4, 6, 8, 16].map((n) => ({ label: `×${n}`, checked: s.repeat === n, run: () => app.edit("Repeat", () => (s.repeat = n)) })) },
@@ -342,6 +464,8 @@ export class SongScreen implements Screen {
       { label: `Key change: ${s.transpose ? (s.transpose > 0 ? "+" : "") + s.transpose + " st" : "none"}`, sub: () => [0, 1, 2, 3, 5, 7, -1, -2, -3, -5].map((d) => ({ label: d === 0 ? "None" : `${d > 0 ? "+" : ""}${d} semitone${Math.abs(d) > 1 ? "s" : ""}`, checked: (s.transpose ?? 0) === d, run: () => app.edit("Key change", () => (s.transpose = d || undefined)) })) },
       { label: "Fade in", checked: s.fadeIn, keepOpen: true, run: () => app.edit("Fade in", () => (s.fadeIn = !s.fadeIn)) },
       { label: "Fade out", checked: s.fadeOut, keepOpen: true, run: () => app.edit("Fade out", () => (s.fadeOut = !s.fadeOut)) },
+      { label: "Move up", hint: "Alt+↑", disabled: i === 0, run: () => this.nudgeScene(i, -1) },
+      { label: "Move down", hint: "Alt+↓", disabled: i >= song.scenes.length - 1, run: () => this.nudgeScene(i, 1) },
       { label: "Add scene at end", run: () => app.edit("Add scene", () => addScene(song)) },
       { label: "Insert blank after", run: () => app.edit("Insert scene", () => insertBlankScene(song, i)) },
       { label: "Duplicate scene", run: () => app.edit("Duplicate scene", () => duplicateScene(song, i)) },

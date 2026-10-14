@@ -12,6 +12,7 @@ import type { App } from "./app";
 import { download, h } from "./dom";
 import { libraryDialog, safeName } from "./library";
 import { shareCodeDialog } from "./share";
+import { tutorialLabel } from "./tutorial";
 import { challengeStatus } from "../engine/challenges";
 import { phraseGridDialog } from "./phrasegrid";
 import { exportMidi } from "../engine/smf";
@@ -365,12 +366,15 @@ export function systemMenu(app: App, newJam: () => void) {
     { label: "Song screen", hint: "F2", run: () => app.show("song") },
     { label: "Edit screen", hint: "F3", disabled: !app.song.tracks.length, run: () => app.show("edit") },
     { label: "Mixer", hint: "F4", run: () => app.show("mix") },
-    { label: "Play mode: scene loop", checked: app.songMode === "scene", run: () => { app.songMode = "scene"; app.renderHeader(); } },
-    { label: "Play mode: whole song", checked: app.songMode === "song", run: () => { app.songMode = "song"; app.renderHeader(); } },
+    { label: "Play mode: SCENE (loop the scene)", hint: "C", checked: app.songMode === "scene", run: () => app.setSongMode("scene") },
+    { label: "Play mode: SONG (scenes in order)", hint: "C", checked: app.songMode === "song", run: () => app.setSongMode("song") },
+    { label: "Song loop (SONG mode)", checked: app.song.songLoop, keepOpen: true, run: () => app.edit("Song loop", () => (app.song.songLoop = !app.song.songLoop)) },
+    { label: "Metronome (click)", checked: app.song.metronome, keepOpen: true, run: () => app.edit("Metronome", () => (app.song.metronome = !app.song.metronome)) },
     { label: "Auto-arrange (one-scene songs)", disabled: !canArrange(app.song), run: () => app.edit("Auto-arrange", () => autoArrange(app.song)) },
     { label: app.learning ? "MIDI learn: finish" : "MIDI learn…", run: () => app.setLearning(!app.learning) },
     { label: "Oscilloscope", run: () => app.toggleScope?.() },
-    { label: "Controls…", run: () => helpDialog(app) },
+    { label: "Controls…", hint: "?", run: () => helpDialog(app) },
+    { label: tutorialLabel(), run: () => app.openTutorial?.() },
   ]);
 }
 
@@ -390,16 +394,26 @@ export function helpDialog(app: App) {
       row("RB / R", "Switch piano roll ↔ instrument panel. Hold: roll only / split / panel only"),
       row("LB / L (hold)", "Jump to any track / scene"),
       row("Start / +", "App menu.  Back / −: undo"),
+      row("Left stick click (L3)", "Play mode: SCENE (loop the scene) ↔ SONG (scenes in order)"),
+      row("LT / ZL + up / down", "Song screen: move the scene"),
       h("tr", null, h("th", null, "Keyboard"), h("th", null, "")),
       row("Arrows, Enter, Esc", "Move, confirm (hold Enter + ←→: length), back"),
       row("A S D F G H J K L ; '", "Play notes (scale degrees when scale lock is on), Q-row = octave up"),
       row("Z / X", "Octave down / up"),
       row("Space / Shift+Space", "Play-stop / record. On the setup screen: NUDGE / new song"),
+      row("C", "Play mode: SCENE (loop the scene) ↔ SONG (scenes in order)"),
+      row("Alt + ↑ / ↓", "Song screen: move the scene up / down"),
+      row("?", "These controls"),
       row("Shift + arrows", "Select a range"),
       row("M", "Context menu.  Tab: roll ↔ panel.  ` (hold): jump overlay"),
       row(", .  /  - =", "Knob / note length  ·  velocity"),
       row("Ctrl+Z / Y / C / X / V / D / A", "Undo, redo, copy, cut, paste, duplicate clip, select all"),
       row("Delete", "Delete notes.  F1: app menu.  F2/F3/F4: song / editor / mixer"),
+      h("tr", null, h("th", null, "Mouse / touch"), h("th", null, "")),
+      row("SCENE | SONG (by ▶)", "What Play does. SONG adds ⟳: play the song again at its end. The display shows LOOP SCENE 2 / SONG 3/6"),
+      row("A scene's ▶", "SCENE: loop that scene.  SONG: play the song from there"),
+      row("Scene ⋮⋮ grip / long-press + drag", "Move the scene. Click a scene's name for Intro, Verse, Chorus… (each has its colour)"),
+      row("Right-click / long-press", "The menu for a scene, clip or track (a sheet from the bottom on phones)"),
       h("tr", null, h("th", null, "MIDI"), h("th", null, "")),
       row("MIDI learn", "App menu → MIDI learn: touch a knob, move a hardware control. Transport CCs in Settings"),
       h("tr", null, h("th", null, "Setup screen"), h("th", null, "")),
