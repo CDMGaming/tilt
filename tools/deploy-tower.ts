@@ -1,18 +1,18 @@
-// Deploy Rollbox (app + online relay) to Tower: build, copy, rebuild the container, check it answers.
+// Deploy TILT (app + online relay) to Tower: build, copy, rebuild the container, check it answers.
 // Run: deno run -A tools/deploy-tower.ts
 //
 // Uses Windows OpenSSH and the `route-nas` SSH alias (Git Bash's ssh mangles /mnt/... paths).
-// Lives in /mnt/cache/appdata/rollbox (the real disk, not the /mnt/user FUSE view).
+// Lives in /mnt/cache/appdata/tilt (the real disk, not the /mnt/user FUSE view).
 
 const HOST = "route-nas";
-const DIR = "/mnt/cache/appdata/rollbox";
+const DIR = "/mnt/cache/appdata/tilt";
 const URL_LAN = "http://tower.local:8097";
 const SSH = Deno.build.os === "windows" ? "C:\\Windows\\System32\\OpenSSH\\ssh.exe" : "ssh";
 const SCP = Deno.build.os === "windows" ? "C:\\Windows\\System32\\OpenSSH\\scp.exe" : "scp";
 
 const root = decodeURIComponent(new URL("..", import.meta.url).pathname).replace(/^\/([A-Za-z]:)/, "$1");
 Deno.chdir(root);
-const stage = await Deno.makeTempDir({ prefix: "rollbox-deploy-" });
+const stage = await Deno.makeTempDir({ prefix: "tilt-deploy-" });
 
 async function run(cmd: string, args: string[]) {
   console.log(`> ${[cmd.split(/[\\/]/).pop(), ...args].join(" ")}`);
@@ -38,11 +38,11 @@ for (let i = 0; i < 20; i++) {
     const page = await fetch(URL_LAN);
     const health = await (await fetch(`${URL_LAN}/health`)).json();
     if (page.ok && (await page.text()).includes("<div id=\"app\"") && health.ok) {
-      console.log(`\nRollbox is up: ${URL_LAN} (rooms open: ${health.rooms})`);
+      console.log(`\nTILT is up: ${URL_LAN} (rooms open: ${health.rooms})`);
       Deno.exit(0);
     }
   } catch { /* still starting */ }
   await new Promise((r) => setTimeout(r, 1000));
 }
-console.error(`\nRollbox didn't answer at ${URL_LAN}. Check: ssh ${HOST} docker logs rollbox`);
+console.error(`\nTILT didn't answer at ${URL_LAN}. Check: ssh ${HOST} docker logs tilt`);
 Deno.exit(1);

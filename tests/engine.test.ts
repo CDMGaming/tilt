@@ -282,3 +282,16 @@ Deno.test("a scene change at the next bar cuts the playing scene at the bar line
   assertEquals(barCut(8 * bar, 7.5 * bar), 8 * bar, "the last bar: the scene ends anyway");
   assertEquals(barCut(4 * bar, 0), 4 * bar, "not started yet: nothing to cut");
 });
+
+Deno.test("NUDGE re-rolls one die and keeps the rest", async () => {
+  const { DICE, nudge } = await import("../src/engine/dice.ts");
+  for (let seed = 1; seed < 60; seed++) {
+    const s = roll(null, NO_LOCKS, seed);
+    for (const die of DICE.filter((d) => d !== "cards")) {
+      const n = nudge(s, die, seed * 31);
+      for (const other of ["key", "scale", "tempo", "swing"] as const) if (other !== die) assertEquals(n[other], s[other], `${die} nudge kept ${other}`);
+      if (die !== "lineup" && die !== "presets") assertEquals(n.lineup.map((l) => l.kind), s.lineup.map((l) => l.kind), `${die} nudge kept the lineup`);
+      assertEquals(decodeSetup(encodeSetup(n)), n, "a nudged roll still makes a share code");
+    }
+  }
+});

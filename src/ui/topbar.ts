@@ -6,6 +6,7 @@ import type { App } from "./app";
 import { exportDialog, playTogetherDialog, settingsDialog, songSettings } from "./dialogs";
 import { fmtTime, h } from "./dom";
 import { isPhone } from "./phone";
+import { dmdText } from "./dmd";
 
 export function bindTopbar(app: App, el: HTMLElement) {
   const timerEl = h("div", { class: "timer" });
@@ -17,7 +18,7 @@ export function bindTopbar(app: App, el: HTMLElement) {
     el.classList.remove("rails");
     const playing = app.engine.playing;
     el.replaceChildren(
-      h("button", { class: "brand", onclick: () => app.openSystemMenu?.(), title: "Menu (Start / F1)" }, "⚄ ROLLBOX"),
+      h("button", { class: "brand", onclick: () => app.openSystemMenu?.(), title: "Menu (Start / F1)", "aria-label": "TILT menu" }, dmdText("TILT", { height: 15, slant: 7, unlit: false })),
       h("button", { class: "chip-btn title", onclick: () => songSettings(app) }, s.title),
       h("button", { class: "chip-btn", onclick: () => songSettings(app), title: "Key and scale" }, `${NOTE_NAMES[s.key]} ${scaleById(s.scale).name}`),
       app.engine.externalTempo
@@ -97,7 +98,7 @@ export function bindTopbar(app: App, el: HTMLElement) {
     const t = app.timer;
     if (!t.running && !t.done) { timerEl.textContent = ""; timerEl.className = "timer"; return; }
     const left = app.timeLeft();
-    timerEl.textContent = t.done ? "0:00" : fmtTime(left);
+    timerEl.replaceChildren(dmdText(t.done ? "0:00" : fmtTime(left), { height: 16 }));
     timerEl.className = "timer on" + (t.done ? " done" : left < 60 ? " hurry" : "");
   };
   app.renderHeader = render;

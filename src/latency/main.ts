@@ -307,7 +307,7 @@ function biquad(x: Float32Array, sr: number, type: "lowpass" | "bandpass", f: nu
 
 function report(): string {
   const lines = [
-    `Rollbox latency report: ${new Date().toISOString()}`,
+    `TILT latency report: ${new Date().toISOString()}`,
     `UA: ${navigator.userAgent}`,
     ctx ? `engine: rate=${ctx.sampleRate} base=${(ctx.baseLatency * 1000).toFixed(2)}ms output=${((ctx.outputLatency ?? 0) * 1000).toFixed(2)}ms hint=${($("hint") as HTMLSelectElement).value} device=${sinkLabel()}` : "engine: not started",
     `midi inputs: ${midiNames.join(", ") || "(none)"}`,

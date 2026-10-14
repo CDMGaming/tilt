@@ -1,4 +1,4 @@
-// Rollbox online relay: rooms of up to 4 players, each a WebSocket. The relay
+// TILT online relay: rooms of up to 4 players, each a WebSocket. The relay
 // knows nothing about music: it hands out room codes and peer ids, passes JSON
 // messages on (to everyone else in the room, or to one peer with `to`), stamps
 // them with `from`, and answers clock pings with its own time so players can
@@ -108,7 +108,7 @@ if (import.meta.main) {
   const port = Number(Deno.args[0] ?? 8787);
   const rooms = new Rooms();
   Deno.serve({ port, hostname: "0.0.0.0" }, (req) => {
-    if (req.headers.get("upgrade") !== "websocket") return new Response("Rollbox relay: connect with a WebSocket\n", { headers: { "access-control-allow-origin": "*" } });
+    if (req.headers.get("upgrade") !== "websocket") return new Response("TILT relay: connect with a WebSocket\n", { headers: { "access-control-allow-origin": "*" } });
     return relaySocket(rooms, req);
   });
   console.log(`[relay] listening on ws://0.0.0.0:${port}`);

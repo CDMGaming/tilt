@@ -1,8 +1,8 @@
-// Rollbox offline cache. The page itself is fetched fresh when there's a
+// TILT offline cache. The page itself is fetched fresh when there's a
 // connection (so a new version shows up at once) and from the cache when
 // there isn't; everything else (code, sounds, fonts) is cached on first use.
 // Online games (/relay) and /health are never cached.
-const CACHE = "rollbox-v1";
+const CACHE = "tilt-v1"; // (the old "rollbox-v1" cache is deleted on activate: it only held copies of app files)
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => {

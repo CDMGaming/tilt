@@ -958,6 +958,16 @@ export class App {
 
   // ------------------------------------------------------------ timer
 
+  /** EXTRA BALL (once per session, from the song-complete screen): two more minutes, unlocked. */
+  extraBallUsed = false;
+  extraBall() {
+    if (this.extraBallUsed) return;
+    this.extraBallUsed = true;
+    this.startTimer(2);
+    this.renderHeader();
+    this.overlays.toast("EXTRA BALL: 2 more minutes", 1500);
+  }
+
   startTimer(minutes: number) {
     this.timer = { total: minutes * 60, endsAt: minutes ? performance.now() + minutes * 60000 : 0, running: minutes > 0, done: false };
     this.locked = false;

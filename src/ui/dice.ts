@@ -1,6 +1,6 @@
 // DICE screen: roll a setup, lock what you like, pick a timer, go.
 
-import { decodeSetup, encodeSetup, roll, songFromSetup, type LockKey, type Setup } from "../engine/dice";
+import { DICE, decodeSetup, encodeSetup, nudge, roll, songFromSetup, type LockKey, type Setup } from "../engine/dice";
 import { INSTRUMENTS } from "../engine/instruments";
 import { newSong } from "../engine/model";
 import { NOTE_NAMES, SCALES, scaleById } from "../engine/music";
@@ -12,15 +12,17 @@ import { SpatialNav } from "./nav";
 import { challengeById } from "../engine/challenges";
 import { libraryDialog } from "./library";
 import { phraseGridDialog } from "./phrasegrid";
+import { dmdText } from "./dmd";
 
 const TIMERS = [0, 10, 20, 30];
-const FACES = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 
 export class DiceScreen implements Screen {
   el = h("div", { class: "dice-screen" });
   private nav = new SpatialNav(() => this.el);
   private rolling = 0;
   private shown: Setup;
+  /** The die that just got nudged (it gives a little shake). */
+  private nudged: LockKey | null = null;
 
   constructor(private app: App) {
     this.shown = app.dice.setup;
@@ -30,7 +32,7 @@ export class DiceScreen implements Screen {
     const app = this.app, d = app.dice, s = this.shown;
     const locks = d.locks;
     const item = (key: LockKey, label: string, value: string, extra?: HTMLElement) =>
-      h("button", { class: "die" + (locks[key] ? " locked" : "") + (this.rolling ? " rolling" : ""), "data-nav": key, onclick: () => { locks[key] = !locks[key]; this.render(); } },
+      h("button", { class: "die" + (locks[key] ? " locked" : "") + (this.rolling ? " rolling" : "") + (this.nudged === key ? " nudged" : ""), "data-nav": key, onclick: () => { locks[key] = !locks[key]; this.render(); } },
         h("div", { class: "die-label" }, label),
         h("div", { class: "die-value" }, value),
         extra ?? null,
@@ -38,8 +40,8 @@ export class DiceScreen implements Screen {
     const saved = App.savedSong();
     this.el.replaceChildren(
       h("div", { class: "dice-head" },
-        h("div", { class: "logo" }, h("span", { class: "logo-die" }, FACES[(s.tempo + s.key) % 6]), "ROLLBOX"),
-        h("div", { class: "tagline" }, "Roll the dice. Beat the clock. Finish the song.")),
+        h("div", { class: "logo" }, dmdText("TILT", { height: 64, slant: 7 })),
+        h("div", { class: "tagline" }, "Just a Nudge")),
       h("div", { class: "dice-grid" },
         item("key", "Key", NOTE_NAMES[s.key]),
         item("scale", "Scale", scaleById(s.scale).name),
@@ -51,6 +53,7 @@ export class DiceScreen implements Screen {
       ),
       h("div", { class: "dice-actions" },
         h("button", { class: "roll-btn", "data-nav": "roll", onclick: () => this.roll() }, "🎲 ROLL", h("small", null, "Y / Space")),
+        h("button", { class: "roll-btn nudge-btn", "data-nav": "nudge", onclick: () => this.nudge(), title: "Re-roll one die: the one the cursor is on, or a random unlocked one" }, "NUDGE", h("small", null, "one die")),
         h("div", { class: "timer-pick" },
           h("div", { class: "die-label" }, "Timer"),
           h("div", { class: "seg" }, TIMERS.map((m) => h("button", { class: "seg-btn" + (d.minutes === m ? " on" : ""), "data-nav": `t${m}`, onclick: () => { d.minutes = m; this.render(); } }, m ? `${m} min` : "Off")))),
@@ -96,6 +99,27 @@ export class DiceScreen implements Screen {
       setTimeout(tick, 45 + (8 - this.rolling) * 12);
     };
     tick();
+  }
+
+  /** Re-roll one die: the one the cursor is on (gamepad / keys), else a random unlocked one. */
+  nudge() {
+    const app = this.app, d = app.dice;
+    if (this.rolling) return;
+    const at = this.nav.focused?.dataset.nav as LockKey | undefined;
+    const usable = (k: LockKey) => !d.locks[k] && (k !== "cards" || d.cards > 0);
+    let die: LockKey | undefined;
+    if (at && DICE.includes(at)) {
+      if (!usable(at)) { app.overlays.toast(d.locks[at] ? "That die is locked" : "No challenge cards to nudge", 1000); return; }
+      die = at;
+    } else {
+      const free = DICE.filter(usable);
+      if (!free.length) { app.overlays.toast("Everything is locked", 1000); return; }
+      die = free[Math.floor(Math.random() * free.length)];
+    }
+    d.setup = this.shown = nudge(d.setup, die, randomSeed(), d.cards);
+    this.nudged = die;
+    this.render();
+    setTimeout(() => { if (this.nudged === die) { this.nudged = null; this.render(); } }, 450);
   }
 
   private async copyCode() {

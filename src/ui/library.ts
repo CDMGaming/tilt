@@ -11,7 +11,9 @@ import { download, h } from "./dom";
 
 const DB_NAME = STORE_PREFIX + "library";
 const STORE = "songs";
-export const FILE_FORMAT = "rollbox-song";
+export const FILE_FORMAT = "tilt-song";
+/** Song files saved before the rename still open. */
+const OLD_FORMATS = ["rollbox-song"];
 
 export interface LibraryEntry { id: string; title: string; updated: number; tracks: number; scenes: number; code?: string; song: Song }
 
@@ -66,23 +68,24 @@ export async function exportSongFile(song: Song) {
     if (s) samples[s.id] = { name: s.name, rate: s.rate, pcm16: toB64(s.data) };
   }
   const data = JSON.stringify({ format: FILE_FORMAT, version: 1, song, samples }, null, 1);
-  download(`${safeName(song.title)}.rollbox.json`, data, "application/json");
+  download(`${safeName(song.title)}.tilt`, data, "application/json");
 }
 
 export function safeName(s: string) {
-  return (s || "rollbox").replace(/[^\w\- ]+/g, "").trim() || "rollbox";
+  return (s || "tilt").replace(/[^\w\- ]+/g, "").trim() || "tilt";
 }
 
 /** Ask for a song file; resolves with the parsed song (new library id) or null. */
 export function pickSongFile(): Promise<Song | null> {
   return new Promise((resolve) => {
-    const input = h("input", { type: "file", accept: ".json,application/json" });
+    // .tilt (now), .rollbox.json / .json (before the rename): all the same JSON inside.
+    const input = h("input", { type: "file", accept: ".tilt,.json,application/json" });
     input.onchange = async () => {
       const f = input.files?.[0];
       if (!f) return resolve(null);
       try {
         const j = JSON.parse(await f.text());
-        const song = (j.format === FILE_FORMAT ? j.song : j) as Song;
+        const song = (j.format === FILE_FORMAT || OLD_FORMATS.includes(j.format) ? j.song : j) as Song;
         if (!song?.tracks || !song?.scenes) throw new Error("not a song");
         // Restore embedded user samples (they keep their ids, which are content hashes).
         for (const [id, s] of Object.entries((j.samples ?? {}) as Record<string, { name: string; rate: number; pcm16: string }>)) {
@@ -91,7 +94,7 @@ export function pickSongFile(): Promise<Song | null> {
         song.libId = newLibId();
         resolve(normalizeSong(song));
       } catch {
-        alert("That file isn't a Rollbox song.");
+        alert("That file isn't a TILT song.");
         resolve(null);
       }
     };

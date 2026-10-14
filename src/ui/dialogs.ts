@@ -16,6 +16,7 @@ import { phraseGridDialog } from "./phrasegrid";
 import { exportMidi } from "../engine/smf";
 import { zip } from "../engine/zip";
 import { stepper } from "./overlay";
+import { tiltFlash } from "./tilt";
 
 const KINDS: InstrumentKind[] = ALL_KINDS;
 
@@ -183,7 +184,7 @@ export function settingsDialog(app: App) {
         app.saveSettings();
         rerender();
       }),
-      h("p", { class: "note" }, app.engine.externalTempo ? `Following external clock at ${app.engine.externalTempo.toFixed(1)} bpm.` : "Follow: Rollbox starts, stops and keeps tempo with incoming MIDI clock. Send: it drives other gear (and Ableton, with Sync on its MIDI input) while it plays."),
+      h("p", { class: "note" }, app.engine.externalTempo ? `Following external clock at ${app.engine.externalTempo.toFixed(1)} bpm.` : "Follow: TILT starts, stops and keeps tempo with incoming MIDI clock. Send: it drives other gear (and Ableton, with Sync on its MIDI input) while it plays."),
       h("button", { class: "row-btn", "data-nav": "monitor", onclick: () => midiMonitor(app) }, "MIDI monitor…"),
       h("button", { class: "row-btn", "data-nav": "learn-play", onclick: () => { app.learnTransport = "play"; app.overlays.toast("Press the button on your MIDI device for play / stop"); } },
         `Transport CC, play / stop: ${st.transport.play ? `CC ${st.transport.play.cc} ch ${st.transport.play.ch + 1}` : "not set"} (click, then press a button)`),
@@ -230,11 +231,16 @@ function midiMonitor(app: App) {
 
 // ------------------------------------------------------------ time's up
 
+/** The clock ran out: TILT flashes (with a buzz), then the song is complete. */
 export function timeUpDialog(app: App) {
   app.engine.stop();
   app.overlays.closeAll();
+  tiltFlash(app, () => songCompleteDialog(app));
+}
+
+function songCompleteDialog(app: App) {
   const arrange = canArrange(app.song);
-  app.overlays.dialog("⏰ Time's up!", (close) => h("div", { class: "form" },
+  app.overlays.dialog("SONG COMPLETE", (close) => h("div", { class: "form" },
     h("p", { class: "note big" }, "Editing is locked. Finish it:"),
     ...challengeStatus(app.song).map((c) => h("p", { class: "note" }, `${c.met ? "✅" : "⬜"} ${c.text}`)),
     arrange ? h("button", {
@@ -251,6 +257,8 @@ export function timeUpDialog(app: App) {
     }, "Auto-arrange into a full song, then export") : null,
     h("button", { class: "row-btn" + (arrange ? "" : " primary"), "data-nav": "export", onclick: () => { close(); exportDialog(app); } }, "Export WAV as it is"),
     h("button", { class: "row-btn", "data-nav": "listen", onclick: () => { close(); app.songMode = "song"; app.show("song"); app.engine.play({ kind: "song", fromIndex: 0 }); app.renderHeader(); } }, "Just listen (stays locked)"),
+    // One extra ball per session: two more minutes on the clock.
+    !app.extraBallUsed ? h("button", { class: "row-btn extra-ball", "data-nav": "extra", onclick: () => { close(); app.extraBall(); } }, "EXTRA BALL", h("span", { class: "note" }, " +2 minutes, once")) : null,
     h("button", { class: "row-btn", "data-nav": "unlock", onclick: () => { close(); app.unlock(); } }, "Unlock and keep going"),
   ));
 }
@@ -316,7 +324,7 @@ export function onlineDialog(app: App, mode: "host" | "join") {
 }
 
 export function systemMenu(app: App, newJam: () => void) {
-  app.overlays.menu("Rollbox", () => [
+  app.overlays.menu("TILT", () => [
     ...(app.couch ? [{ label: "End couch mode", run: () => app.endCouch() }] : []),
     { label: app.couch ? "🛋 Back to the couch" : "👥 Play together…", run: () => (app.couch ? app.show("couch") : playTogetherDialog(app)) },
     { label: "New jam (dice)…", run: newJam },

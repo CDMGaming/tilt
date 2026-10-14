@@ -1,4 +1,4 @@
-# Rollbox (working name)
+# TILT
 
 A Windows music-making app built around speed: roll random constraints, beat a timer, finish a song.
 Workflow inspired by Korg Gadget for Switch. Names, art and instrument designs are original.

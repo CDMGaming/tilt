@@ -50,4 +50,4 @@ try {
 } catch { /* storage blocked */ }
 
 // For automated checks in the browser console.
-(window as unknown as { rollbox: App }).rollbox = app;
+(window as unknown as { tilt: App }).tilt = app;

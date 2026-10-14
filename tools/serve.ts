@@ -29,7 +29,7 @@ async function file(path: string): Promise<Response | null> {
 Deno.serve({ port, hostname: "0.0.0.0" }, async (req) => {
   const url = new URL(req.url);
   if (url.pathname === "/relay" || req.headers.get("upgrade") === "websocket") {
-    if (req.headers.get("upgrade") !== "websocket") return new Response("Rollbox relay: connect with a WebSocket\n");
+    if (req.headers.get("upgrade") !== "websocket") return new Response("TILT relay: connect with a WebSocket\n");
     return relaySocket(rooms, req);
   }
   if (url.pathname === "/health") return new Response(JSON.stringify({ ok: true, rooms: rooms.rooms.size }), { headers: { "content-type": "application/json" } });
@@ -41,4 +41,4 @@ Deno.serve({ port, hostname: "0.0.0.0" }, async (req) => {
   if (/\.[a-z0-9]+$/i.test(rel)) return new Response("Not found", { status: 404 });
   return (await file(`${dist}/index.html`))!;
 });
-console.log(`[rollbox] app + relay on http://0.0.0.0:${port}`);
+console.log(`[tilt] app + relay on http://0.0.0.0:${port}`);

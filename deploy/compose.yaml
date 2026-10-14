@@ -1,12 +1,12 @@
-# Rollbox on Tower: http://192.168.6.244:8097 on the LAN; the Cloudflare tunnel
+# TILT on Tower: http://192.168.6.244:8097 on the LAN; the Cloudflare tunnel
 # (its own container, managed in the Cloudflare dashboard) publishes it as
-# https://rollbox.estradanas.com. No data is stored here: songs live in each
+# https://tilt.estradanas.com. No data is stored here: songs live in each
 # player's browser, games only exist while someone is connected.
 services:
-  rollbox:
+  tilt:
     build: .
-    image: rollbox:latest
-    container_name: rollbox
+    image: tilt:latest
+    container_name: tilt
     restart: unless-stopped
     ports:
       - "8097:8097"

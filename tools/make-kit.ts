@@ -136,4 +136,4 @@ for (const [name, data] of Object.entries(kit)) {
   await Deno.writeFile(new URL(`${name}.wav`, OUT), wav16(data));
   console.log(`${name}.wav  ${(data.length / SR).toFixed(2)}s`);
 }
-await Deno.writeTextFile(new URL("LICENSE.txt", OUT), "These drum sounds were synthesised by tools/make-kit.ts for Rollbox.\nReleased under CC0 1.0 (public domain dedication).\n");
+await Deno.writeTextFile(new URL("LICENSE.txt", OUT), "These drum sounds were synthesised by tools/make-kit.ts for TILT.\nReleased under CC0 1.0 (public domain dedication).\n");

@@ -1,4 +1,4 @@
-# Rollbox on a server: the built app and the online relay on one port.
+# TILT on a server: the built app and the online relay on one port.
 # Built by tools/deploy-tower.ts (which puts dist/ and tools/ next to this file).
 FROM denoland/deno:2.5.6
 WORKDIR /app

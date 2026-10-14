@@ -1,12 +1,12 @@
 /* Display face: Chakra Petch (SIL OFL 1.1, public/fonts/LICENSE-ChakraPetch.txt), bundled so it works offline.
    If the files are missing, --font-display falls back to Bahnschrift (built into Windows). */
-@font-face { font-family: "Rollbox Display"; src: url("/fonts/display.woff2") format("woff2"); font-weight: 400 600; font-display: swap; }
-@font-face { font-family: "Rollbox Display"; src: url("/fonts/display-bold.woff2") format("woff2"); font-weight: 700 900; font-display: swap; }
+@font-face { font-family: "Tilt Display"; src: url("/fonts/display.woff2") format("woff2"); font-weight: 400 600; font-display: swap; }
+@font-face { font-family: "Tilt Display"; src: url("/fonts/display-bold.woff2") format("woff2"); font-weight: 700 900; font-display: swap; }
 
 :root {
   /* ---- type ---- */
   --font-ui: "Segoe UI", system-ui, sans-serif;
-  --font-display: "Rollbox Display", "Bahnschrift", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Tilt Display", "Bahnschrift", "Segoe UI", system-ui, sans-serif;
   --font-mono: "Cascadia Mono", var(--font-mono);
 
   /* ---- foundation: deep navy / blue-grey ramp ---- */
@@ -665,3 +665,23 @@ body.phone .thumplab .pads.four { grid-template-rows: repeat(2, 60px); }
   body.phone .thumplab .module .knob-label { font-size: 9px; letter-spacing: 0; }
   body.phone .thumplab .module .knob-value { font-size: 10px; }
 }
+
+/* ---------- TILT: a hint of pinball (dot-matrix display amber on the logo and the timer only) ---------- */
+:root { --dmd: #ffa62b; }
+.dmd { display: inline-block; vertical-align: middle; overflow: visible; }
+.dmd .on { fill: currentColor; }
+.dmd .off { fill: currentColor; opacity: .13; }
+.logo { color: var(--dmd); filter: drop-shadow(0 0 10px color-mix(in srgb, var(--dmd) 45%, transparent)); }
+.tagline { font-family: var(--font-display); letter-spacing: .14em; text-transform: uppercase; font-size: 13px; color: color-mix(in srgb, var(--dmd) 70%, var(--dim)); }
+.brand { color: var(--dmd); display: flex; align-items: center; padding: 4px 6px; }
+.timer { color: var(--dmd); display: inline-flex; align-items: center; }
+.timer.on { padding: 5px 9px; }
+.nudge-btn { background: var(--raise); color: var(--dmd); border-color: color-mix(in srgb, var(--dmd) 45%, var(--line)); }
+.die.nudged { animation: nudge .42s ease-out; }
+@keyframes nudge { 0% { transform: translateX(0) rotate(0); } 20% { transform: translateX(-5px) rotate(-1.5deg); } 45% { transform: translateX(4px) rotate(1deg); } 70% { transform: translateX(-2px); } 100% { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .die.nudged { animation: none; } }
+.tilt-flash { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 82%, transparent); color: var(--dmd); pointer-events: none; }
+.tilt-flash .dmd { max-width: 86vw; height: auto !important; filter: drop-shadow(0 0 16px color-mix(in srgb, var(--dmd) 55%, transparent)); animation: tilt-blink .22s steps(1) 5; }
+@keyframes tilt-blink { 50% { opacity: .15; } }
+@media (prefers-reduced-motion: reduce) { .tilt-flash .dmd { animation: none; } }
+.row-btn.extra-ball { color: var(--dmd); border-color: color-mix(in srgb, var(--dmd) 45%, var(--line)); font-family: var(--font-display); letter-spacing: .12em; }

@@ -1,2 +1,2 @@
-These drum sounds were synthesised by tools/make-kit.ts for Rollbox.
+These drum sounds were synthesised by tools/make-kit.ts for TILT.
 Released under CC0 1.0 (public domain dedication).

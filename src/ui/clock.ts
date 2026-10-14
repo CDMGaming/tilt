@@ -58,7 +58,7 @@ export class MidiClock {
         break;
       }
       case 0xfa: // start
-      case 0xfb: // continue (treated as start: Rollbox loops scenes, it has no song pointer)
+      case 0xfb: // continue (treated as start: TILT loops scenes, it has no song pointer)
         this.count = 0;
         this.following = true;
         if (this.bpm) eng.setTempoOverride(this.bpm);

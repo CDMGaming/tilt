@@ -39,6 +39,19 @@ const TEMPO_BANDS: [[number, number, number], number][] = [
   [[151, 175, 0.1], 1], // dnb-ish
 ];
 
+export const DICE: LockKey[] = ["key", "scale", "tempo", "swing", "lineup", "presets", "cards"];
+
+/**
+ * NUDGE: re-roll just one die, keeping everything else as it is. Tries a few
+ * seeds so the die actually changes (a die can land on the same face).
+ */
+export function nudge(prev: Setup, die: LockKey, seed: number = randomSeed(), cardCount = 0): Setup {
+  const only = Object.fromEntries(DICE.map((k) => [k, k !== die])) as Locks;
+  let next = roll(prev, only, seed, cardCount);
+  for (let i = 1; i < 8 && encodeSetup(next) === encodeSetup(prev); i++) next = roll(prev, only, seed + i * 7919, cardCount);
+  return next;
+}
+
 export function roll(prev: Setup | null, locks: Locks, seed: number = randomSeed(), cardCount = 0): Setup {
   const r = new Rng(seed);
   const keep = (k: LockKey) => prev !== null && locks[k];

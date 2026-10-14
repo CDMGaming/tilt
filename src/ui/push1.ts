@@ -1,4 +1,4 @@
-// Ableton Push (1st generation) as a Rollbox controller.
+// Ableton Push (1st generation) as a TILT controller.
 //
 // Protocol facts (from Ableton's Push remote scripts, as documented in Chompfe's
 // push1.js): SysEx header F0 47 7F 15; LCD line n = F0 47 7F 15 <18+n> 00 45 00
