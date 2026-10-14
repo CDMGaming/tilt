@@ -132,16 +132,22 @@ export function channelStrip(app: App, t: Track, i: number, meter: HTMLElement):
     set: (id, v) => app.setParam(t, id, v),
     begin: (id) => app.setParam(t, id, getParam(t, id), true),
   };
-  const slots = t.fx.map((slot, s) => {
+  // Only the effects in use get a box; the free slots fold into one "+ FX" chip (it fills the first free one).
+  const free = t.fx.findIndex((x) => x.type === "off");
+  const slots: HTMLElement[] = t.fx.flatMap((slot, s) => {
     const d = fxDef(slot.type);
     const on = slot.type !== "off";
-    return h("div", { class: "fx-slot" + (on ? " on" : "") },
+    if (!on) return [];
+    return [h("div", { class: "fx-slot on" },
       h("button", { class: "fx-type", "data-nav": `t${t.id}fx${s}`, onclick: (e: Event) => pickFx(app, t, s, e.currentTarget as HTMLElement) },
         h("span", { class: "fx-num" }, `FX${s + 1}`), on ? d.name : "+ add"),
       on ? h("div", { class: "fx-knobs" },
         knob(paramInfo(t, `fx${s}:a`)!, host, { label: d.a, size: "s" }),
-        knob(paramInfo(t, `fx${s}:b`)!, host, { label: d.b, size: "s" })) : null);
+        knob(paramInfo(t, `fx${s}:b`)!, host, { label: d.b, size: "s" })) : null)];
   });
+  if (free >= 0) {
+    slots.push(h("button", { class: "fx-add", "data-nav": `t${t.id}fx${free}`, title: `Add an insert effect (FX${free + 1})`, onclick: (e: Event) => pickFx(app, t, free, e.currentTarget as HTMLElement) }, "+ FX"));
+  }
   return h("div", { class: "strip", "data-track": t.id, style: `--track:${trackColor(t)}` },
     h("div", { class: "strip-head" }, h("div", { class: "strip-name" }, `${i + 1} ${INSTRUMENTS[t.kind].name}`), h("div", { class: "strip-preset" }, t.preset)),
     ...slots,

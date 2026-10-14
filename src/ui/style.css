@@ -760,3 +760,10 @@ body:not(.phone) .editor:not(.couch-ed) .ed-toolbar > * { flex: none; }
 .add-label { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
 .add-scene { min-height: 64px; flex-direction: row; gap: 8px; }
 .add-scene .add-plus { font-size: 24px; }
+
+/* ---------- F: mixer: free FX slots fold into one chip, faders get the height, master beside the tracks ---------- */
+.strip.master { margin-left: 0; }
+.fx-add { flex: none; font-size: 12px; padding: 6px 8px; color: var(--dim); background: transparent; border: 1px dashed var(--line); border-radius: var(--r-s); cursor: pointer; }
+.fx-add:hover, .fx-add.navfocus { color: var(--accent); border-color: var(--accent); }
+.mixer .strip-fader { min-height: 220px; }
+.mixer .fader-track { min-height: 180px; }
