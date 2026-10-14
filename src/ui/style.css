@@ -850,3 +850,48 @@ body.phone .dice-bar .roll-btn, body.phone .dice-bar .go-btn { padding: 8px 14px
 /* Grab: a strip of label tape; dark-rimmed caps. */
 .panel.kind-sampler .inst-name { background: #e8e4d8; color: #222; border: none; border-radius: 2px; transform: rotate(-1.2deg); box-shadow: 0 2px 4px #0006; letter-spacing: .1em; }
 .panel.kind-sampler { --cap-edge: #000; --cap-edge-w: 2; --cap-fill: #2b3040; }
+
+/* ---------- Desktop top bar (replaces the left rail): logo | display + bulb | SONG EDIT MIX | transport ---------- */
+body:not(.phone) #app { display: flex; flex-direction: column; }
+body:not(.phone) .topbar.deskbar { display: flex; align-items: center; gap: 10px; padding: 6px 10px; flex-wrap: nowrap; min-width: 0; background: var(--panel); border-bottom: 1px solid var(--line); }
+.tilt-logo { flex: none; background: none; border: none; box-shadow: none; padding: 4px 6px; color: var(--dmd); filter: drop-shadow(0 0 6px color-mix(in srgb, var(--dmd) 35%, transparent)); }
+.tilt-logo:hover:not(:disabled) { background: var(--raise); }
+.dmd-wrap { flex: 0 1 auto; min-width: 0; display: flex; align-items: stretch; border-radius: var(--r-m); background: #07090f; border: 1px solid #2a2016; box-shadow: inset 0 0 18px #000c, 0 0 0 1px #0008; }
+.dmd-wrap .dmd-display { background: transparent; border: none; box-shadow: none; min-width: 0; flex: 1 1 auto; }
+.dmd-bulb { flex: none; background: transparent; border: none; border-left: 1px solid #2a2016; border-radius: 0 var(--r-m) var(--r-m) 0; box-shadow: none; padding: 0 10px; font-size: 18px; filter: saturate(.7); }
+.dmd-bulb:hover:not(:disabled) { background: #1a1308; filter: none drop-shadow(0 0 6px var(--dmd)); }
+.scr-seg { flex: none; display: flex; gap: 2px; padding: 3px; background: var(--well); border-radius: calc(var(--r-m) + 3px); }
+.scr-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 58px; padding: 4px 10px; background: transparent; border: 1px solid transparent; box-shadow: none; color: var(--ink); }
+.scr-glyph { font-size: 16px; line-height: 1; }
+.scr-label { font: 700 10px var(--font-display); letter-spacing: .14em; color: var(--dim); }
+.scr-tab:hover:not(:disabled):not(.on) { background: var(--raise); }
+.scr-tab:hover:not(:disabled):not(.on) .scr-label { color: var(--ink); }
+/* The lit insert lamp: amber, readable in every state (hover / focus / pressed never blank it). */
+button.scr-tab.on, button.scr-tab.on:hover:not(:disabled), button.scr-tab.on:focus-visible {
+  background: color-mix(in srgb, var(--dmd) 20%, var(--raise)); color: var(--dmd); border-color: color-mix(in srgb, var(--dmd) 65%, transparent); filter: none;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--dmd) 35%, transparent), inset 0 0 8px color-mix(in srgb, var(--dmd) 22%, transparent); }
+button.scr-tab.on .scr-label { color: var(--dmd); }
+.deskbar .transport { flex: none; }
+.deskbar .chip-btn { flex: none; }
+@media (max-width: 1000px) {
+  body:not(.phone) .topbar.deskbar { gap: 6px; padding: 5px 6px; }
+  .dmd-info { min-width: 120px; }
+  .dmd-timer { min-width: 64px; }
+  .scr-tab { min-width: 48px; padding: 4px 7px; }
+  .deskbar .mode-label { display: none; }
+}
+/* The same fix for the phone rails: an active button stays lit and legible when hovered or tapped. */
+button.rail-btn.on, button.rail-btn.on:hover:not(:disabled) { background: color-mix(in srgb, var(--dmd) 18%, var(--raise)); color: var(--dmd); border-color: transparent; filter: none; }
+button.rail-btn.on .rail-label, button.rail-btn.on:hover:not(:disabled) .rail-label { color: var(--dmd); }
+button.rail-btn.rec.on, button.rail-btn.rec.on:hover:not(:disabled) { background: var(--coral); color: var(--accent-ink); }
+button.rail-btn.play.on, button.rail-btn.play.on:hover:not(:disabled) { background: var(--mint); color: var(--accent-ink); }
+button.rail-btn.rec.on .rail-label, button.rail-btn.play.on .rail-label { color: var(--accent-ink); }
+
+/* Editor toolbar below 1000 px: a second row instead of running off the screen. */
+@media (max-width: 999px) {
+  body:not(.phone) .editor:not(.couch-ed) .ed-toolbar { flex-wrap: wrap; overflow-x: visible; row-gap: 5px; }
+  body:not(.phone) .editor:not(.couch-ed) .ed-toolbar .spacer { display: none; }
+}
+
+/* Song screen: + Track stays reachable at the end of the track header row, however many tracks. */
+.song-grid > .add-track { position: sticky; right: 0; z-index: 3; background: var(--bg); box-shadow: -8px 0 10px var(--bg); }

@@ -1,9 +1,11 @@
-// Top bar: song, key/tempo, transport, play mode, timer, screens, menu.
+// Top bar. Desktop: one bar: the TILT logo (the app menu), the dot-matrix display
+// (timer, key / tempo, where you are, scrolling messages, and the Stuck? bulb),
+// the SONG | EDIT | MIX switch and the transport. Phones: the rails (after Flip).
 
 import { NOTE_NAMES, scaleById } from "../engine/music";
 import { challengeStatus } from "../engine/challenges";
 import type { App } from "./app";
-import { exportDialog, playTogetherDialog, songSettings } from "./dialogs";
+import { playTogetherDialog, songSettings } from "./dialogs";
 import { INSTRUMENTS } from "../engine/instruments";
 import { libraryDialog } from "./library";
 import { fmtTime, h } from "./dom";
@@ -16,18 +18,22 @@ export function bindTopbar(app: App, el: HTMLElement) {
     const s = app.song;
     if (!s) { el.replaceChildren(); el.classList.add("hidden"); return; }
     el.classList.remove("hidden");
-    el.classList.add("rails");
+    el.classList.toggle("rails", isPhone());
+    el.classList.toggle("deskbar", !isPhone());
     if (isPhone()) { renderRails(); return; }
-    // Desktop: the screen rail down the left (shared with phones), the top strip beside it.
-    if (app.screenName === "dice") { el.replaceChildren(screenRail()); return; }
-    const playing = app.engine.playing;
-    el.replaceChildren(screenRail(), h("div", { class: "backbox" },
-      display(),
+    const playing = app.engine.playing, none = !s.tracks.length;
+    el.replaceChildren(
+      h("button", { class: "tilt-logo", onclick: () => app.openSystemMenu?.(), title: "Menu (Start / F1): dice, songs, together, export, settings...", "aria-label": "TILT menu" },
+        dmdText("TILT", { height: 17, slant: 7, unlit: false })),
+      h("div", { class: "dmd-wrap" },
+        display(),
+        h("button", { class: "dmd-bulb", onclick: () => app.stuck?.(), disabled: app.locked || none, title: "Stuck? Ideas for this scene (phrase grid)", "aria-label": "Stuck?" }, "💡")),
+      screenSwitch(),
       h("div", { class: "transport" },
         h("button", { class: "tp-btn" + (playing ? " on" : ""), onclick: () => app.togglePlay(), title: "Play / stop (Y, Space)" }, playing ? "■" : "▶"),
         h("button", { class: "tp-btn rec" + (app.recording ? " on" : ""), onclick: () => app.toggleRecord(), title: "Record (hold Y, Shift+Space)" }, "●"),
         h("button", { class: "tp-btn mode", onclick: () => { app.songMode = app.songMode === "scene" ? "song" : "scene"; render(); }, title: "Loop the scene, or play the whole song" },
-          app.songMode === "scene" ? "⟳ Scene" : s.songLoop ? "⟳ Song" : "→ Song"),
+          app.songMode === "scene" ? "⟳" : s.songLoop ? "⟳" : "→", h("span", { class: "mode-label" }, app.songMode === "scene" ? " Scene" : " Song")),
         h("button", { class: "tp-btn" + (s.metronome ? " on" : ""), onclick: () => app.edit("Metronome", () => (s.metronome = !s.metronome)), title: "Metronome" }, "♩")),
       s.challenges?.length ? (() => {
         const st = challengeStatus(s);
@@ -35,8 +41,23 @@ export function bindTopbar(app: App, el: HTMLElement) {
           st.map((c) => h("p", { class: "note big" }, `${c.met ? "✅" : "⬜"} ${c.text}`)),
           h("button", { class: "row-btn primary", "data-nav": "ok", onclick: close }, "Back to it"))) }, `🃏 ${st.filter((c) => c.met).length}/${st.length}`);
       })() : "",
-    ));
+    );
     updateTimer();
+  };
+
+  /** SONG | EDIT | MIX, the active one lit amber like an insert lamp (couch / online: the shared screen). */
+  const screenSwitch = () => {
+    const none = !app.song.tracks.length;
+    const tab = (glyph: string, label: string, on: boolean, onclick: () => void, title: string, disabled = false) =>
+      h("button", { class: "scr-tab" + (on ? " on" : ""), onclick, title, disabled, "aria-pressed": String(on) },
+        h("span", { class: "scr-glyph", "aria-hidden": "true" }, glyph), h("span", { class: "scr-label" }, label));
+    if (app.couch) {
+      return h("div", { class: "scr-seg" }, tab(app.couch.online ? "🌐" : "🛋", app.couch.online ? app.couch.online.room : "COUCH", app.screenName === "couch", () => app.show("couch"), "Back to the shared screen"));
+    }
+    return h("div", { class: "scr-seg", role: "group", "aria-label": "Screens" },
+      tab("▦", "SONG", app.screenName === "song", () => app.show("song"), "Song (F2)"),
+      tab("♪", "EDIT", app.screenName === "edit", () => app.show("edit"), "Edit (F3)", none),
+      tab("⫼", "MIX", app.screenName === "mix", () => app.show("mix"), "Mixer (F4)", none));
   };
 
   /**
@@ -51,9 +72,10 @@ export function bindTopbar(app: App, el: HTMLElement) {
    * Messages scroll across the display like a pinball machine's: in from the right, through,
    * and the display goes back to its lines. A new message replaces the one showing.
    */
-  let msgTimer = 0, msgAnim: Animation | null = null;
+  let msgTimer = 0, msgAnim: Animation | null = null, showing = "";
   app.overlays.marquee = (text, ms) => {
-    if (isPhone() || !infoCell.isConnected || app.screenName === "dice") return false;
+    if (isPhone() || !infoCell.isConnected) return false;
+    showing = text;
     const art = dmdText(text, { height: 14 });
     msgAnim?.cancel();
     clearTimeout(msgTimer);
@@ -66,7 +88,7 @@ export function bindTopbar(app: App, el: HTMLElement) {
     const slide = Math.max(450, (travel / speed) * 1000);
     const hold = Math.max(900, ms - slide);
     msgAnim = art.animate([{ transform: `translateX(${boxW}px)` }, { transform: `translateX(${end}px)` }], { duration: slide, easing: "linear", fill: "forwards" });
-    msgTimer = setTimeout(() => { infoCell.classList.remove("showing-msg"); msgCell.replaceChildren(); }, slide + hold) as unknown as number;
+    msgTimer = setTimeout(() => { infoCell.classList.remove("showing-msg"); msgCell.replaceChildren(); showing = ""; }, slide + hold) as unknown as number;
     return true;
   };
   const display = () => {
@@ -74,29 +96,35 @@ export function bindTopbar(app: App, el: HTMLElement) {
     const tempo = app.engine.externalTempo ? `EXT ${app.engine.externalTempo.toFixed(1)}` : `${s.tempo}`;
     const scene = s.scenes.find((x) => x.id === app.currentSceneId());
     const track = app.screenName === "song" || app.screenName === "mix" ? app.selectedTrack() : app.track();
-    const line1 = `${NOTE_NAMES[s.key]} ${scaleById(s.scale).name}  ${tempo} BPM${s.swing ? `  SW ${s.swing}%` : ""}`;
-    const line2 = app.locked ? "LOCKED" : [scene?.name, track && INSTRUMENTS[track.kind].name].filter(Boolean).join(" . ");
+    // Narrow windows: shorter words, so both lines fit the smaller display.
+    const narrow = innerWidth < 1000;
+    const scaleName = scaleById(s.scale).name;
+    const scaleText = narrow ? scaleName.split(" ").map((w, i) => w.slice(0, i ? 4 : 3)).join(" ") : scaleName;
+    const line1 = narrow
+      ? `${NOTE_NAMES[s.key]} ${scaleText} ${tempo}`
+      : `${NOTE_NAMES[s.key]} ${scaleName}  ${tempo} BPM${s.swing ? `  SW ${s.swing}%` : ""}`;
+    const where = [scene?.name, track && INSTRUMENTS[track.kind].name].filter(Boolean) as string[];
+    const line2 = app.locked ? "LOCKED" : narrow ? where.map((w) => w.slice(0, 7)).join(".") : where.join(" . ");
     infoCell.replaceChildren(
-      h("div", { class: "dmd-line" }, dmdText(line1, { height: 11 })),
-      h("div", { class: "dmd-line" + (app.locked ? " locked" : "") }, dmdText(line2, { height: 11 })),
+      h("div", { class: "dmd-line" }, dmdText(line1, { height: narrow ? 9 : 11 })),
+      h("div", { class: "dmd-line" + (app.locked ? " locked" : "") }, dmdText(line2, { height: narrow ? 9 : 11 })),
       msgCell);
-    return h("button", { class: "dmd-display", onclick: () => songSettings(app), title: `${s.title}: key, scale, tempo, swing (click to change)` }, timerCell, infoCell);
+    // A click while the display says STUCK? opens the ideas; otherwise the song settings.
+    const click = () => (showing && /stuck/i.test(showing) && !app.locked ? app.stuck?.() : songSettings(app));
+    return h("button", { class: "dmd-display", onclick: click, title: `${s.title}: key, scale, tempo, swing (click to change)` }, timerCell, infoCell);
   };
 
   const icon = (glyph: string, label: string, onclick: () => void, cls = "", disabled = false, title = label) =>
     h("button", { class: `rail-btn ${cls}`, onclick, title, "aria-label": label, disabled }, h("span", { class: "rail-glyph" }, glyph), h("span", { class: "rail-label" }, label));
 
   /**
-   * The screens, one rail for desktop (left) and phones (right / bottom): Song, Edit, Mix,
-   * then Dice and the song library below a gap, then Together and Stuck?.
+   * Phones: the screens rail (right / bottom): Song, Edit, Mix, then Dice and the song
+   * library below a gap, then Together and Stuck?.
    */
   const screenRail = () => {
     const s = app.song, none = !s.tracks.length;
     const on = (name: string) => (app.screenName === name ? " on" : "");
     return h("nav", { class: "rail rail-screens", "aria-label": "Screens" },
-      isPhone() ? "" : h("button", { class: "rail-btn brand", onclick: () => app.openSystemMenu?.(), title: "Menu (Start / F1): song, settings, scope, export...", "aria-label": "Menu" },
-        h("span", { class: "rail-glyph" }, dmdText("TILT", { height: 11, slant: 7, unlit: false })), h("span", { class: "rail-label" }, "Menu")),
-      isPhone() ? "" : h("div", { class: "rail-sep" }),
       ...(app.couch
         ? [icon(app.couch.online ? "🌐" : "🛋", app.couch.online ? app.couch.online.room : "Couch", () => app.show("couch"), "on", false, "Back to the shared screen")]
         : [
@@ -109,8 +137,7 @@ export function bindTopbar(app: App, el: HTMLElement) {
       icon("▤", "Songs", () => libraryDialog(app, { onOpen: () => app.show("song") }), "", false, "Song library"),
       h("div", { class: "rail-sep" }),
       app.couch ? "" : icon("👥", "Together", () => playTogetherDialog(app), "", none, "Play together: couch or online"),
-      icon("💡", "Stuck?", () => app.stuck?.(), "", app.locked || none, "Stuck? Ideas for this scene"),
-      isPhone() ? "" : icon("⬇", "Export", () => exportDialog(app), "", none, "Export WAV, stems or MIDI"));
+      icon("💡", "Stuck?", () => app.stuck?.(), "", app.locked || none, "Stuck? Ideas for this scene"));
   };
   /**
    * Phones (after Flip): two rails. Left: menu, song info, undo / redo, metronome, record, play.
@@ -154,6 +181,9 @@ export function bindTopbar(app: App, el: HTMLElement) {
     timerEl.className = "timer on" + state;
   };
   app.renderHeader = render;
+  // The bar's contents depend on the width (short display text, phone / desktop): redraw on resize.
+  let resizeFrame = 0;
+  window.addEventListener("resize", () => { cancelAnimationFrame(resizeFrame); resizeFrame = requestAnimationFrame(render); });
   let last = "";
   app.frameHooks.push(() => {
     const txt = app.timer.running ? fmtTime(app.timeLeft()) : "";

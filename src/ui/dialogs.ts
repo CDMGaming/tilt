@@ -326,20 +326,21 @@ export function onlineDialog(app: App, mode: "host" | "join") {
 export function systemMenu(app: App, newJam: () => void) {
   app.overlays.menu(`TILT · ${app.song.title}`, () => [
     ...(app.couch ? [{ label: "End couch mode", run: () => app.endCouch() }] : []),
-    { label: app.couch ? "🛋 Back to the couch" : "👥 Play together…", run: () => (app.couch ? app.show("couch") : playTogetherDialog(app)) },
-    { label: "New jam (dice)…", run: newJam },
-    { label: "Songs (library)…", run: () => libraryDialog(app, { onOpen: () => app.show("song") }) },
+    { label: "⚄ Dice: new jam…", run: newJam },
+    { label: "▤ Songs (library)…", run: () => libraryDialog(app, { onOpen: () => app.show("song") }) },
+    { label: app.couch ? "🛋 Back to the couch" : "👥 Together: couch or online…", run: () => (app.couch ? app.show("couch") : playTogetherDialog(app)) },
+    { label: "⬇ Export (WAV, stems, MIDI)…", run: () => exportDialog(app) },
+    { label: "⚙ Settings…", run: () => settingsDialog(app) },
     { label: "💡 Stuck? Phrase grid for this scene…", disabled: app.locked, run: () => phraseGridDialog(app, { sceneId: app.currentSceneId(), onDone: () => app.refresh() }) },
     { label: "Song settings…", run: () => songSettings(app) },
-    { label: "Export (WAV, stems, MIDI)…", run: () => exportDialog(app) },
     { label: "Song screen", hint: "F2", run: () => app.show("song") },
+    { label: "Edit screen", hint: "F3", disabled: !app.song.tracks.length, run: () => app.show("edit") },
     { label: "Mixer", hint: "F4", run: () => app.show("mix") },
     { label: "Play mode: scene loop", checked: app.songMode === "scene", run: () => { app.songMode = "scene"; app.renderHeader(); } },
     { label: "Play mode: whole song", checked: app.songMode === "song", run: () => { app.songMode = "song"; app.renderHeader(); } },
     { label: "Auto-arrange (one-scene songs)", disabled: !canArrange(app.song), run: () => app.edit("Auto-arrange", () => autoArrange(app.song)) },
     { label: app.learning ? "MIDI learn: finish" : "MIDI learn…", run: () => app.setLearning(!app.learning) },
     { label: "Oscilloscope", run: () => app.toggleScope?.() },
-    { label: "Settings…", run: () => settingsDialog(app) },
     { label: "Controls…", run: () => helpDialog(app) },
   ]);
 }
