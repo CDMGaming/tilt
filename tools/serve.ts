@@ -11,7 +11,7 @@ const rooms = new Rooms();
 const TYPES: Record<string, string> = {
   html: "text/html; charset=utf-8", js: "text/javascript; charset=utf-8", css: "text/css; charset=utf-8",
   json: "application/json", svg: "image/svg+xml", png: "image/png", webp: "image/webp", ico: "image/x-icon",
-  wav: "audio/wav", mp3: "audio/mpeg", ogg: "audio/ogg", woff2: "font/woff2", woff: "font/woff", ttf: "font/ttf", txt: "text/plain; charset=utf-8",
+  webmanifest: "application/manifest+json", wav: "audio/wav", mp3: "audio/mpeg", ogg: "audio/ogg", woff2: "font/woff2", woff: "font/woff", ttf: "font/ttf", txt: "text/plain; charset=utf-8",
 };
 
 async function file(path: string): Promise<Response | null> {

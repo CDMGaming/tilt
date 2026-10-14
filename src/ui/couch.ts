@@ -113,6 +113,7 @@ export class CouchScreen implements Screen {
       q.root.style.cssText = `--seat:${SEAT_COLORS[seat.slot]};--track:${trackColor(track)}`;
       q.root.classList.toggle("is-conductor", c.isConductor(seat));
       q.root.classList.toggle("remote", !c.isLocal(seat));
+      q.root.classList.toggle("mine", !!c.online && c.isLocal(seat));
       q.root.classList.toggle("unheard", app.localMutes.has(seat.id));
       q.head.replaceChildren(
         h("span", { class: "seat-badge" }, seat.id.toUpperCase()),

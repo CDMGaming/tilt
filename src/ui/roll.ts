@@ -2,6 +2,7 @@
 // with "fold"), an optional bottom lane shows velocity or one automation
 // lane, the cursor is driven by gamepad/keyboard and the mouse edits directly.
 
+import { isPhone } from "./phone";
 import { DRUM_BASE_NOTE, drumCount, drumPartName, formatParam, fromUnit, isDrumKind, toUnit } from "../engine/instruments";
 import { getParam, paramInfo } from "../engine/params";
 import { sampleLabel } from "./samples";
@@ -16,6 +17,8 @@ const RULER_H = 22;
 const VEL_H = 72;
 const AUTO_H = 120;
 const ROW_H = 15;
+/** Note rows: a fingertip needs more height than a mouse pointer. */
+const rowPx = () => (isPhone() ? 24 : ROW_H);
 
 export class PianoRoll {
   canvas: HTMLCanvasElement;
@@ -29,6 +32,10 @@ export class PianoRoll {
     this.canvas = document.createElement("canvas");
     this.canvas.className = "roll-canvas";
     this.ctx = this.canvas.getContext("2d")!;
+    // Touch first: two fingers scroll and pinch-zoom, one finger edits as a mouse does.
+    for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel"] as const) {
+      this.canvas.addEventListener(t, (e) => this.touchLayer(e), { capture: true });
+    }
     this.canvas.addEventListener("pointerdown", (e) => this.pointerDown(e));
     this.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
     // Pointer shape tells you what a drag will do: resize at a note's end, move on its body.
@@ -103,8 +110,8 @@ export class PianoRoll {
     return out;
   }
 
-  rowH() { return this.isDrums() ? Math.max(14, Math.min(60, this.laneH() / this.parts())) : ROW_H; }
-  visibleRows() { return this.isDrums() ? this.parts() : Math.max(4, Math.floor(this.laneH() / ROW_H)); }
+  rowH() { return this.isDrums() ? Math.max(14, Math.min(60, this.laneH() / this.parts())) : rowPx(); }
+  visibleRows() { return this.isDrums() ? this.parts() : Math.max(4, Math.floor(this.laneH() / rowPx())); }
 
   /** Index (in allRows) of the top visible row. */
   private topIdx(): number {
@@ -459,7 +466,7 @@ export class PianoRoll {
       return;
     }
     if (app.locked) { app.overlays.toast("Time's up. Editing is locked."); return; }
-    this.canvas.setPointerCapture(e.pointerId);
+    try { this.canvas.setPointerCapture(e.pointerId); } catch { /* a quick tap: the finger has already lifted */ }
 
     if (e.shiftKey && !hit) {
       // Rubber-band selection.
@@ -592,6 +599,99 @@ export class PianoRoll {
   }
 
   private lastX = 0;
+
+  // ------------------------------------------------------------ touch gestures
+
+  private touches = new Map<number, { x: number; y: number }>();
+  /** A first finger waits a moment: if a second one lands, it was a gesture, not an edit. */
+  private pendingTouch: { e: PointerEvent; timer: number; x: number; y: number } | null = null;
+  private gesture: { cx: number; cy: number; d: number; scroll: number; top: number } | null = null;
+  private replays = new WeakSet<Event>();
+  /** A finger left over from a gesture: ignored until it lifts. */
+  private spent = new Set<number>();
+
+  private touchLayer(e: PointerEvent) {
+    if (e.pointerType !== "touch" || this.replays.has(e)) return; // mouse, pen and our own replays go straight through
+    const id = e.pointerId, block = () => { e.stopImmediatePropagation(); e.preventDefault(); };
+    switch (e.type) {
+      case "pointerdown": {
+        block();
+        try { this.canvas.setPointerCapture(id); } catch { /* gone already */ }
+        this.touches.set(id, { x: e.clientX, y: e.clientY });
+        if (this.touches.size === 1) {
+          const timer = setTimeout(() => this.releasePending(), 90) as unknown as number;
+          this.pendingTouch = { e, timer, x: e.clientX, y: e.clientY };
+        } else if (this.touches.size === 2) {
+          if (this.pendingTouch) { clearTimeout(this.pendingTouch.timer); this.pendingTouch = null; }
+          this.startGesture();
+        }
+        return;
+      }
+      case "pointermove": {
+        const t = this.touches.get(id);
+        if (!t) return;
+        t.x = e.clientX; t.y = e.clientY;
+        if (this.spent.has(id)) { block(); return; }
+        if (this.gesture) { block(); this.moveGesture(); return; }
+        // One finger moving: it's an edit (a drag) after all; start it now.
+        const p = this.pendingTouch;
+        if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 8) this.releasePending();
+        return;
+      }
+      default: { // up / cancel
+        this.touches.delete(id);
+        if (this.spent.delete(id)) { block(); return; }
+        if (this.gesture) {
+          block();
+          if (this.touches.size < 2) { this.gesture = null; for (const k of this.touches.keys()) this.spent.add(k); }
+          return;
+        }
+        if (this.pendingTouch?.e.pointerId === id) {
+          // A quick tap: run it as a press, then replay this release so the edit completes.
+          block();
+          this.releasePending();
+          const replay = new PointerEvent(e.type, { pointerId: id, pointerType: "touch", clientX: e.clientX, clientY: e.clientY, bubbles: true });
+          this.replays.add(replay);
+          this.canvas.dispatchEvent(replay);
+        }
+      }
+    }
+  }
+
+  private releasePending() {
+    const p = this.pendingTouch;
+    if (!p) return;
+    clearTimeout(p.timer);
+    this.pendingTouch = null;
+    this.pointerDown(p.e);
+  }
+
+  private startGesture() {
+    const [a, b] = [...this.touches.values()];
+    this.gesture = { cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y), scroll: this.scroll(), top: this.topIdx() };
+  }
+
+  /** Two fingers: drag to scroll (time and pitch), spread / pinch to zoom in / out a step. */
+  private moveGesture() {
+    const g = this.gesture!, [a, b] = [...this.touches.values()];
+    const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2, d = Math.hypot(a.x - b.x, a.y - b.y);
+    const ed = this.app.ed;
+    if (d > g.d * 1.35 || d < g.d / 1.35) {
+      const r = this.canvas.getBoundingClientRect();
+      this.zoom(d > g.d ? 1 : -1, this.tickAt(cx - r.left));
+      this.startGesture();
+      return;
+    }
+    const pxPerTick = (this.size().w - KEYS_W) / this.viewTicks();
+    if (this.zoomed()) ed.scrollTick = this.clampScroll(Math.round((g.scroll - (cx - g.cx) / pxPerTick) / PPQ) * PPQ);
+    if (!this.isDrums()) {
+      const rows = this.allRows();
+      const i = Math.max(0, Math.min(rows.length - this.visibleRows(), g.top + Math.round((cy - g.cy) / rowPx())));
+      ed.topPitch = rows[i];
+    }
+    this.lastNav = performance.now();
+    this.invalidate();
+  }
 
   /** Pointer-drag helper: calls move(tick, pitch, clientY) until release. */
   private track$(e: PointerEvent, move: (tick: number, pitch: number, cy: number) => void, end: () => void) {

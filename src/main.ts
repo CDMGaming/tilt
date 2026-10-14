@@ -13,8 +13,13 @@ import { bindTopbar } from "./ui/topbar";
 import { bindRightClick } from "./ui/rightclick";
 import { Scope } from "./ui/scope";
 import { getSample } from "./ui/samples";
+import { audioSessionPlayback, keepStorage, watchPhone } from "./ui/phone";
 
 const root = document.getElementById("app")!;
+audioSessionPlayback();
+keepStorage();
+// Installable and playable offline (not on the dev server: it would cache stale code).
+if (!import.meta.env.DEV && "serviceWorker" in navigator) void navigator.serviceWorker.register("/sw.js").catch(() => {});
 const app = new App(root);
 app.screens.dice = new DiceScreen(app);
 app.screens.song = new SongScreen(app);
@@ -22,6 +27,7 @@ app.screens.edit = new EditorScreen(app);
 app.screens.mix = new MixerScreen(app);
 app.screens.couch = new CouchScreen(app);
 bindTopbar(app, app.headerEl);
+watchPhone(() => app.refresh());
 bindRightClick(app);
 app.openSystemMenu = () => systemMenu(app, () => { app.engine.stop(); app.show("dice"); });
 app.songSettings = () => songSettings(app);

@@ -16,6 +16,7 @@ import { SpatialNav } from "./nav";
 import { buildPanel } from "./panels";
 import { PianoRoll } from "./roll";
 import { channelStrip } from "./mixer";
+import { isPhone } from "./phone";
 
 /** Couch mode: a compact editor locked to one player's instrument. */
 export interface CouchEditorOpts {
@@ -39,9 +40,12 @@ export class EditorScreen implements Screen {
     this.roll = new PianoRoll(app, (x, y) => this.openMenu({ x, y }));
     this.rollWrap.appendChild(this.roll.canvas);
     this.el.append(this.toolbar, this.rollWrap, this.panelWrap);
-    if (couch) { this.el.classList.add("couch-ed"); this.el.append(this.mixWrap); }
+    this.el.append(this.mixWrap); // the mix view (couch quarters, phones)
     this.panelWrap.addEventListener("pointerdown", () => { if (app.ed.focus === "roll" && !couch) { app.ed.focus = "panel"; this.paintFocus(); } });
   }
+
+  /** One view at a time (notes / sound / mix): couch quarters and phones. */
+  private get compact() { return !!this.couch || isPhone(); }
 
   /** Couch quarters show one view at a time: notes, sound, or mix. */
   private setView(v: "roll" | "panel" | "mix") { this.app.ed.focus = v; this.render(); }
@@ -51,7 +55,9 @@ export class EditorScreen implements Screen {
   render() {
     const app = this.app, ed = app.ed, track = app.track();
     if (!track) return;
-    if (this.couch) { this.renderCouch(); return; }
+    if (this.compact) { this.renderCouch(); return; }
+    this.el.classList.remove("couch-ed", "view-roll", "view-panel", "view-mix");
+    if (ed.focus === "mix") ed.focus = "roll";
     const scene = app.song.scenes.find((s) => s.id === ed.sceneId);
     const clip = this.clip;
     const ti = app.song.tracks.indexOf(track);
@@ -105,7 +111,15 @@ export class EditorScreen implements Screen {
       h("button", { class: "tb-btn" + (on ? " on" : ""), onclick, title }, label);
     const tab = (v: "roll" | "panel" | "mix", label: string) => btn(label, ed.focus === v, () => this.setView(v), "Switch view (RB / Tab)");
     const roll = ed.focus === "roll";
+    this.el.classList.add("couch-ed");
+    // A phone (not a couch seat) can still move between instruments.
+    const ti = app.song.tracks.indexOf(track);
+    const picker = !this.couch ? h("div", { class: "tb-track", style: `--track:${trackColor(track)}` },
+      h("button", { class: "tb-arrow", onclick: () => this.switchTrack(-1) }, "‹"),
+      h("span", { class: "tb-trackname" }, `${ti + 1} · ${INSTRUMENTS[track.kind].name}`),
+      h("button", { class: "tb-arrow", onclick: () => this.switchTrack(1) }, "›")) : "";
     this.toolbar.replaceChildren(
+      picker,
       h("div", { class: "tb-group tabs" }, tab("roll", "Notes"), tab("panel", "Sound"), tab("mix", "Mix")),
       roll ? h("div", { class: "tb-group" },
         h("span", { class: "tb-label" }, "Bars"),
@@ -319,7 +333,7 @@ export class EditorScreen implements Screen {
   handle(a: Action): boolean {
     const app = this.app, ed = app.ed;
     if (a.type === "focusSwap") {
-      if (this.couch) { this.setView(ed.focus === "roll" ? "panel" : ed.focus === "panel" ? "mix" : "roll"); return true; }
+      if (this.compact) { this.setView(ed.focus === "roll" ? "panel" : ed.focus === "panel" ? "mix" : "roll"); return true; }
       ed.focus = ed.focus === "roll" ? "panel" : "roll"; this.paintFocus(); return true;
     }
     if (a.type === "menu") { this.openMenu(); return true; }
@@ -334,7 +348,7 @@ export class EditorScreen implements Screen {
     const f = this.nav.focused;
     switch (a.type) {
       case "dir":
-        if (!this.nav.move(a.dir) && a.dir === "up" && !this.couch) { app.ed.focus = "roll"; this.paintFocus(); }
+        if (!this.nav.move(a.dir) && a.dir === "up" && !this.compact) { app.ed.focus = "roll"; this.paintFocus(); }
         if (app.learning && this.nav.focused?.dataset.param) app.noteLearnTarget(track.id, this.nav.focused.dataset.param);
         return true;
       case "knob": {
@@ -356,7 +370,7 @@ export class EditorScreen implements Screen {
       case "confirmUp":
         if (this.heldKey) { app.noteInput(Number(this.heldKey.dataset.note), 0, false); this.heldKey.classList.remove("down"); this.heldKey = null; }
         return true;
-      case "back": if (this.couch) this.setView("roll"); else { app.ed.focus = "roll"; this.paintFocus(); } return true;
+      case "back": if (this.compact) this.setView("roll"); else { app.ed.focus = "roll"; this.paintFocus(); } return true;
     }
     return false;
   }

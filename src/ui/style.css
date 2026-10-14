@@ -556,3 +556,49 @@ body.couch-mode .overlay-layer.menu-layer { background: transparent; }
 .field { display: grid; gap: 4px; margin-bottom: 8px; color: var(--dim); }
 .advanced { margin: 6px 0; color: var(--dim); }
 .advanced summary { cursor: pointer; margin-bottom: 6px; }
+
+/* ---------- phones (body.phone): Flip-style rails, compact editor, bigger touch targets ---------- */
+body.phone { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+body.phone #app { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); box-sizing: border-box; }
+body.phone .topbar.rails { display: contents; }
+body.phone .screen-host { grid-column: 2; grid-row: 1; min-width: 0; }
+.rail { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; background: var(--panel); overflow: auto; scrollbar-width: none; }
+.rail-left { grid-column: 1; grid-row: 1; border-right: 1px solid var(--line); }
+.rail-right { grid-column: 3; grid-row: 1; border-left: 1px solid var(--line); }
+.rail-gap { flex: 1; min-height: 4px; min-width: 4px; }
+.rail-btn { width: 52px; min-height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  background: transparent; color: var(--ink); border: none; border-radius: var(--r-m); padding: 3px 0; font: inherit; flex: none; }
+.rail-btn:disabled { opacity: .35; }
+.rail-btn.on { background: var(--raise); color: var(--cyan); }
+.rail-btn.rec { color: var(--coral); }
+.rail-btn.rec.on { background: var(--coral); color: var(--accent-ink); }
+.rail-btn.play.on { background: var(--mint); color: var(--accent-ink); }
+.rail-glyph { font-size: 20px; line-height: 1; }
+.rail-glyph.small { font-family: var(--font-display); font-size: 15px; }
+.rail-label { font-size: 10px; color: var(--dim); letter-spacing: .02em; }
+.rail-btn.on .rail-label, .rail-btn.rec.on .rail-label, .rail-btn.play.on .rail-label { color: inherit; }
+.rail .timer { font-size: 12px; padding: 2px 4px; }
+.rail .locked-badge { font-size: 9px; writing-mode: vertical-rl; }
+/* Portrait: the rails become a top bar and a bottom tab bar. */
+@media (orientation: portrait) {
+  body.phone #app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; }
+  body.phone .screen-host { grid-column: 1; grid-row: 2; }
+  body.phone .rail { flex-direction: row; padding: 4px 6px; }
+  body.phone .rail-left { grid-column: 1; grid-row: 1; border-right: none; border-bottom: 1px solid var(--line); }
+  body.phone .rail-right { grid-column: 1; grid-row: 3; border-left: none; border-top: 1px solid var(--line); justify-content: space-around; }
+  body.phone .rail-btn { width: 46px; }
+  body.phone .rail .locked-badge { writing-mode: horizontal-tb; }
+}
+/* The editor on a phone: one view at a time (the couch quarter's layout), a single scrolling toolbar row. */
+body.phone .couch-ed .ed-toolbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+body.phone .couch-ed .tb-btn, body.phone .tb-btn { min-height: 34px; }
+body.phone .menu-item { min-height: 40px; }
+body.phone .song-screen, body.phone .mixer { -webkit-overflow-scrolling: touch; }
+.editor:not(.couch-ed) .mix-wrap { display: none; }
+/* Online on a phone: your quarter fills the screen, the shared strip scrolls underneath. */
+body.phone .couch:has(.quad.mine) { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; padding: 4px; gap: 4px; }
+body.phone .couch:has(.quad.mine) .couch-cell { display: none; }
+body.phone .couch:has(.quad.mine) .couch-cell:has(.quad.mine) { display: flex; grid-row: 1; grid-column: 1; }
+body.phone .couch:has(.quad.mine) .couch-strip { grid-row: 2; grid-column: 1; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+body.phone .tb-trackname { white-space: nowrap; }

@@ -436,6 +436,7 @@ export class App {
       else name = "couch";
     }
     if (name !== "dice" && !this.song.tracks.length && name === "edit") name = "song";
+    this.fixCursors(); // a valid track and scene to show, whatever led here
     this.screenName = name;
     const s = this.screens[name];
     this.main.replaceChildren(s.el);
