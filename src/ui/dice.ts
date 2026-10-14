@@ -31,36 +31,25 @@ export class DiceScreen implements Screen {
   render() {
     const app = this.app, d = app.dice, s = this.shown;
     const locks = d.locks;
+    // A reel per die, its HOLD lamp underneath (lit amber while held). Click / A on a reel toggles HOLD.
     const item = (key: LockKey, label: string, value: string, extra?: HTMLElement) =>
-      h("button", { class: "die" + (locks[key] ? " locked" : "") + (this.rolling ? " rolling" : "") + (this.nudged === key ? " nudged" : ""), "data-nav": key, onclick: () => { locks[key] = !locks[key]; this.render(); } },
+      h("button", { class: `die reel reel-${key}` + (locks[key] ? " locked" : "") + (this.rolling ? " rolling" : "") + (this.nudged === key ? " nudged" : ""), "data-nav": key, "aria-pressed": String(locks[key]), title: `${label}: click to ${locks[key] ? "release" : "hold"}`, onclick: () => { locks[key] = !locks[key]; this.render(); } },
         h("div", { class: "die-label" }, label),
-        h("div", { class: "die-value" }, value),
-        extra ?? null,
-        h("div", { class: "die-lock" }, locks[key] ? "🔒 locked" : "🔓"));
+        h("div", { class: "reel-window" }, value ? h("div", { class: "die-value" }, value) : "", extra ?? ""),
+        h("div", { class: "hold" + (locks[key] ? " on" : "") }, "HOLD"));
     const saved = App.savedSong();
     this.el.replaceChildren(
       h("div", { class: "dice-head" },
-        h("div", { class: "logo" }, dmdText("TILT", { height: 64, slant: 7 })),
+        h("div", { class: "logo" }, dmdText("TILT", { height: 56, slant: 7 })),
         h("div", { class: "tagline" }, "Just a Nudge")),
-      h("div", { class: "dice-grid" },
+      h("div", { class: "reels" },
         item("key", "Key", NOTE_NAMES[s.key]),
         item("scale", "Scale", scaleById(s.scale).name),
         item("tempo", "Tempo", `${s.tempo}`, h("div", { class: "die-unit" }, "bpm")),
         item("swing", "Swing", s.swing ? `${s.swing}%` : "straight"),
-        item("lineup", "Lineup", `${s.lineup.length} tracks`, h("div", { class: "lineup" }, s.lineup.map((l) => h("span", { class: `chip kind-${l.kind}` }, INSTRUMENTS[l.kind].name)))),
+        item("lineup", "Lineup", "", h("div", { class: "lineup" }, s.lineup.map((l) => h("span", { class: `chip kind-${l.kind}` }, INSTRUMENTS[l.kind].name)))),
         item("presets", "Sounds", "", h("div", { class: "lineup" }, s.lineup.map((l) => h("span", { class: "chip" }, INSTRUMENTS[l.kind].presets[l.preset]?.name ?? "")))),
-        item("cards", "Challenge cards", s.cards?.length ? "" : "none", h("div", { class: "cards" }, (s.cards ?? []).map((c) => h("div", { class: "card" }, "🃏 " + (challengeById(c)?.text ?? c))))),
-      ),
-      h("div", { class: "dice-actions" },
-        h("button", { class: "roll-btn", "data-nav": "roll", onclick: () => this.roll() }, "🎲 ROLL", h("small", null, "Y / Space")),
-        h("button", { class: "roll-btn nudge-btn", "data-nav": "nudge", onclick: () => this.nudge(), title: "Re-roll one die: the one the cursor is on, or a random unlocked one" }, "NUDGE", h("small", null, "one die")),
-        h("div", { class: "timer-pick" },
-          h("div", { class: "die-label" }, "Timer"),
-          h("div", { class: "seg" }, TIMERS.map((m) => h("button", { class: "seg-btn" + (d.minutes === m ? " on" : ""), "data-nav": `t${m}`, onclick: () => { d.minutes = m; this.render(); } }, m ? `${m} min` : "Off")))),
-        h("div", { class: "timer-pick" },
-          h("div", { class: "die-label" }, "Challenges"),
-          h("div", { class: "seg" }, [0, 1, 2, 3].map((n) => h("button", { class: "seg-btn" + (d.cards === n ? " on" : ""), "data-nav": `cards${n}`, onclick: () => { d.cards = n; d.locks.cards = false; this.roll(); } }, n ? String(n) : "Off")))),
-        h("button", { class: "go-btn", "data-nav": "go", onclick: () => this.start() }, "START ▶"),
+        item("cards", "Challenges", s.cards?.length ? "" : "none", h("div", { class: "cards" }, (s.cards ?? []).map((c) => h("div", { class: "card" }, challengeById(c)?.text ?? c)))),
       ),
       h("div", { class: "dice-foot" },
         h("div", { class: "code" }, h("span", { class: "die-label" }, "Share code "), h("code", null, encodeSetup(s))),
@@ -69,6 +58,18 @@ export class DiceScreen implements Screen {
         saved?.tracks.length ? h("button", { class: "small-btn", "data-nav": "continue", onclick: () => this.continueSaved() }, `Continue “${saved.title}”`) : null,
         h("button", { class: "small-btn", "data-nav": "library", onclick: () => libraryDialog(this.app, { onOpen: () => this.app.show("song") }) }, "Songs…"),
         h("button", { class: "small-btn", "data-nav": "blank", onclick: () => this.blank() }, "Blank song, no dice"),
+      ),
+      // The bar that's always on screen: roll, nudge, timer, challenges, start.
+      h("div", { class: "dice-bar" },
+        h("button", { class: "roll-btn", "data-nav": "roll", onclick: () => this.roll() }, "🎲 ROLL", h("small", null, "Y / Space")),
+        h("button", { class: "roll-btn nudge-btn", "data-nav": "nudge", onclick: () => this.nudge(), title: "Re-roll one die: the one the cursor is on, or a random unlocked one" }, "NUDGE", h("small", null, "one reel")),
+        h("div", { class: "timer-pick" },
+          h("div", { class: "die-label" }, "Timer"),
+          h("div", { class: "seg" }, TIMERS.map((m) => h("button", { class: "seg-btn" + (d.minutes === m ? " on" : ""), "data-nav": `t${m}`, onclick: () => { d.minutes = m; this.render(); } }, m ? `${m} min` : "Off")))),
+        h("div", { class: "timer-pick" },
+          h("div", { class: "die-label" }, "Challenges"),
+          h("div", { class: "seg" }, [0, 1, 2, 3].map((n) => h("button", { class: "seg-btn" + (d.cards === n ? " on" : ""), "data-nav": `cards${n}`, onclick: () => { d.cards = n; d.locks.cards = false; this.roll(); } }, n ? String(n) : "Off")))),
+        h("button", { class: "go-btn", "data-nav": "go", onclick: () => this.start(), title: "Start the jam (Shift+Space / hold Y)" }, h("span", { class: "press-start" }, "PRESS START")),
       ),
     );
     this.nav.paint();
