@@ -35,7 +35,7 @@ app.openDice = () => { app.engine.stop(); app.show("dice"); };
 app.openSystemMenu = () => systemMenu(app, () => app.openDice!());
 app.openHelp = () => { if (!app.overlays.open) helpDialog(app); };
 const tutorial = new Tutorial(app);
-app.openTutorial = () => { document.querySelector(".coach-offer")?.remove(); void tutorial.start(true); };
+app.openTutorial = (fresh = false) => { document.querySelector(".coach-offer")?.remove(); void tutorial.start(!fresh); };
 app.songSettings = () => songSettings(app);
 app.onTimeUp = () => timeUpDialog(app);
 app.openShortcut = () => openShortcut(app);

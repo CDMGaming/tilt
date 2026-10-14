@@ -16,6 +16,7 @@ import { trackColor } from "./theme";
 import type { MenuItem } from "./overlay";
 import { shareCodeDialog } from "./share";
 import { isPhone } from "./phone";
+import { byInput, watchInput } from "./lastinput";
 
 const HOLD_MS = 450;
 
@@ -32,6 +33,7 @@ export class SongScreen implements Screen {
   constructor(private app: App) {
     this.el.appendChild(this.grid);
     this.el.addEventListener("touchmove", (e) => { if (this.holding) e.preventDefault(); }, { passive: false });
+    watchInput();
   }
 
   render() {
@@ -44,6 +46,14 @@ export class SongScreen implements Screen {
     const at = (r: number, c: number, el: HTMLElement) => {
       el.classList.toggle("cursor", isCur(r, c));
       el.addEventListener("pointerdown", (e) => {
+        if (this.carry && e.button === 0 && r >= 0 && r < song.scenes.length && c >= 0 && c < cols) {
+          e.preventDefault();
+          const t = song.tracks[c], s = song.scenes[r];
+          if (t.id === this.carry.trackId && s.id === this.carry.sceneId) { this.cancelCarry(); return; }
+          cur.row = r; cur.col = c;
+          this.dropMenu(this.carry, { trackId: t.id, sceneId: s.id }, { x: e.clientX, y: e.clientY });
+          return;
+        }
         if (cur.row !== r || cur.col !== c) { cur.row = r; cur.col = c; this.render(); }
         if (e.button === 2) { e.preventDefault(); this.openMenu({ x: e.clientX, y: e.clientY }); }
       });
@@ -76,6 +86,14 @@ export class SongScreen implements Screen {
     for (let c = 0; c <= cols; c++) at(song.scenes.length, c, h("div", { class: "filler" }));
 
     this.grid.replaceChildren(...cells);
+    // Moving a clip: say how to drop it (for the input in use), with a way out that needs no B button.
+    this.el.querySelector(".carry-bar")?.remove();
+    if (this.carry) {
+      const t = song.tracks.find((x) => x.id === this.carry!.trackId), s = song.scenes.find((x) => x.id === this.carry!.sceneId);
+      this.el.prepend(h("div", { class: "carry-bar", role: "status" },
+        h("span", null, `Moving ${t ? INSTRUMENTS[t.kind].name : "clip"} · ${s?.name ?? ""}: `, byInput("click the cell it goes to", "arrow to the cell, press Enter", "move to the cell, press A", "tap the cell it goes to")),
+        h("button", { class: "small-btn", onclick: () => this.cancelCarry() }, "Cancel")));
+    }
     if (!song.tracks.length) this.grid.appendChild(h("div", { class: "empty-hint" }, "No tracks yet. Press A / Enter on + to add an instrument."));
     requestAnimationFrame(() => this.grid.querySelector(".cursor")?.scrollIntoView({ block: "nearest", inline: "nearest" }));
   }
@@ -97,7 +115,7 @@ export class SongScreen implements Screen {
     grip.addEventListener("pointerdown", (e) => { if (e.button === 0) { e.stopPropagation(); e.preventDefault(); this.sceneDrag(r, e); } });
     return h("div", { class: "scene-head" + (color ? " tinted" : ""), "data-scene": s.id, style: color ? `--scene:${color}` : "" },
       isPhone() ? "" : grip,
-      h("button", { class: "scene-play" + (songMode ? " from" : ""), onclick: (e: Event) => { e.stopPropagation(); this.playScene(r); }, title: songMode ? "Play the song from here" : "Loop this scene" }, "▶"),
+      h("button", { class: "scene-play" + (songMode ? " from" : ""), onclick: (e: Event) => { e.stopPropagation(); this.playScene(r); }, title: songMode ? "Play the song from here" : this.app.song.sceneLoop === false ? "Play this scene once" : "Loop this scene" }, "▶"),
       h("div", { class: "sh-text" },
         h("button", { class: "sh-name", title: "Name it: Intro, Verse, Chorus…", onclick: (e: Event) => { e.stopPropagation(); this.nameMenu(s, e.currentTarget as HTMLElement); } }, `${r + 1} ${s.name}`),
         h("div", { class: "sh-meta" },
@@ -179,7 +197,7 @@ export class SongScreen implements Screen {
       }
       case "menu": this.openMenu(); return true;
       case "back":
-        if (this.carry) { this.carry = null; this.render(); app.overlays.toast("Move cancelled", 800); return true; }
+        if (this.carry) { this.cancelCarry(); return true; }
         return false;
       case "copy": { const c = this.curClip(); if (c) { this.clipboard = JSON.parse(JSON.stringify(c)); app.overlays.toast("Clip copied", 800); } return true; }
       case "paste": this.pasteClip(); return true;
@@ -219,8 +237,8 @@ export class SongScreen implements Screen {
     const app = this.app, s = app.song.scenes[r];
     app.songCur.row = r;
     if (app.songMode === "song") app.engine.play({ kind: "song", fromIndex: r });
-    else if (app.engine.playing) app.engine.queue({ kind: "scene", sceneId: s.id });
-    else app.engine.play({ kind: "scene", sceneId: s.id });
+    else if (app.engine.playing) app.engine.queue({ kind: "scene", sceneId: s.id, once: app.song.sceneLoop === false });
+    else app.engine.play({ kind: "scene", sceneId: s.id, once: app.song.sceneLoop === false });
     app.refresh();
   }
 
@@ -409,6 +427,12 @@ export class SongScreen implements Screen {
     ], at);
   }
 
+  private cancelCarry() {
+    this.carry = null;
+    this.render();
+    this.app.overlays.toast("Move cancelled", 800);
+  }
+
   private cellPos(t: Track, s: Scene) {
     return { row: this.app.song.scenes.indexOf(s), col: this.app.song.tracks.indexOf(t) };
   }
@@ -451,7 +475,7 @@ export class SongScreen implements Screen {
     const setTempo = (v: number | null) => app.edit("Scene tempo", () => (s.tempo = v));
     const cur = s.tempo ?? song.tempo;
     return [
-      app.songMode === "song" ? { label: "Play the song from here", run: () => this.playScene(i) } : { label: "Loop this scene", run: () => this.playScene(i) },
+      app.songMode === "song" ? { label: "Play the song from here", run: () => this.playScene(i) } : { label: app.song.sceneLoop === false ? "Play this scene once" : "Loop this scene", run: () => this.playScene(i) },
       { label: "Name", sub: () => [
         ...SCENE_NAMES.map((n) => ({ label: n, color: sceneColor(n) ?? undefined, checked: s.name === n, run: () => app.edit("Rename scene", () => (s.name = n)) })),
         { label: "Custom…", run: () => { const n = prompt("Scene name", s.name); if (n) app.edit("Rename scene", () => (s.name = n.slice(0, 24))); } },
@@ -479,7 +503,7 @@ export class SongScreen implements Screen {
     const clip = t.clips[s.id];
     return [
       { label: "Edit clip", run: () => this.openEditor(t, s, "roll") },
-      { label: "Move / copy to…", disabled: !clip, run: () => { this.carry = { trackId: t.id, sceneId: s.id }; this.render(); app.overlays.toast("Pick a cell and press A (or Enter). B cancels.", 2500); } },
+      { label: "Move / copy to…", disabled: !clip, run: () => { this.carry = { trackId: t.id, sceneId: s.id }; this.render(); } },
       { label: "Duplicate (x2 length)", disabled: !clip || clip.bars * 2 > MAX_BARS, run: () => app.edit("Duplicate clip", () => duplicateClip(song, clip!)) },
       { label: "Clip length", sub: () => Array.from({ length: MAX_BARS }, (_, i) => ({ label: `${i + 1} bar${i ? "s" : ""}`, checked: clip?.bars === i + 1, run: () => app.edit("Clip length", () => setClipBars(ensureClip(song, t, s.id), i + 1)) })) },
       { label: "Mute clip", disabled: !clip, checked: !!clip?.muted, keepOpen: true, run: () => app.edit("Mute clip", () => (clip!.muted = !clip!.muted)) },

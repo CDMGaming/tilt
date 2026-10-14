@@ -11,7 +11,8 @@ import { laneValue } from "./songops";
 /** Automation lanes are sampled every 64th note; the worklet smooths between steps. */
 export const AUTO_STEP = PPQ / 16;
 
-export type PlayMode = { kind: "scene"; sceneId: number } | { kind: "song"; fromIndex: number };
+/** `once`: play the scene one time and stop (otherwise it loops). */
+export type PlayMode = { kind: "scene"; sceneId: number; once?: boolean } | { kind: "song"; fromIndex: number };
 
 export interface SceneInstance {
   sceneId: number;
@@ -69,7 +70,7 @@ export function firstInstance(song: Song, mode: PlayMode, startTime: number): Sc
 /** The instance that follows `prev`, or null when the song ends. */
 export function nextInstance(song: Song, mode: PlayMode, prev: SceneInstance): SceneInstance | null {
   const end = prev.startTime + prev.ticks * prev.secPerTick;
-  if (mode.kind === "scene") return firstInstance(song, mode, end);
+  if (mode.kind === "scene") return mode.once ? null : firstInstance(song, mode, end);
   // The scene list may have been edited while playing: re-find by id.
   let idx = song.scenes.findIndex((s) => s.id === prev.sceneId);
   if (idx < 0) idx = Math.min(prev.index, song.scenes.length - 1);

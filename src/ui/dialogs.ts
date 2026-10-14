@@ -12,7 +12,11 @@ import type { App } from "./app";
 import { download, h } from "./dom";
 import { libraryDialog, safeName } from "./library";
 import { shareCodeDialog } from "./share";
-import { tutorialLabel } from "./tutorial";
+import { tutorialLabel, tutorialStatus } from "./tutorial";
+import { lastInput } from "./lastinput";
+import { dmdText } from "./dmd";
+
+declare const __BUILD__: string;
 import { challengeStatus } from "../engine/challenges";
 import { phraseGridDialog } from "./phrasegrid";
 import { exportMidi } from "../engine/smf";
@@ -368,62 +372,107 @@ export function systemMenu(app: App, newJam: () => void) {
     { label: "Mixer", hint: "F4", run: () => app.show("mix") },
     { label: "Play mode: SCENE (loop the scene)", hint: "C", checked: app.songMode === "scene", run: () => app.setSongMode("scene") },
     { label: "Play mode: SONG (scenes in order)", hint: "C", checked: app.songMode === "song", run: () => app.setSongMode("song") },
-    { label: "Song loop (SONG mode)", checked: app.song.songLoop, keepOpen: true, run: () => app.edit("Song loop", () => (app.song.songLoop = !app.song.songLoop)) },
+    { label: app.songMode === "song" ? "Loop the song" : "Loop the scene", checked: app.loopOn(), keepOpen: true, run: () => app.toggleLoop() },
     { label: "Metronome (click)", checked: app.song.metronome, keepOpen: true, run: () => app.edit("Metronome", () => (app.song.metronome = !app.song.metronome)) },
     { label: "Auto-arrange (one-scene songs)", disabled: !canArrange(app.song), run: () => app.edit("Auto-arrange", () => autoArrange(app.song)) },
     { label: app.learning ? "MIDI learn: finish" : "MIDI learn…", run: () => app.setLearning(!app.learning) },
     { label: "Oscilloscope", run: () => app.toggleScope?.() },
-    { label: "Controls…", hint: "?", run: () => helpDialog(app) },
+    { label: "Help: controls, tutorial, about…", hint: "?", run: () => helpDialog(app) },
     { label: tutorialLabel(), run: () => app.openTutorial?.() },
   ]);
 }
 
-export function helpDialog(app: App) {
-  const row = (k: string, v: string) => h("tr", null, h("td", null, k), h("td", null, v));
-  app.overlays.dialog("Controls", (close) => h("div", { class: "form" },
-    h("table", { class: "help" },
-      h("tr", null, h("th", null, "Gamepad"), h("th", null, "")),
-      row("Stick / D-pad", "Move the cursor"),
-      row("A", "Place / delete note, open, confirm. Hold A + left/right: note length"),
-      row("B", "Back"),
-      row("X", "Context menu"),
-      row("Y", "Play / stop. Hold: record. On the setup screen: NUDGE (hold: new song)"),
-      row("Right stick", "Turn knob. In the roll: length (←→), velocity (↑↓), or draw the automation lane (↑↓) when one is open. Delete removes the lane point at the cursor"),
-      row("LT / ZL (hold)", "Fine adjust"),
-      row("RT / ZR (hold) + move", "Select a range"),
-      row("RB / R", "Switch piano roll ↔ instrument panel. Hold: roll only / split / panel only"),
-      row("LB / L (hold)", "Jump to any track / scene"),
-      row("Start / +", "App menu.  Back / −: undo"),
-      row("Left stick click (L3)", "Play mode: SCENE (loop the scene) ↔ SONG (scenes in order)"),
-      row("LT / ZL + up / down", "Song screen: move the scene"),
-      h("tr", null, h("th", null, "Keyboard"), h("th", null, "")),
-      row("Arrows, Enter, Esc", "Move, confirm (hold Enter + ←→: length), back"),
-      row("A S D F G H J K L ; '", "Play notes (scale degrees when scale lock is on), Q-row = octave up"),
-      row("Z / X", "Octave down / up"),
-      row("Space / Shift+Space", "Play-stop / record. On the setup screen: NUDGE / new song"),
-      row("C", "Play mode: SCENE (loop the scene) ↔ SONG (scenes in order)"),
-      row("Alt + ↑ / ↓", "Song screen: move the scene up / down"),
-      row("?", "These controls"),
-      row("Shift + arrows", "Select a range"),
-      row("M", "Context menu.  Tab: roll ↔ panel.  ` (hold): jump overlay"),
-      row(", .  /  - =", "Knob / note length  ·  velocity"),
-      row("Ctrl+Z / Y / C / X / V / D / A", "Undo, redo, copy, cut, paste, duplicate clip, select all"),
-      row("Delete", "Delete notes.  F1: app menu.  F2/F3/F4: song / editor / mixer"),
-      h("tr", null, h("th", null, "Mouse / touch"), h("th", null, "")),
-      row("SCENE | SONG (by ▶)", "What Play does. SONG adds ⟳: play the song again at its end. The display shows LOOP SCENE 2 / SONG 3/6"),
-      row("A scene's ▶", "SCENE: loop that scene.  SONG: play the song from there"),
-      row("Scene ⋮⋮ grip / long-press + drag", "Move the scene. Click a scene's name for Intro, Verse, Chorus… (each has its colour)"),
-      row("Right-click / long-press", "The menu for a scene, clip or track (a sheet from the bottom on phones)"),
-      h("tr", null, h("th", null, "MIDI"), h("th", null, "")),
-      row("MIDI learn", "App menu → MIDI learn: touch a knob, move a hardware control. Transport CCs in Settings"),
-      h("tr", null, h("th", null, "Setup screen"), h("th", null, "")),
-      row("A / Enter on a value", "Pick it from a list (or − / + for tempo and swing). Editing a field HOLDs it"),
-      row("HOLD", "Held fields stay put. Lineup / Sounds: HOLD keeps every slot; each slot can also be chosen on its own or left as ?"),
-      row("NUDGE (Y, Space)", "Re-roll everything that isn't held.  Release all: let go of every hold"),
-      row("Setups ▾ / Save setup…", "Save the held fields and slots under a name; loading one brings them back held"),
-      row("Game mode…", "Challenge cards, lock at zero, extra ball, the TILT flash (off by default)"),
-      row("🎲 code (Song screen, top left)", "Share the song's setup code: copy it, copy a link that opens TILT with it, or start a new song from it. Also in the TILT menu and Songs…"),
-    ),
-    h("button", { class: "row-btn primary", "data-nav": "done", onclick: close }, "Done"),
-  ), { wide: true });
+type HelpPage = "controls" | "tutorial" | "about";
+type ControlsTab = "gamepad" | "keyboard" | "touch" | "setup" | "midi";
+
+const CONTROLS: Record<ControlsTab, { label: string; rows: [string, string][] }> = {
+  gamepad: { label: "Gamepad", rows: [
+    ["Stick / D-pad", "Move the cursor"],
+    ["A", "Place / delete note, open, confirm. Hold A + left/right: note length"],
+    ["B", "Back"],
+    ["X", "Context menu"],
+    ["Y", "Play / stop. Hold: record. On the setup screen: NUDGE (hold: new song)"],
+    ["Right stick", "Turn knob. In the roll: length (←→), velocity (↑↓), or draw the automation lane (↑↓) when one is open"],
+    ["LT / ZL (hold)", "Fine adjust.  + up / down on the Song screen: move the scene"],
+    ["RT / ZR (hold) + move", "Select a range"],
+    ["RB / R", "Switch piano roll ↔ instrument panel. Hold: roll only / split / panel only"],
+    ["LB / L (hold)", "Jump to any track / scene"],
+    ["Left stick click (L3)", "Play: SCENE (this scene) ↔ SONG (all the scenes in order)"],
+    ["Start / +", "App menu.  Back / −: undo"],
+  ] },
+  keyboard: { label: "Keyboard", rows: [
+    ["Arrows, Enter, Esc", "Move, confirm (hold Enter + ←→: length), back"],
+    ["A S D F G H J K L ; '", "Play notes (scale degrees when scale lock is on), Q-row = octave up"],
+    ["Z / X", "Octave down / up"],
+    ["Space / Shift+Space", "Play-stop / record. On the setup screen: NUDGE / new song"],
+    ["C", "Play: SCENE (this scene) ↔ SONG (all the scenes in order)"],
+    ["Alt + ↑ / ↓", "Song screen: move the scene up / down"],
+    ["Shift + arrows", "Select a range"],
+    ["M", "Context menu.  Tab: roll ↔ panel.  ` (hold): jump overlay"],
+    [", .  /  - =", "Knob / note length  ·  velocity"],
+    ["Ctrl+Z / Y / C / X / V / D / A", "Undo, redo, copy, cut, paste, duplicate clip, select all"],
+    ["Delete", "Delete notes"],
+    ["F1 / F2 / F3 / F4", "App menu / song / editor / mixer"],
+    ["?", "Help"],
+  ] },
+  touch: { label: "Mouse & touch", rows: [
+    ["SCENE | SONG (by ▶)", "What Play plays: this scene, or all the scenes in order"],
+    ["⟳ Loop", "On: it repeats. Off (Once): it plays one time and stops. Works for SCENE and SONG"],
+    ["A scene's ▶", "SCENE: play that scene.  SONG: play the song from there"],
+    ["Scene ⋮⋮ grip / long-press + drag", "Move the scene"],
+    ["A scene's name", "Intro, Verse, Chorus, Bridge, Drop, Outro: each has its colour"],
+    ["Right-click / long-press", "The menu for a scene, clip or track (a sheet from the bottom on phones)"],
+    ["Move / copy to… (clip menu)", "Then click or tap the cell it goes to. Cancel in the bar, or tap the clip again"],
+    ["Drag a clip (mouse)", "Drop it on another cell: move, copy or swap"],
+    ["🎲 code (Song screen, top left)", "Share the song's setup code: copy it, a link that opens TILT with it, or a new song from it"],
+  ] },
+  setup: { label: "Setup screen", rows: [
+    ["A / Enter / click on a value", "Pick it from a list (or − / + for tempo and swing). Editing a field HOLDs it"],
+    ["HOLD", "Held fields stay put. Lineup / Sounds: each slot can be chosen on its own or left as ?"],
+    ["NUDGE (Y, Space)", "Re-roll everything that isn't held.  Release all: let go of every hold"],
+    ["Setups ▾ / Save setup…", "Save the held fields under a name; loading one brings them back held"],
+    ["Timer", "Off, 5, 10, 15 or 20 minutes. At zero playback stops and the display says TIME"],
+    ["Game mode…", "Challenge cards, lock at zero, extra ball, the TILT flash (off by default)"],
+  ] },
+  midi: { label: "MIDI", rows: [
+    ["Keyboard / pads", "Play the instrument you're on; held notes light its keys and pads"],
+    ["MIDI learn", "TILT menu → MIDI learn: touch a knob, move a hardware control"],
+    ["Transport", "Play / stop / record CCs and clock sync in Settings"],
+  ] },
+};
+
+/** Help: Controls (by input; the one you're using first), the tutorial, about TILT. */
+export function helpDialog(app: App, page: HelpPage = "controls") {
+  const li = lastInput();
+  let tab: ControlsTab = li === "gamepad" ? "gamepad" : li === "keyboard" ? "keyboard" : "touch";
+  app.overlays.dialog("Help", (close, rerender) => {
+    const pageBtn = (id: HelpPage, label: string) =>
+      h("button", { class: "help-tab" + (page === id ? " on" : ""), "data-nav": `help-${id}`, "aria-pressed": String(page === id), onclick: () => { page = id; rerender(); } }, label);
+    const body = page === "controls" ? h("div", { class: "help-page" },
+      h("div", { class: "help-chips" }, (Object.keys(CONTROLS) as ControlsTab[]).map((k) =>
+        h("button", { class: "chip-tab" + (tab === k ? " on" : ""), "data-nav": `ctl-${k}`, onclick: () => { tab = k; rerender(); } }, CONTROLS[k].label))),
+      h("table", { class: "help" }, CONTROLS[tab].rows.map(([k, v]) => h("tr", null, h("td", null, k), h("td", null, v)))))
+      : page === "tutorial" ? (() => {
+        const st = tutorialStatus();
+        return h("div", { class: "help-page" },
+          h("p", { class: "note big" }, "Your first song in 5 minutes: drums, bass and a lead in C minor, one step at a time. Each step finishes when you do it; Skip does it for you."),
+          h("p", { class: "note" }, st.finished ? "You've finished it. Run it again any time." : st.step > 0 ? `You stopped at step ${st.step + 1} of ${st.total}.` : "Not started yet."),
+          h("div", { class: "help-actions" },
+            st.step > 0 && !st.finished ? h("button", { class: "row-btn primary", "data-nav": "tut-go", onclick: () => { close(); app.openTutorial?.(false); } }, `Continue (step ${st.step + 1})`) : "",
+            h("button", { class: "row-btn" + (st.step > 0 && !st.finished ? "" : " primary"), "data-nav": "tut-new", onclick: () => { close(); app.openTutorial?.(true); } }, st.step > 0 || st.finished ? "Start over" : "Start the tutorial")));
+      })()
+      : h("div", { class: "help-page about" },
+        h("div", { class: "about-logo" }, dmdText("TILT", { height: 30, slant: 7, unlit: false })),
+        h("p", { class: "note big" }, "Just a nudge. Roll a key, a tempo and a lineup of instruments, then build a song out of scenes."),
+        h("ul", { class: "note game-list" },
+          h("li", null, "Your songs live in this browser (Songs…). Export a song file to back it up or move it to another device."),
+          h("li", null, "A 🎲 code or link shares a starting point: key, scale, tempo, swing, instruments and sounds."),
+          h("li", null, "Play together: couch mode on one screen, or online with a 4-letter code."),
+          h("li", null, "Works with a mouse, a keyboard, touch, a gamepad, MIDI keyboards and Push 1.")),
+        h("p", { class: "note" }, `Build ${__BUILD__}`));
+    return h("div", { class: "form help-hub" },
+      h("div", { class: "help-tabs", role: "tablist" }, pageBtn("controls", "Controls"), pageBtn("tutorial", "Tutorial"), pageBtn("about", "About")),
+      body,
+      h("button", { class: "row-btn", "data-nav": "done", onclick: close }, "Close"));
+  }, { wide: true });
 }

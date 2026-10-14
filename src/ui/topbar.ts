@@ -54,7 +54,8 @@ export function bindTopbar(app: App, el: HTMLElement) {
       h("div", { class: "mode-seg", "data-coach": "mode", role: "group", "aria-label": "Play mode (C)" },
         seg("scene", "SCENE", "Play loops the current scene (C)"),
         seg("song", "SONG", "Play goes through the scenes in order (C)")),
-      m === "song" ? h("button", { class: "tp-btn loop-btn" + (s.songLoop ? " on" : ""), "aria-pressed": String(s.songLoop), onclick: () => app.edit("Song loop", () => (s.songLoop = !s.songLoop)), title: s.songLoop ? "Song loop on: the song starts again at its end" : "Song loop off: the song stops at its end" }, "⟳") : "");
+      h("button", { class: "tp-btn loop-btn" + (app.loopOn() ? " on" : ""), "aria-pressed": String(app.loopOn()), onclick: () => app.toggleLoop(),
+        title: m === "song" ? (s.songLoop ? "Loop on: the song starts again at its end" : "Loop off: the song plays once") : (app.loopOn() ? "Loop on: the scene repeats" : "Loop off: the scene plays once") }, "⟳"));
   };
 
   /** SONG | EDIT | MIX, the active one lit amber like an insert lamp (couch / online: the shared screen). */
@@ -184,8 +185,11 @@ export function bindTopbar(app: App, el: HTMLElement) {
         icon("↶", "Undo", () => app.undo()),
         icon("↷", "Redo", () => app.redo()),
         // SCENE / SONG (the metronome lives in the menu on phones), and the song loop in SONG mode.
-        icon(app.songMode === "scene" ? "⟳" : "→", app.songMode === "scene" ? "Scene" : "Song", () => app.setSongMode(app.songMode === "scene" ? "song" : "scene"), "mode-rail" + (app.songMode === "song" ? " song" : ""), false, "Play mode: loop the scene or play the song (C)"),
-        app.songMode === "song" ? icon("⟳", "Loop", () => app.edit("Song loop", () => (s.songLoop = !s.songLoop)), s.songLoop ? "on" : "", false, "Song loop") : "",
+        // What Play plays (one scene / the whole song) and whether it repeats: both always shown.
+        h("button", { class: "rail-btn mode-rail", onclick: () => app.setSongMode(app.songMode === "scene" ? "song" : "scene"), title: "Play: this scene, or the whole song (C)", "aria-label": `Play mode: ${app.songMode}` },
+          h("span", { class: "mode-mini" + (app.songMode === "scene" ? " on" : "") }, "SCENE"),
+          h("span", { class: "mode-mini" + (app.songMode === "song" ? " on" : "") }, "SONG")),
+        icon("⟳", app.loopOn() ? "Loop" : "Once", () => app.toggleLoop(), "loop-rail" + (app.loopOn() ? " on" : ""), false, "Loop on: repeat. Off: play once"),
         icon("●", "Rec", () => app.toggleRecord(), "rec" + (app.recording ? " on" : "")),
         icon(playing ? "■" : "▶", playing ? "Stop" : "Play", () => app.togglePlay(), "play" + (playing ? " on" : ""))),
       screenRail(),

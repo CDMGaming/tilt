@@ -9,3 +9,7 @@ Taken with headless Chrome against the dev server (sandbox storage).
 | `song-phone-sheet.png` | Phone: long-press on a clip, the menu as a bottom sheet |
 | `tutorial-step2-desktop.png` | Tutorial step 2: dashed outlines where the kicks go, the instruction on the display, the card moved off the Kick row |
 | `tutorial-step6-phone.png` | Tutorial step 6 on a phone: spotlight on scene 1, the instruction on the card |
+| `phone-rail-once.png` | Phone rail: SCENE / SONG (the lit one is what Play plays) and Loop / Once, always both |
+| `phone-move-bar.png` | Phone: Move / copy to…, the instruction and Cancel stay up until you tap the cell |
+| `phone-help.png` | Help on a phone: Controls / Tutorial / About, controls by input, rows stacked |
+| `desktop-help-about.png` | Help → About |

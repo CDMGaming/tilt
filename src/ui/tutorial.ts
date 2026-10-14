@@ -11,12 +11,12 @@ import type { App } from "./app";
 import { h } from "./dom";
 import { listLibrary, saveToLibrary } from "./library";
 import { isPhone } from "./phone";
+import { byInput, pollGamepad, watchInput } from "./lastinput";
 import { STORE_PREFIX } from "./storage";
 
 const KEY = STORE_PREFIX + "tutorial.v1";
 export const TUTORIAL_TITLE = "My first song";
 
-type Input = "mouse" | "keyboard" | "gamepad" | "touch";
 interface Saved { step: number; libId?: string; finished?: boolean; dismissed?: boolean }
 
 function load(): Saved | null {
@@ -26,20 +26,7 @@ function store(s: Saved) {
   try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* storage blocked */ }
 }
 
-// ---------------------------------------------------------------- the last input used
-
-let lastInput: Input | null = null;
-function watchInput() {
-  window.addEventListener("pointerdown", (e) => (lastInput = e.pointerType === "mouse" ? "mouse" : "touch"), true);
-  window.addEventListener("keydown", () => (lastInput = "keyboard"), true);
-}
-function pollGamepad() {
-  for (const p of navigator.getGamepads?.() ?? []) if (p?.buttons.some((b) => b.pressed) || p?.axes.some((a) => Math.abs(a) > 0.5)) { lastInput = "gamepad"; return; }
-}
-const input = (): Input => lastInput ?? (isPhone() ? "touch" : "mouse");
-
-/** Pick the hint for the input in use. */
-const by = (m: string, k: string, g: string, t: string) => ({ mouse: m, keyboard: k, gamepad: g, touch: t })[input()];
+const by = byInput;
 
 // ---------------------------------------------------------------- the steps
 
@@ -310,3 +297,4 @@ export function tutorialLabel(): string {
   return s && !s.finished && s.step > 0 ? `🎓 First song tutorial (step ${s.step + 1})…` : "🎓 First song tutorial…";
 }
 export function tutorialResumable(): boolean { const s = load(); return !!s && !s.finished && s.step > 0; }
+export function tutorialStatus() { const s = load(); return { step: s?.step ?? 0, finished: !!s?.finished, total: STEPS.length }; }

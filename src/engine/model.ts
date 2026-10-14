@@ -82,6 +82,8 @@ export interface Song {
   key: number; // 0 = C .. 11 = B
   scale: string; // id from music.ts SCALES
   songLoop: boolean;
+  /** SCENE mode: false plays the scene once and stops (missing / true: it loops). */
+  sceneLoop?: boolean;
   metronome: boolean;
   tracks: Track[];
   scenes: Scene[];

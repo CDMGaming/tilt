@@ -373,3 +373,11 @@ Deno.test("sceneColor: quick names have colours, copies and numbers keep them", 
   assertEquals(sceneColor("Scene 3"), null);
   assertEquals(new Set(QUICK_SCENES.map((q) => q.color)).size, QUICK_SCENES.length);
 });
+
+Deno.test("scene played once: no next instance; looping: the same scene again", () => {
+  const song = songFromSetup({ key: 0, scale: "minor", tempo: 120, swing: 0, lineup: [{ kind: "drums", preset: 0 }] });
+  const id = song.scenes[0].id;
+  const first = firstInstance(song, { kind: "scene", sceneId: id, once: true }, 0)!;
+  assertEquals(nextInstance(song, { kind: "scene", sceneId: id, once: true }, first), null);
+  assertEquals(nextInstance(song, { kind: "scene", sceneId: id }, first)!.sceneId, id);
+});

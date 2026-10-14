@@ -1046,3 +1046,28 @@ body.phone .song-grid .cell, body.phone .song-grid .scene-head, body.phone .song
 body.phone .coach-card, body.phone .coach-offer { bottom: calc(76px + env(safe-area-inset-bottom)); left: 12px; right: 12px; width: auto; }
 .coach-card.at-top { top: 72px; bottom: auto; }
 body.phone .coach-card.at-top { top: calc(70px + env(safe-area-inset-top)); bottom: auto; }
+
+/* Phone rail: SCENE / SONG stacked, the one Play uses lit; Loop (or Once) next to it. */
+.rail-btn.mode-rail { flex-direction: column; gap: 3px; justify-content: center; }
+.mode-mini { font: 700 9px var(--font-display); letter-spacing: .08em; padding: 2px 5px; border-radius: 4px; color: var(--dim); line-height: 1.1; }
+.mode-mini.on { background: var(--dmd); color: #1a0f00; box-shadow: 0 0 8px color-mix(in srgb, var(--dmd) 55%, transparent); }
+.rail-btn.loop-rail.on .rail-glyph { color: var(--dmd); }
+.rail-btn.loop-rail:not(.on) .rail-glyph { opacity: .45; }
+
+/* Moving a clip: the instruction and Cancel stay on screen until it's dropped. */
+.carry-bar { position: sticky; top: 0; left: 0; z-index: 4; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; padding: 8px 12px;
+  border-radius: var(--r-m); background: color-mix(in srgb, var(--yellow) 16%, var(--panel)); border: 1px dashed var(--yellow); font-size: 13px; }
+
+/* Help: Controls / Tutorial / About, and the controls by input */
+.help-tabs { display: flex; gap: 4px; padding: 3px; background: var(--well); border-radius: calc(var(--r-m) + 3px); }
+.help-tab { flex: 1; font: 700 12px var(--font-display); letter-spacing: .1em; text-transform: uppercase; background: transparent; border-color: transparent; box-shadow: none; color: var(--dim); }
+.help-tab.on, button.help-tab.on:hover:not(:disabled) { background: var(--dmd); color: #1a0f00; border-color: transparent; }
+.help-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.chip-tab { padding: 4px 12px; border-radius: 999px; font-size: 12px; }
+.chip-tab.on, button.chip-tab.on:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 22%, var(--raise)); border-color: var(--accent); color: var(--ink); }
+.help-page { min-height: 300px; }
+.help-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.about-logo { display: flex; justify-content: center; margin: 6px 0 10px; color: var(--dmd); filter: drop-shadow(0 0 8px color-mix(in srgb, var(--dmd) 40%, transparent)); }
+body.phone .help tr { display: block; padding: 6px 0; border-bottom: 1px solid var(--line); }
+body.phone .help td { display: block; padding: 0; border: none; }
+body.phone .help td:first-child { font-weight: 700; color: var(--accent); margin-bottom: 2px; }

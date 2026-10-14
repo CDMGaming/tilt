@@ -654,7 +654,19 @@ export class App {
       const row = this.screenName === "song" ? Math.max(0, this.songCur.row) : this.song.scenes.findIndex((s) => s.id === this.ed.sceneId);
       return { kind: "song" as const, fromIndex: Math.max(0, Math.min(row, this.song.scenes.length - 1)) };
     }
-    return { kind: "scene" as const, sceneId: this.currentSceneId() };
+    return { kind: "scene" as const, sceneId: this.currentSceneId(), once: this.song.sceneLoop === false };
+  }
+
+  /** Loop: on for the mode in use? SCENE: the scene loops (off: once). SONG: back to the start at the end. */
+  loopOn(): boolean { return this.songMode === "song" ? this.song.songLoop : this.song.sceneLoop !== false; }
+
+  toggleLoop() {
+    const song = this.song, on = !this.loopOn();
+    this.edit(this.songMode === "song" ? "Song loop" : "Scene loop", () => { if (this.songMode === "song") song.songLoop = on; else song.sceneLoop = on; });
+    // A scene that's playing picks up the change at its end.
+    const pos = this.engine.position();
+    if (pos && this.songMode === "scene") this.engine.queue({ kind: "scene", sceneId: pos.sceneId, once: !on });
+    this.overlays.toast(this.songMode === "song" ? (on ? "SONG LOOPS" : "SONG PLAYS ONCE") : (on ? "SCENE LOOPS" : "SCENE PLAYS ONCE"), 1200);
   }
 
   /**
@@ -668,9 +680,9 @@ export class App {
     const pos = this.engine.position();
     if (pos) {
       const i = Math.max(0, this.song.scenes.findIndex((s) => s.id === pos.sceneId));
-      this.engine.queue(m === "scene" ? { kind: "scene", sceneId: pos.sceneId } : { kind: "song", fromIndex: i });
+      this.engine.queue(m === "scene" ? { kind: "scene", sceneId: pos.sceneId, once: this.song.sceneLoop === false } : { kind: "song", fromIndex: i });
     }
-    this.overlays.toast(m === "scene" ? "SCENE: play loops the scene" : this.song.songLoop ? "SONG: plays the scenes in order, then again" : "SONG: plays the scenes in order", 1400);
+    this.overlays.toast(m === "scene" ? (this.loopOn() ? "SCENE: loops the scene" : "SCENE: plays the scene once") : this.loopOn() ? "SONG: all the scenes, then again" : "SONG: all the scenes, once", 1400);
     this.refresh();
   }
 
@@ -679,11 +691,12 @@ export class App {
     const song = this.song, n = song.scenes.length, pos = this.engine.position();
     if (this.songMode === "song") {
       const i = pos ? song.scenes.findIndex((s) => s.id === pos.sceneId) : (this.playMode() as { fromIndex: number }).fromIndex;
-      return `SONG ${Math.max(0, i) + 1}/${n}${song.songLoop ? (narrow ? "+" : " LOOP") : ""}`;
+      return `SONG ${Math.max(0, i) + 1}/${n}${song.songLoop ? (narrow ? " LP" : " LOOP") : ""}`;
     }
     const id = pos ? pos.sceneId : this.currentSceneId();
     const i = song.scenes.findIndex((s) => s.id === id);
-    return narrow ? `LOOP ${i + 1}` : `LOOP SCENE ${i + 1}`;
+    const loop = song.sceneLoop !== false;
+    return narrow ? `SC ${i + 1}${loop ? " LP" : ""}` : loop ? `LOOP SCENE ${i + 1}` : `SCENE ${i + 1} ONCE`;
   }
 
   currentSceneId(): number {
@@ -1018,7 +1031,8 @@ export class App {
 
   openSystemMenu?: () => void;
   openHelp?: () => void;
-  openTutorial?: () => void;
+  /** The tutorial: picks up where you left off, or `fresh` starts over. */
+  openTutorial?: (fresh?: boolean) => void;
   /** The tutorial's current instruction (the dot-matrix display shows it), or null. */
   coach: { step: number; total: number; text: string } | null = null;
   /** Outlines the piano roll draws where notes should go (the tutorial's kicks), or null. */
