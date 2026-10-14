@@ -12,7 +12,7 @@ import { newSong, type InstrumentKind } from "../engine/model";
 import { NOTE_NAMES, SCALES, scaleById } from "../engine/music";
 import { randomSeed } from "../engine/rng";
 import type { Action } from "./actions";
-import { App, STORE_PREFIX, type Screen } from "./app";
+import { App, STORE_PREFIX, TIMER_CHOICES, type Screen } from "./app";
 import { h } from "./dom";
 import { SpatialNav } from "./nav";
 import { challengeById } from "../engine/challenges";
@@ -22,7 +22,6 @@ import { dmdText } from "./dmd";
 import { gameModeDialog } from "./dialogs";
 import type { MenuItem } from "./overlay";
 
-const TIMERS = [0, 10, 20, 30];
 const RANGES: [number, number][] = [[1, 3], [2, 4], [3, 5], [4, 6], [5, 8]];
 const SETUPS_KEY = STORE_PREFIX + "setups.v1";
 
@@ -125,7 +124,7 @@ export class DiceScreen implements Screen {
         h("button", { class: "roll-btn nudge-btn", "data-nav": "nudge", onclick: () => this.nudge(), title: "Re-roll everything that isn't held (Y / Space)" }, "NUDGE", h("small", null, "Y / Space")),
         h("div", { class: "timer-pick" },
           h("div", { class: "die-label" }, "Timer ", h("button", { class: "link-btn", "data-nav": "game-mode", onclick: () => gameModeDialog(app, () => this.changed()) }, app.settings.gameMode ? "Game mode: on…" : "Game mode…")),
-          h("div", { class: "seg" }, TIMERS.map((m) => h("button", { class: "seg-btn" + (d.minutes === m ? " on" : ""), "data-nav": `t${m}`, onclick: () => { d.minutes = m; this.changed(); } }, m ? `${m} min` : "Off")))),
+          h("div", { class: "seg" }, TIMER_CHOICES.map((m) => h("button", { class: "seg-btn" + (d.minutes === m ? " on" : ""), "data-nav": `t${m}`, onclick: () => { d.minutes = m; this.changed(); } }, m ? `${m} min` : "Off")))),
         this.cardsOn ? h("div", { class: "timer-pick" },
           h("div", { class: "die-label" }, "Challenges"),
           h("div", { class: "seg" }, [0, 1, 2, 3].map((c) => h("button", { class: "seg-btn" + (d.cards === c ? " on" : ""), "data-nav": `cards${c}`, onclick: () => { d.cards = c; d.setup = nudgeSetup(d.setup, { key: true, scale: true, tempo: true, swing: true }, this.heldSpec(), randomSeed(), c); this.changed(); } }, c ? String(c) : "Off")))) : "",

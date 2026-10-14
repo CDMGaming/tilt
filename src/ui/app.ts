@@ -99,11 +99,15 @@ const SONG_KEY = STORE_PREFIX + "song.v1";
 const SETTINGS_KEY = STORE_PREFIX + "settings.v1";
 const DICE_KEY = STORE_PREFIX + "dice.v1";
 
-export interface DiceState { setup: Setup; holds: Holds; spec: LineupSpec; minutes: number; cards: number }
+export interface DiceState { setup: Setup; holds: Holds; spec: LineupSpec; minutes: number; cards: number; v?: number }
+
+/** The setup screen's timer choices (0 = off) and the one a new player starts with. */
+export const TIMER_CHOICES = [0, 5, 10, 15, 20];
+const DEFAULT_MINUTES = 10;
 
 /** The last setup screen (holds and lineup choices included), or a fresh one: timer off, nothing held. */
 function loadDice(): DiceState {
-  const fresh = (): DiceState => ({ setup: nudgeSetup(null, NO_HOLDS, defaultSpec()), holds: { ...NO_HOLDS }, spec: defaultSpec(), minutes: 0, cards: 0 });
+  const fresh = (): DiceState => ({ setup: nudgeSetup(null, NO_HOLDS, defaultSpec()), holds: { ...NO_HOLDS }, spec: defaultSpec(), minutes: DEFAULT_MINUTES, cards: 0, v: 2 });
   try {
     const raw = localStorage.getItem(DICE_KEY);
     if (!raw) return fresh();
@@ -113,7 +117,9 @@ function loadDice(): DiceState {
     const spec = { ...f.spec, ...(d.spec ?? {}) };
     spec.slots = [...(spec.slots ?? []), ...f.spec.slots].slice(0, f.spec.slots.length);
     spec.presets = [...(spec.presets ?? []), ...f.spec.presets].slice(0, f.spec.presets.length);
-    return { setup: d.setup, holds: { ...f.holds, ...(d.holds ?? {}) }, spec, minutes: d.minutes ?? 0, cards: d.cards ?? 0 };
+    // Before v2 the timer was off by default and offered 10 / 20 / 30: start those at the new default.
+    const minutes = d.v === 2 && TIMER_CHOICES.includes(d.minutes ?? -1) ? d.minutes! : DEFAULT_MINUTES;
+    return { setup: d.setup, holds: { ...f.holds, ...(d.holds ?? {}) }, spec, minutes, cards: d.cards ?? 0, v: 2 };
   } catch { return fresh(); }
 }
 
