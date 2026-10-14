@@ -29,7 +29,8 @@ jobs:
           # The ID is 32 hex characters; take it out of a longer paste (a dashboard URL, a label).
           account=$(printf %s "$RAW_ACCOUNT" | tr 'A-F' 'a-f' | grep -oE '[0-9a-f]{32}' | head -1 || true)
           if [ -z "$account" ]; then echo "::error::CLOUDFLARE_ACCOUNT_ID has no 32-character account ID in it"; exit 1; fi
-          token=$(printf %s "$RAW_TOKEN" | tr -d '[:space:]"')
+          # Just the token, even from a pasted `-H "Authorization: Bearer <token>"` line.
+          token=$(printf %s "$RAW_TOKEN" | sed -E 's/.*Bearer[[:space:]]+//' | tr -d '[:space:]"'"'"'')
           echo "::add-mask::$account"
           echo "::add-mask::$token"
           echo "account id: found ($(printf %s "$RAW_ACCOUNT" | grep -oE '[0-9a-fA-F]{32}' | wc -l) candidate(s) in the secret)"
