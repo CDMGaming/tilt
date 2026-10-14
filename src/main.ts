@@ -14,6 +14,7 @@ import { bindRightClick } from "./ui/rightclick";
 import { Scope } from "./ui/scope";
 import { getSample } from "./ui/samples";
 import { audioSessionPlayback, keepStorage, watchPhone } from "./ui/phone";
+import { takeCodeFromUrl } from "./ui/share";
 
 const root = document.getElementById("app")!;
 audioSessionPlayback();
@@ -41,6 +42,7 @@ app.stuck = () => phraseGridDialog(app, { sceneId: app.currentSceneId(), onDone:
 app.engine.userSampleLoader = async (id) => { const s = await getSample(id); return s && { data: s.data, rate: s.rate }; };
 await app.boot(App.savedSong() ?? newSong());
 app.show("dice");
+takeCodeFromUrl(app);
 
 // First visit: show the controls once.
 try {

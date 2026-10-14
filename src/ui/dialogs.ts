@@ -11,6 +11,7 @@ import { encodeWav, peakDb } from "../engine/wav";
 import type { App } from "./app";
 import { download, h } from "./dom";
 import { libraryDialog, safeName } from "./library";
+import { shareCodeDialog } from "./share";
 import { challengeStatus } from "../engine/challenges";
 import { phraseGridDialog } from "./phrasegrid";
 import { exportMidi } from "../engine/smf";
@@ -356,6 +357,7 @@ export function systemMenu(app: App, newJam: () => void) {
     { label: "▤ Songs (library)…", run: () => libraryDialog(app, { onOpen: () => app.show("song") }) },
     { label: app.couch ? "🛋 Back to the couch" : "👥 Together: couch or online…", run: () => (app.couch ? app.show("couch") : playTogetherDialog(app)) },
     { label: "⬇ Export (WAV, stems, MIDI)…", run: () => exportDialog(app) },
+    { label: "🎲 Share setup code…", disabled: !app.song.tracks.length, run: () => shareCodeDialog(app) },
     { label: "⚙ Settings…", run: () => settingsDialog(app) },
     { label: "🎮 Game mode…", checked: app.settings.gameMode, run: () => gameModeDialog(app, () => app.refresh()) },
     { label: "💡 Stuck? Phrase grid for this scene…", disabled: app.locked, run: () => phraseGridDialog(app, { sceneId: app.currentSceneId(), onDone: () => app.refresh() }) },
@@ -406,6 +408,7 @@ export function helpDialog(app: App) {
       row("NUDGE (Y, Space)", "Re-roll everything that isn't held.  Release all: let go of every hold"),
       row("Setups ▾ / Save setup…", "Save the held fields and slots under a name; loading one brings them back held"),
       row("Game mode…", "Challenge cards, lock at zero, extra ball, the TILT flash (off by default)"),
+      row("🎲 code (Song screen, top left)", "Share the song's setup code: copy it, copy a link that opens TILT with it, or start a new song from it. Also in the TILT menu and Songs…"),
     ),
     h("button", { class: "row-btn primary", "data-nav": "done", onclick: close }, "Done"),
   ), { wide: true });

@@ -330,3 +330,21 @@ Deno.test("editing the lineup applies at once and keeps the other slots", async 
   spec.presets[1] = 0;
   assertEquals(conformSetup(grown, spec, 6).lineup[1].preset, 0);
 });
+
+Deno.test("setupFromSong: a song's code as it is now", async () => {
+  const { setupFromSong } = await import("../src/engine/dice.ts");
+  const { addTrack } = await import("../src/engine/songops.ts");
+  const setup = { key: 5, scale: "dorian", tempo: 124, swing: 25, lineup: [{ kind: "drums" as const, preset: 2 }, { kind: "acid" as const, preset: 1 }] };
+  const song = songFromSetup(setup);
+  // Unchanged: the same code it started from.
+  assertEquals(encodeSetup(setupFromSong(song)!), song.setupCode);
+  // Edited: tempo and a new instrument show up, and the code decodes back to them.
+  song.tempo = 98;
+  addTrack(song, "pad", 3);
+  const now = decodeSetup(encodeSetup(setupFromSong(song)!))!;
+  assertEquals(now.tempo, 98);
+  assertEquals(now.lineup.map((l) => [l.kind, l.preset]), [["drums", 2], ["acid", 1], ["pad", 3]]);
+  // A renamed / custom sound falls back to the first one.
+  song.tracks[2].preset = "My own pad";
+  assertEquals(setupFromSong(song)!.lineup[2].preset, 0);
+});

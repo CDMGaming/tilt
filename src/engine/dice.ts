@@ -230,6 +230,22 @@ export function decodeSetup(code: string): Setup | null {
   return setup;
 }
 
+/**
+ * The setup a song is at now, so it can be shared as a code: its key, scale, tempo,
+ * swing, first 8 instruments and their built-in sounds (an edited or custom sound
+ * comes back as the nearest built-in one: the one it was loaded from, else the first).
+ */
+export function setupFromSong(song: Song): Setup | null {
+  const lineup = song.tracks.filter((t) => KIND_CODE.includes(t.kind)).slice(0, 8).map((t) => {
+    const i = INSTRUMENTS[t.kind].presets.findIndex((p) => p.name === t.preset);
+    return { kind: t.kind, preset: i >= 0 && i < 16 ? i : 0 };
+  });
+  if (!lineup.length) return null;
+  const setup: Setup = { key: song.key, scale: song.scale, tempo: Math.max(40, Math.min(295, Math.round(song.tempo))), swing: Math.round(song.swing), lineup };
+  if (song.challenges?.length) setup.cards = [...song.challenges];
+  return setup;
+}
+
 /** A new song from a setup: one scene, one empty one-bar clip per track. */
 export function songFromSetup(s: Setup): Song {
   const song = newSong();

@@ -8,6 +8,7 @@ import { NOTE_NAMES } from "../engine/music";
 import type { App } from "./app";
 import { STORE_PREFIX } from "./storage";
 import { download, h } from "./dom";
+import { shareCodeDialog } from "./share";
 
 const DB_NAME = STORE_PREFIX + "library";
 const STORE = "songs";
@@ -143,6 +144,7 @@ export function libraryDialog(app: App, opts: { onOpen: () => void }) {
       { label: "Duplicate", run: async () => { const s = JSON.parse(JSON.stringify(e.song)) as Song; s.libId = newLibId(); s.title = `${e.title} copy`; await saveToLibrary(s); await refresh(); } },
       { label: "Rename…", run: async () => { const t = prompt("Song title", e.title); if (!t) return; e.song.title = t.slice(0, 40); await saveToLibrary(e.song); if (app.song.libId === e.id) { app.song.title = e.song.title; app.renderHeader(); } await refresh(); } },
       { label: "Export song file", run: () => exportSongFile(e.song) },
+      { label: "Share setup code…", disabled: !e.song.tracks.length, run: () => shareCodeDialog(app, e.song) },
       { label: "Delete", disabled: app.song.libId === e.id, hint: app.song.libId === e.id ? "open now" : "", run: async () => { if (confirm(`Delete "${e.title}"? This can't be undone.`)) { await deleteFromLibrary(e.id); await refresh(); } } },
     ], { x: r.left + 40, y: r.top + 10 });
   };
@@ -163,7 +165,7 @@ export function libraryDialog(app: App, opts: { onOpen: () => void }) {
             onclick: (ev: Event) => actions(e, ev.currentTarget as HTMLElement),
           },
           h("span", { class: "lib-title" }, e.title),
-          h("span", { class: "lib-meta" }, `${e.tracks} tracks · ${e.scenes} scene${e.scenes === 1 ? "" : "s"}`),
+          h("span", { class: "lib-meta" }, `${e.tracks} tracks · ${e.scenes} scene${e.scenes === 1 ? "" : "s"}`, e.code ? h("span", { class: "lib-code" }, ` · 🎲 ${e.code}`) : ""),
           h("span", { class: "lib-date" }, fmt(e.updated))))),
     );
   }, { wide: true });

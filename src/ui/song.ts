@@ -1,7 +1,7 @@
 // Song screen: tracks (columns) x scenes (rows); each cell is a clip.
 
 import { canArrange, autoArrange } from "../engine/arranger";
-import { pickPreset, usedPresets } from "../engine/dice";
+import { encodeSetup, pickPreset, setupFromSong, usedPresets } from "../engine/dice";
 import { ALL_KINDS, INSTRUMENTS, isDrumKind } from "../engine/instruments";
 import { MAX_BARS, TICKS_PER_BAR, newId, type Clip, type Scene, type Track } from "../engine/model";
 import {
@@ -14,6 +14,7 @@ import { instrumentPicker } from "./dialogs";
 import { h } from "./dom";
 import { trackColor } from "./theme";
 import type { MenuItem } from "./overlay";
+import { shareCodeDialog } from "./share";
 
 export class SongScreen implements Screen {
   el = h("div", { class: "song-screen" });
@@ -46,7 +47,11 @@ export class SongScreen implements Screen {
     // header row
     at(-1, -1, h("div", { class: "corner" },
       h("div", { class: "song-title" }, song.title),
-      h("div", { class: "corner-sub" }, song.setupCode ? `🎲 ${song.setupCode}` : "")));
+      (() => {
+        // The song's setup code as it is now: click to copy, link or share it.
+        const now = setupFromSong(song);
+        return now ? h("button", { class: "corner-sub code-btn", "data-nav": "share-code", title: "Share this song's setup code", onclick: (e: Event) => { e.stopPropagation(); shareCodeDialog(app); } }, `🎲 ${encodeSetup(now)}`) : "";
+      })()));
     song.tracks.forEach((t, c) => at(-1, c, this.trackHeader(t, c)));
     at(-1, cols, h("div", { class: "add-track", title: "Add an instrument" }, h("span", { class: "add-plus" }, "+"), h("span", { class: "add-label" }, "Track")));
 
