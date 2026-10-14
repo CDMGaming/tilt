@@ -1,0 +1,11 @@
+# TILT on Cloudflare Pages: https://tilt-jam.pages.dev
+# The built app (dist/) plus functions/relay.ts, which hands /relay to the relay
+# Durable Object in cloud/ (deployed first, as its own worker).
+name = "tilt-jam"
+pages_build_output_dir = "dist"
+compatibility_date = "2025-06-01"
+
+[[durable_objects.bindings]]
+name = "RELAY"
+class_name = "RelayRoom"
+script_name = "tilt-jam-relay"

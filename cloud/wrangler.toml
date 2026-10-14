@@ -1,0 +1,14 @@
+# The online relay (a Durable Object). Reached only through the app's /relay route.
+name = "tilt-jam-relay"
+main = "relay-worker.ts"
+compatibility_date = "2025-06-01"
+workers_dev = false
+preview_urls = false
+
+[[durable_objects.bindings]]
+name = "RELAY"
+class_name = "RelayRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RelayRoom"]
