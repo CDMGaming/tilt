@@ -803,3 +803,50 @@ body.phone .dice-bar .roll-btn, body.phone .dice-bar .go-btn { padding: 8px 14px
 /* Centre the reels and the share row in the space above the bar. */
 .dice-foot { margin-top: 0; margin-bottom: auto; }
 .dice-head { margin-top: auto; }
+
+/* ---------- H: each instrument its own nameplate and knob style (subtle; built from its identity colour) ---------- */
+/* Knob parts read these, so an instrument can restyle them without new markup (the 8-knob order never changes). */
+.knob-track { stroke-width: var(--arc-w, 4.5); stroke-dasharray: var(--arc-dash, none); stroke-linecap: var(--arc-cap, round); }
+.knob-val { stroke-width: var(--arc-w, 4.5); stroke-dasharray: var(--arc-dash, none); stroke-linecap: var(--arc-cap, round); }
+.knob-cap { fill: var(--cap-fill, var(--raise)); stroke: var(--cap-edge, var(--line-strong)); stroke-width: var(--cap-edge-w, 1); stroke-dasharray: var(--cap-dash, none); }
+.knob-dot { stroke: var(--knob-dot, var(--ink)); stroke-width: var(--dot-w, 2.5); }
+.knob:hover .knob-cap, .knob.turning .knob-cap { fill: var(--cap-hover, var(--raise-hi)); }
+
+/* The nameplate: every instrument has one; its shape and finish are the instrument's own. */
+.panel .inst-name { padding: 3px 10px; border-radius: var(--r-s); border: 1px solid color-mix(in srgb, var(--track) 35%, transparent); background: color-mix(in srgb, var(--track) 8%, transparent); line-height: 1.15; }
+
+/* Kitbox: a stencilled hardware plate; flat caps, chunky arcs. */
+.panel.kind-drums .inst-name { background: var(--track); color: #1a0a0c; border: none; border-radius: 3px; letter-spacing: .2em; box-shadow: inset 0 -2px 0 #0003; }
+.panel.kind-drums { --arc-w: 5.5; --arc-cap: butt; --cap-fill: #241a22; --cap-edge: color-mix(in srgb, var(--track) 40%, #000); }
+/* Thump Lab: brushed metal with screws; knurled caps. */
+.panel.kind-analog .inst-name { color: #2a1607; border: none; border-radius: 4px; padding: 3px 18px;
+  background: radial-gradient(circle at 7px 50%, #0006 0 2px, transparent 2.5px), radial-gradient(circle at calc(100% - 7px) 50%, #0006 0 2px, transparent 2.5px), repeating-linear-gradient(90deg, #ffffff14 0 1px, transparent 1px 3px), var(--track); }
+.panel.kind-analog { --cap-dash: 1.2 1.2; --cap-edge: color-mix(in srgb, var(--track) 70%, #000); --cap-edge-w: 1.6; --cap-fill: #2a2018; }
+/* Squelch: a little LCD window; thin bright arcs. */
+.panel.kind-acid .inst-name { font-family: var(--font-mono); background: #0d1306; color: var(--track); border: 1px solid color-mix(in srgb, var(--track) 45%, #000); box-shadow: inset 0 0 8px #000a; text-shadow: 0 0 6px color-mix(in srgb, var(--track) 60%, transparent); }
+.panel.kind-acid { --arc-w: 3; --cap-fill: #141a10; --knob-dot: var(--track); }
+/* Wobbler: a neon tube in a pill; glowing rims. */
+.panel.kind-wobble .inst-name { border-radius: 999px; background: transparent; border: 2px solid var(--track); box-shadow: 0 0 10px color-mix(in srgb, var(--track) 45%, transparent), inset 0 0 8px color-mix(in srgb, var(--track) 30%, transparent); }
+.panel.kind-wobble { --cap-edge: var(--track); --cap-edge-w: 1.5; --cap-fill: #1f1428; }
+/* Chordette: soft and friendly; cream caps. */
+.panel.kind-poly .inst-name { border-radius: 999px; background: color-mix(in srgb, var(--track) 18%, transparent); border-color: transparent; }
+.panel.kind-poly { --cap-fill: #e7e2d6; --cap-hover: #f4f0e6; --cap-edge: #0004; --knob-dot: #1d2640; }
+/* Haze: a soft gradient haze; translucent caps. */
+.panel.kind-pad .inst-name { border: none; background: linear-gradient(90deg, color-mix(in srgb, var(--track) 30%, transparent), transparent); border-radius: var(--r-m) 0 0 var(--r-m); }
+.panel.kind-pad { --cap-fill: color-mix(in srgb, var(--track) 16%, var(--raise)); --cap-edge: color-mix(in srgb, var(--track) 35%, transparent); --arc-w: 3.5; }
+/* Razor: a slanted blade; long thin pointers. */
+.panel.kind-lead .inst-name { transform: skewX(-12deg); border-radius: 2px; background: color-mix(in srgb, var(--track) 14%, transparent); border-left: 4px solid var(--track); }
+.panel.kind-lead { --dot-w: 1.6; --knob-dot: var(--track); --arc-w: 3.5; }
+/* Pixel: chunky pixel frame; segmented LED arcs. */
+.panel.kind-chip .inst-name { font-family: var(--font-mono); border-radius: 0; border: none; background: color-mix(in srgb, var(--track) 14%, transparent);
+  box-shadow: 0 0 0 2px var(--track), 4px 4px 0 0 color-mix(in srgb, var(--track) 40%, #000); }
+.panel.kind-chip { --arc-dash: 2.4 1.6; --arc-cap: butt; --arc-w: 5; --cap-fill: #1b1838; }
+/* Glint: engraved metal; fine arcs, bright edges. */
+.panel.kind-fm .inst-name { background: linear-gradient(180deg, #ffffff12, transparent 60%), color-mix(in srgb, var(--track) 10%, transparent); border: 1px solid color-mix(in srgb, var(--track) 60%, transparent); letter-spacing: .18em; font-weight: 600; }
+.panel.kind-fm { --arc-w: 2.5; --cap-edge: color-mix(in srgb, var(--track) 70%, transparent); --cap-fill: #23252a; }
+/* Morph: a two-tone wave plate; dotted arcs. */
+.panel.kind-wave .inst-name { background: linear-gradient(110deg, color-mix(in srgb, var(--track) 26%, transparent) 50%, transparent 50%); border-color: color-mix(in srgb, var(--track) 50%, transparent); }
+.panel.kind-wave { --arc-dash: 0.1 3.4; --arc-w: 4.5; --cap-fill: #14241a; }
+/* Grab: a strip of label tape; dark-rimmed caps. */
+.panel.kind-sampler .inst-name { background: #e8e4d8; color: #222; border: none; border-radius: 2px; transform: rotate(-1.2deg); box-shadow: 0 2px 4px #0006; letter-spacing: .1em; }
+.panel.kind-sampler { --cap-edge: #000; --cap-edge-w: 2; --cap-fill: #2b3040; }
