@@ -602,3 +602,36 @@ body.phone .couch:has(.quad.mine) .couch-cell { display: none; }
 body.phone .couch:has(.quad.mine) .couch-cell:has(.quad.mine) { display: flex; grid-row: 1; grid-column: 1; }
 body.phone .couch:has(.quad.mine) .couch-strip { grid-row: 2; grid-column: 1; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
 body.phone .tb-trackname { white-space: nowrap; }
+/* The compact toolbar's roll tools: inline in one row, except on a portrait phone where they get the second row. */
+.tb-tools { display: contents; }
+@media (orientation: portrait) {
+  body.phone .couch-ed .ed-toolbar { flex-wrap: wrap; overflow-x: visible; row-gap: 4px; }
+  body.phone .couch-ed .ed-toolbar .menu-btn { margin-left: auto; }
+  body.phone .couch-ed .tb-tools { display: flex; flex-basis: 100%; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+  body.phone .couch-ed .tb-tools .tb-label { display: none; }
+}
+.couch-ed .ed-toolbar .menu-btn { order: 1; } /* last in the single row */
+@media (orientation: portrait) {
+  body.phone .couch-ed .ed-toolbar .menu-btn { order: 0; }
+  body.phone .couch-ed .tb-tools { order: 2; }
+}
+@media (orientation: portrait) {
+  body.phone .couch-ed .ed-toolbar { gap: 4px; padding: 4px; }
+  body.phone .couch-ed .tb-group { gap: 2px; }
+  body.phone .couch-ed .tb-group.tabs .tb-btn { min-width: 0; padding-left: 9px; padding-right: 9px; }
+  body.phone .couch-ed .tb-btn { padding-left: 8px; padding-right: 8px; }
+  body.phone .couch-ed .tb-tools { min-width: 0; max-width: 100%; justify-content: space-between; }
+}
+@media (orientation: portrait) {
+  /* Narrow phones (360 px): the bars share the width instead of pushing the page wider. */
+  body.phone #app { width: 100vw; overflow: hidden; }
+  body.phone .rail { min-width: 0; }
+  body.phone .rail-btn { width: auto; flex: 1 1 0; min-width: 0; }
+  body.phone .rail-left .rail-gap { display: none; }
+}
+body.phone .editor, body.phone .couch-ed .ed-toolbar { min-width: 0; }
+@media (orientation: portrait) and (max-width: 374px) {
+  body.phone .couch-ed .tb-tools .tb-btn { padding-left: 5px; padding-right: 5px; }
+  body.phone .couch-ed .tb-tools { gap: 3px; }
+  body.phone .couch-ed .tb-tools .tb-value { min-width: 0; padding: 0 3px; }
+}
