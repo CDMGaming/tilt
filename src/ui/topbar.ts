@@ -3,7 +3,8 @@
 import { NOTE_NAMES, scaleById } from "../engine/music";
 import { challengeStatus } from "../engine/challenges";
 import type { App } from "./app";
-import { exportDialog, playTogetherDialog, settingsDialog, songSettings } from "./dialogs";
+import { exportDialog, playTogetherDialog, songSettings } from "./dialogs";
+import { INSTRUMENTS } from "../engine/instruments";
 import { libraryDialog } from "./library";
 import { fmtTime, h } from "./dom";
 import { isPhone } from "./phone";
@@ -20,33 +21,41 @@ export function bindTopbar(app: App, el: HTMLElement) {
     // Desktop: the screen rail down the left (shared with phones), the top strip beside it.
     if (app.screenName === "dice") { el.replaceChildren(screenRail()); return; }
     const playing = app.engine.playing;
-    el.replaceChildren(screenRail(), h("div", { class: "topstrip" },
-      h("button", { class: "brand", onclick: () => app.openSystemMenu?.(), title: "Menu (Start / F1)", "aria-label": "TILT menu" }, dmdText("TILT", { height: 15, slant: 7, unlit: false })),
-      h("button", { class: "chip-btn title", onclick: () => songSettings(app) }, s.title),
-      h("button", { class: "chip-btn", onclick: () => songSettings(app), title: "Key and scale" }, `${NOTE_NAMES[s.key]} ${scaleById(s.scale).name}`),
-      app.engine.externalTempo
-        ? h("button", { class: "chip-btn ext-tempo", onclick: () => songSettings(app), title: "Following external MIDI clock (Settings → MIDI sync)" }, `EXT ${app.engine.externalTempo.toFixed(1)} bpm`)
-        : h("button", { class: "chip-btn", onclick: () => songSettings(app), title: "Tempo, swing, tap" }, `${s.tempo} bpm${s.swing ? ` · swing ${s.swing}%` : ""}`),
+    el.replaceChildren(screenRail(), h("div", { class: "backbox" },
+      display(),
       h("div", { class: "transport" },
         h("button", { class: "tp-btn" + (playing ? " on" : ""), onclick: () => app.togglePlay(), title: "Play / stop (Y, Space)" }, playing ? "■" : "▶"),
         h("button", { class: "tp-btn rec" + (app.recording ? " on" : ""), onclick: () => app.toggleRecord(), title: "Record (hold Y, Shift+Space)" }, "●"),
         h("button", { class: "tp-btn mode", onclick: () => { app.songMode = app.songMode === "scene" ? "song" : "scene"; render(); }, title: "Loop the scene, or play the whole song" },
           app.songMode === "scene" ? "⟳ Scene" : s.songLoop ? "⟳ Song" : "→ Song"),
         h("button", { class: "tp-btn" + (s.metronome ? " on" : ""), onclick: () => app.edit("Metronome", () => (s.metronome = !s.metronome)), title: "Metronome" }, "♩")),
-      timerEl,
       s.challenges?.length ? (() => {
         const st = challengeStatus(s);
         return h("button", { class: "chip-btn", title: st.map((c) => `${c.met ? "✓" : "○"} ${c.text}`).join("\n"), onclick: () => app.overlays.dialog("Challenge cards", (close) => h("div", { class: "form" },
           st.map((c) => h("p", { class: "note big" }, `${c.met ? "✅" : "⬜"} ${c.text}`)),
           h("button", { class: "row-btn primary", "data-nav": "ok", onclick: close }, "Back to it"))) }, `🃏 ${st.filter((c) => c.met).length}/${st.length}`);
       })() : "",
-      app.locked ? h("span", { class: "locked-badge" }, "LOCKED") : "",
-      h("div", { class: "spacer" }),
-      h("button", { class: "chip-btn", onclick: () => exportDialog(app), title: "Export WAV, stems or MIDI" }, "⬇ Export"),
-      h("button", { class: "chip-btn", onclick: () => app.toggleScope?.(), title: "Oscilloscope" }, "∿"),
-      h("button", { class: "chip-btn", onclick: () => settingsDialog(app), title: "Settings" }, "⚙"),
     ));
     updateTimer();
+  };
+
+  /**
+   * The backbox display: one dot-matrix panel. The timer (largest; FREE PLAY without one),
+   * key / scale / tempo, and where you are (scene, instrument). Click: song settings.
+   */
+  const timerCell = h("div", { class: "dmd-timer" });
+  const infoCell = h("div", { class: "dmd-info" });
+  const display = () => {
+    const s = app.song;
+    const tempo = app.engine.externalTempo ? `EXT ${app.engine.externalTempo.toFixed(1)}` : `${s.tempo}`;
+    const scene = s.scenes.find((x) => x.id === app.currentSceneId());
+    const track = app.screenName === "song" || app.screenName === "mix" ? app.selectedTrack() : app.track();
+    const line1 = `${NOTE_NAMES[s.key]} ${scaleById(s.scale).name}  ${tempo} BPM${s.swing ? `  SW ${s.swing}%` : ""}`;
+    const line2 = app.locked ? "LOCKED" : [scene?.name, track && INSTRUMENTS[track.kind].name].filter(Boolean).join(" . ");
+    infoCell.replaceChildren(
+      h("div", { class: "dmd-line" }, dmdText(line1, { height: 11 })),
+      h("div", { class: "dmd-line" + (app.locked ? " locked" : "") }, dmdText(line2, { height: 11 })));
+    return h("button", { class: "dmd-display", onclick: () => songSettings(app), title: `${s.title}: key, scale, tempo, swing (click to change)` }, timerCell, infoCell);
   };
 
   const icon = (glyph: string, label: string, onclick: () => void, cls = "", disabled = false, title = label) =>
@@ -60,6 +69,9 @@ export function bindTopbar(app: App, el: HTMLElement) {
     const s = app.song, none = !s.tracks.length;
     const on = (name: string) => (app.screenName === name ? " on" : "");
     return h("nav", { class: "rail rail-screens", "aria-label": "Screens" },
+      isPhone() ? "" : h("button", { class: "rail-btn brand", onclick: () => app.openSystemMenu?.(), title: "Menu (Start / F1): song, settings, scope, export...", "aria-label": "Menu" },
+        h("span", { class: "rail-glyph" }, dmdText("TILT", { height: 11, slant: 7, unlit: false })), h("span", { class: "rail-label" }, "Menu")),
+      isPhone() ? "" : h("div", { class: "rail-sep" }),
       ...(app.couch
         ? [icon(app.couch.online ? "🌐" : "🛋", app.couch.online ? app.couch.online.room : "Couch", () => app.show("couch"), "on", false, "Back to the shared screen")]
         : [
@@ -72,7 +84,8 @@ export function bindTopbar(app: App, el: HTMLElement) {
       icon("▤", "Songs", () => libraryDialog(app, { onOpen: () => app.show("song") }), "", false, "Song library"),
       h("div", { class: "rail-sep" }),
       app.couch ? "" : icon("👥", "Together", () => playTogetherDialog(app), "", none, "Play together: couch or online"),
-      icon("💡", "Stuck?", () => app.stuck?.(), "", app.locked || none, "Stuck? Ideas for this scene"));
+      icon("💡", "Stuck?", () => app.stuck?.(), "", app.locked || none, "Stuck? Ideas for this scene"),
+      isPhone() ? "" : icon("⬇", "Export", () => exportDialog(app), "", none, "Export WAV, stems or MIDI"));
   };
   /**
    * Phones (after Flip): two rails. Left: menu, song info, undo / redo, metronome, record, play.
@@ -102,11 +115,18 @@ export function bindTopbar(app: App, el: HTMLElement) {
   };
 
   const updateTimer = () => {
-    const t = app.timer;
+    const t = app.timer, left = app.timeLeft();
+    const state = t.done ? " done" : t.running && left < 60 ? " hurry" : "";
+    if (!isPhone()) {
+      timerCell.className = "dmd-timer" + state;
+      timerCell.replaceChildren(t.running || t.done
+        ? dmdText(t.done ? "0:00" : fmtTime(left), { height: 30 })
+        : h("div", { class: "free-play" }, dmdText("FREE", { height: 13 }), dmdText("PLAY", { height: 13 })));
+      return;
+    }
     if (!t.running && !t.done) { timerEl.textContent = ""; timerEl.className = "timer"; return; }
-    const left = app.timeLeft();
     timerEl.replaceChildren(dmdText(t.done ? "0:00" : fmtTime(left), { height: 16 }));
-    timerEl.className = "timer on" + (t.done ? " done" : left < 60 ? " hurry" : "");
+    timerEl.className = "timer on" + state;
   };
   app.renderHeader = render;
   let last = "";

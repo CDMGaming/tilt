@@ -700,3 +700,19 @@ body.phone .rail-screens { grid-column: 3; grid-row: 1; border-left: 1px solid v
   body.phone .rail-screens { grid-column: 1; grid-row: 3; border-left: none; border-top: 1px solid var(--line); justify-content: space-around; }
   body.phone .rail-screens .rail-gap, body.phone .rail-screens .rail-sep { display: none; }
 }
+
+/* ---------- B: the backbox (one dot-matrix display + transport) ---------- */
+body:not(.phone) .backbox { grid-column: 2; grid-row: 1; display: flex; align-items: center; gap: 12px; padding: 6px 12px; background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0; }
+.dmd-display { display: flex; align-items: center; gap: 14px; min-width: 0; max-width: 560px; padding: 6px 14px; border-radius: var(--r-m);
+  background: #07090f; border: 1px solid #2a2016; box-shadow: inset 0 0 18px #000c, 0 0 0 1px #0008; color: var(--dmd); cursor: pointer; font: inherit; }
+.dmd-display:hover { border-color: color-mix(in srgb, var(--dmd) 40%, #2a2016); }
+.dmd-timer { flex: none; display: flex; align-items: center; min-width: 84px; justify-content: center; }
+.dmd-timer.hurry { color: var(--rec); animation: pulse .8s infinite; }
+.dmd-timer.done { color: var(--rec); }
+.free-play { display: flex; flex-direction: column; gap: 3px; align-items: center; opacity: .8; }
+.dmd-info { display: flex; flex-direction: column; gap: 5px; min-width: 0; overflow: hidden; position: relative; }
+.dmd-line { white-space: nowrap; overflow: hidden; line-height: 0; }
+.dmd-line.locked { color: var(--rec); }
+.backbox .transport { flex: none; }
+.backbox .chip-btn { flex: none; }
+.rail-btn.brand { color: var(--dmd); }

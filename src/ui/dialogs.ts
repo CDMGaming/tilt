@@ -324,7 +324,7 @@ export function onlineDialog(app: App, mode: "host" | "join") {
 }
 
 export function systemMenu(app: App, newJam: () => void) {
-  app.overlays.menu("TILT", () => [
+  app.overlays.menu(`TILT · ${app.song.title}`, () => [
     ...(app.couch ? [{ label: "End couch mode", run: () => app.endCouch() }] : []),
     { label: app.couch ? "🛋 Back to the couch" : "👥 Play together…", run: () => (app.couch ? app.show("couch") : playTogetherDialog(app)) },
     { label: "New jam (dice)…", run: newJam },
