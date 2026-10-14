@@ -15,6 +15,7 @@ import { Scope } from "./ui/scope";
 import { getSample } from "./ui/samples";
 import { audioSessionPlayback, keepStorage, watchPhone } from "./ui/phone";
 import { takeCodeFromUrl } from "./ui/share";
+import { takeSharedFromUrl } from "./ui/sharesong";
 import { Tutorial, offerTutorial } from "./ui/tutorial";
 
 const root = document.getElementById("app")!;
@@ -47,6 +48,7 @@ app.engine.userSampleLoader = async (id) => { const s = await getSample(id); ret
 await app.boot(App.savedSong() ?? newSong());
 app.show("dice");
 takeCodeFromUrl(app);
+takeSharedFromUrl(app); // /s/CODE or #song=…: a whole shared song
 // New here: a card on the setup screen offers the tutorial (never a forced dialog).
 void offerTutorial(app, tutorial, document.body);
 app.frameHooks.push(() => { if (app.screenName !== "dice") document.querySelector(".coach-offer")?.remove(); });

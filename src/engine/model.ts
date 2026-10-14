@@ -90,6 +90,10 @@ export interface Song {
   master: Master;
   nextId: number;
   setupCode?: string; // DICE share code this song was started from
+  /** Opened from someone's share: its song code (shown as "Shared · TILT-XXXXXXXX"). */
+  sharedFrom?: string;
+  /** Codes this song was shared under, newest first (each edit shares as a new code). */
+  shares?: { code: string; at: number }[];
   challenges?: string[]; // challenge card ids dealt at START
   libId?: string; // id in the song library (set on first save)
   /** MIDI learn: hardware CC -> a parameter of a track. */

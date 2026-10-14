@@ -17,6 +17,7 @@ import { h } from "./dom";
 import { SpatialNav } from "./nav";
 import { challengeById } from "../engine/challenges";
 import { libraryDialog } from "./library";
+import { openCodeOrLink } from "./sharesong";
 import { phraseGridDialog } from "./phrasegrid";
 import { dmdText } from "./dmd";
 import { gameModeDialog } from "./dialogs";
@@ -274,13 +275,13 @@ export class DiceScreen implements Screen {
     catch { prompt("Share code", code); }
   }
 
+  /** One box for everything: a song code (TILT-XXXXXXXX) opens that song; a setup code fills the reels. */
   private enterCode() {
-    const c = prompt("Paste a share code");
+    const c = prompt("Song code (TILT-XXXXXXXX), setup code, or a TILT link");
     if (!c) return;
     const s = decodeSetup(c);
-    if (!s) { this.app.overlays.toast("That code doesn't decode"); return; }
-    this.d.setup = s;
-    this.changed();
+    if (s) { this.d.setup = s; this.changed(); return; }
+    void openCodeOrLink(this.app, c);
   }
 
   start() {

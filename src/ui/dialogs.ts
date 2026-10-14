@@ -12,6 +12,7 @@ import type { App } from "./app";
 import { download, h } from "./dom";
 import { libraryDialog, safeName } from "./library";
 import { shareCodeDialog } from "./share";
+import { enterCodeDialog, shareSongDialog } from "./sharesong";
 import { tutorialLabel, tutorialStatus } from "./tutorial";
 import { lastInput } from "./lastinput";
 import { dmdText } from "./dmd";
@@ -362,7 +363,9 @@ export function systemMenu(app: App, newJam: () => void) {
     { label: "▤ Songs (library)…", run: () => libraryDialog(app, { onOpen: () => app.show("song") }) },
     { label: app.couch ? "🛋 Back to the couch" : "👥 Together: couch or online…", run: () => (app.couch ? app.show("couch") : playTogetherDialog(app)) },
     { label: "⬇ Export (WAV, stems, MIDI)…", run: () => exportDialog(app) },
+    { label: "⇪ Share song…", disabled: !app.song.tracks.length, run: () => shareSongDialog(app) },
     { label: "🎲 Share setup code…", disabled: !app.song.tracks.length, run: () => shareCodeDialog(app) },
+    { label: "Open a code or link…", run: () => enterCodeDialog(app) },
     { label: "⚙ Settings…", run: () => settingsDialog(app) },
     { label: "🎮 Game mode…", checked: app.settings.gameMode, run: () => gameModeDialog(app, () => app.refresh()) },
     { label: "💡 Stuck? Phrase grid for this scene…", disabled: app.locked, run: () => phraseGridDialog(app, { sceneId: app.currentSceneId(), onDone: () => app.refresh() }) },

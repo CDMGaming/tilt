@@ -15,6 +15,7 @@ import { h } from "./dom";
 import { trackColor } from "./theme";
 import type { MenuItem } from "./overlay";
 import { shareCodeDialog } from "./share";
+import { shareSongDialog } from "./sharesong";
 import { isPhone } from "./phone";
 import { byInput, watchInput } from "./lastinput";
 
@@ -68,6 +69,7 @@ export class SongScreen implements Screen {
     // header row
     at(-1, -1, h("div", { class: "corner" },
       h("div", { class: "song-title" }, song.title),
+      h("button", { class: "corner-share", "data-nav": "share-song", title: "Share the whole song: a code, a link, a QR code", onclick: (e: Event) => { e.stopPropagation(); shareSongDialog(app); } }, "⇪ Share song"),
       (() => {
         // The song's setup code as it is now: click to copy, link or share it.
         const now = setupFromSong(song);

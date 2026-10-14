@@ -38,6 +38,22 @@ export class RelayRoom {
   }
 }
 
+/**
+ * Share rate limit: one of these per IP (by name), counting requests over the last minute.
+ * GET ?per=N answers 429 once there have been N in the last 60 s.
+ */
+export class ShareLimit {
+  private hits: number[] = [];
+
+  fetch(req: Request): Response {
+    const per = Number(new URL(req.url).searchParams.get("per") ?? 20), now = Date.now();
+    this.hits = this.hits.filter((t) => now - t < 60_000);
+    if (this.hits.length >= per) return new Response("slow down", { status: 429 });
+    this.hits.push(now);
+    return new Response("ok");
+  }
+}
+
 /** One lobby object holds every room (a few friends at a time needs nothing more). */
 export function lobby(env: Env) {
   return env.RELAY.get(env.RELAY.idFromName("lobby"));

@@ -5,6 +5,7 @@ import {
   type AutoPoint, type Clip, type InstrumentKind, type Note, type Scene, type Song, type Track,
 } from "./model";
 import { INSTRUMENTS, presetParams } from "./instruments";
+import { inScale, snapToScale } from "./music";
 import { DEFAULT_SAMPLER_REFS } from "./instruments3";
 
 export const SCENE_NAMES = ["Intro", "Verse", "Build", "Chorus", "Drop", "Break", "Bridge", "Outro"];
@@ -234,4 +235,26 @@ export function clearAutoRange(clip: Clip, key: string, from: number, to: number
   const lane = clip.auto?.[key];
   if (!lane) return;
   clip.auto![key] = from <= to ? lane.filter((p) => p.tick <= from || p.tick > to) : lane.filter((p) => p.tick > to && p.tick <= from);
+}
+
+/** Notes sitting outside the song's key (scale lock was off, or the key / scale changed after). */
+export function outOfKeyNotes(clip: Clip | undefined, key: number, scaleId: string): Note[] {
+  return clip ? clip.notes.filter((n) => !inScale(n.pitch, key, scaleId)) : [];
+}
+
+/**
+ * Move every out-of-key note to the nearest in-key row (ties go down). A note that lands
+ * exactly on another one (same pitch, same start) merges into it. Returns how many moved.
+ */
+export function snapClipToScale(clip: Clip, key: number, scaleId: string, only?: Set<number>): number {
+  let moved = 0;
+  for (const n of clip.notes) {
+    if ((only && !only.has(n.id)) || inScale(n.pitch, key, scaleId)) continue;
+    n.pitch = snapToScale(n.pitch, key, scaleId);
+    moved++;
+  }
+  const seen = new Set<string>();
+  clip.notes = clip.notes.filter((n) => { const k = `${n.pitch}:${n.start}`; if (seen.has(k)) return false; seen.add(k); return true; });
+  clip.notes.sort((a, b) => a.start - b.start || a.pitch - b.pitch);
+  return moved;
 }

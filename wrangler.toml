@@ -1,6 +1,13 @@
 # TILT on Cloudflare Pages: https://tilt-jam.pages.dev
-# The built app (dist/) plus functions/relay.ts, which hands /relay to the relay
-# Durable Object in cloud/ (deployed first, as its own worker).
+# The built app (dist/) plus functions/: /relay (online games, handed to the relay
+# Durable Object in cloud/, deployed first as its own worker), /api/share and
+# /api/sample (song sharing), /s/:code (opens a shared song).
+#
+# Song sharing needs a KV namespace (SHARES) and an R2 bucket (SAMPLES). They're not
+# listed here: the deploy workflow looks them up by name (tilt-shares, tilt-samples) and
+# adds them when they exist, so a deploy before they're created still works (sharing
+# then falls back to self-contained #song= links).
+# Local: npx wrangler pages dev dist --kv SHARES --r2 SAMPLES  (in-memory stand-ins)
 name = "tilt-jam"
 pages_build_output_dir = "dist"
 compatibility_date = "2025-06-01"
@@ -8,4 +15,9 @@ compatibility_date = "2025-06-01"
 [[durable_objects.bindings]]
 name = "RELAY"
 class_name = "RelayRoom"
+script_name = "tilt-jam-relay"
+
+[[durable_objects.bindings]]
+name = "LIMITER"
+class_name = "ShareLimit"
 script_name = "tilt-jam-relay"

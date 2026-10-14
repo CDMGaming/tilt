@@ -46,6 +46,22 @@ jobs:
       - name: Pages project (made on the first run)
         if: env.RAW_TOKEN != ''
         run: npx --yes wrangler@4 pages project list | grep -q "tilt-jam " || npx --yes wrangler@4 pages project create tilt-jam --production-branch=main
+      - name: Song sharing storage (KV tilt-shares, R2 tilt-samples), when they exist
+        if: env.RAW_TOKEN != ''
+        run: |
+          kv=$(npx --yes wrangler@4 kv namespace list 2>/dev/null | jq -r '.[] | select(.title=="tilt-shares") | .id' 2>/dev/null || true)
+          if [ -n "$kv" ]; then
+            { echo; echo '[[kv_namespaces]]'; echo 'binding = "SHARES"'; echo "id = \"$kv\""; } >> wrangler.toml
+            echo "KV namespace tilt-shares: bound as SHARES"
+          else
+            echo "::warning::No KV namespace named tilt-shares yet: Share song falls back to self-contained #song= links"
+          fi
+          if npx --yes wrangler@4 r2 bucket list 2>/dev/null | grep -qw "tilt-samples"; then
+            { echo; echo '[[r2_buckets]]'; echo 'binding = "SAMPLES"'; echo 'bucket_name = "tilt-samples"'; } >> wrangler.toml
+            echo "R2 bucket tilt-samples: bound as SAMPLES"
+          else
+            echo "::warning::No R2 bucket named tilt-samples yet: shared songs go out without user samples"
+          fi
       - name: App
         if: env.RAW_TOKEN != ''
         run: npx --yes wrangler@4 pages deploy dist --project-name=tilt-jam --branch=main

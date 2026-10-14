@@ -6,7 +6,7 @@ import { inScale, NOTE_NAMES, scaleById, snapToScale, stepInScale } from "../eng
 import { getParam, paramInfo } from "../engine/params";
 import { fxDef } from "../engine/params";
 import { drumCount, isDrumKind, toUnit } from "../engine/instruments";
-import { addNote, duplicateClip, ensureClip, laneValue, noteAt, quantizeClip, setAutoPoint, setClipBars } from "../engine/songops";
+import { addNote, duplicateClip, ensureClip, laneValue, noteAt, outOfKeyNotes, quantizeClip, setAutoPoint, setClipBars, snapClipToScale } from "../engine/songops";
 import { mods, type Action } from "./actions";
 import type { App, EditorLayout, Screen } from "./app";
 import { h } from "./dom";
@@ -104,7 +104,8 @@ export class EditorScreen implements Screen {
         btn("Step", ed.stepInput, () => this.toggleStep(), "Step input: play notes while stopped, the cursor advances"),
         twin("Velocity", "Vel", ed.velView && !ed.autoKey, () => { ed.velView = !(ed.velView && !ed.autoKey); ed.autoKey = null; this.render(); }, "Velocity lane"),
         twin(ed.autoKey ? `Auto: ${paramInfo(track, ed.autoKey)?.label ?? ed.autoKey} ▾` : "Automation ▾", "Auto ▾", !!ed.autoKey, () => this.lanePicker(), "Show an automation lane: draw volume, filter, FX... across the clip"),
-        !isDrumKind(track.kind) ? twin(app.settings.scaleLock ? "Scale lock ●" : "Scale lock ○", app.settings.scaleLock ? "Lock ●" : "Lock ○", app.settings.scaleLock, () => this.toggleLock(), "Scale lock: only notes in the song's key") : null),
+        !isDrumKind(track.kind) ? twin(app.settings.scaleLock ? "Scale lock ●" : "Scale lock ○", app.settings.scaleLock ? "Lock ●" : "Lock ○", app.settings.scaleLock, () => this.toggleLock(), "Scale lock: only notes in the song's key") : null,
+        this.outKeyButton()),
       h("div", { class: "spacer" }),
       h("div", { class: "tb-group layout-seg", title: "Roll only / split / panel only (\\ key, or hold RB)" },
         layBtn("roll", "Roll", "Piano roll only"), layBtn("split", "Split", "Piano roll and instrument panel"), layBtn("panel", "Panel", "Instrument panel only")),
@@ -136,6 +137,7 @@ export class EditorScreen implements Screen {
     this.toolbar.replaceChildren(
       picker,
       h("div", { class: "tb-group tabs" }, tab("roll", "Notes"), tab("panel", "Sound"), tab("mix", "Mix")),
+      this.outKeyButton() ?? "",
       h("button", { class: "tb-btn menu-btn", onclick: () => this.openMenu() }, "☰"),
       roll ? h("div", { class: "tb-tools" },
         h("div", { class: "tb-group" },
@@ -321,6 +323,24 @@ export class EditorScreen implements Screen {
       { label: "All sound settings", sub: () => def.params.filter((p) => !p.options).map((p) => item(p.id)) },
       ...(ed.autoKey && has(ed.autoKey) ? [{ label: "Clear this lane", run: () => app.edit("Clear lane", () => { delete clip!.auto![ed.autoKey!]; }) }] : []),
     ]);
+  }
+
+  /** "⚠ 3 out of key": notes off the song's scale in this clip. Click: snap them, or select them. */
+  private outKeyButton(): HTMLElement | null {
+    const app = this.app, track = app.track(), clip = this.clip;
+    if (!track || isDrumKind(track.kind)) return null;
+    const off = outOfKeyNotes(clip, app.song.key, app.song.scale);
+    if (!off.length) return null;
+    const n = off.length;
+    return h("button", { class: "tb-btn outkey-btn", title: `${n} note${n > 1 ? "s" : ""} outside ${NOTE_NAMES[app.song.key]} ${scaleById(app.song.scale).name}`, onclick: (e: Event) => {
+      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const sel = [...app.ed.sel].filter((id) => off.some((x) => x.id === id));
+      app.overlays.menu(`${n} note${n > 1 ? "s" : ""} out of key`, () => [
+        { label: `Snap to scale (${n} note${n > 1 ? "s" : ""})`, hint: "nearest in-key row", run: () => app.edit("Snap to scale", () => snapClipToScale(clip!, app.song.key, app.song.scale)) },
+        ...(sel.length && sel.length < n ? [{ label: `Snap the selected ones (${sel.length})`, run: () => app.edit("Snap to scale", () => snapClipToScale(clip!, app.song.key, app.song.scale, new Set(sel))) }] : []),
+        { label: "Select them", run: () => { app.ed.sel = new Set(off.map((x) => x.id)); this.roll.invalidate(); this.render(); } },
+      ], { x: r.left, y: r.bottom + 4 });
+    } }, h("span", { class: "outkey-mark", "aria-hidden": "true" }, "⚠"), h("span", { class: "lbl-long" }, ` ${n} out of key`), h("span", { class: "lbl-short" }, ` ${n}`));
   }
 
   private toggleLock() {

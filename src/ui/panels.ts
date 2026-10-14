@@ -3,7 +3,7 @@
 
 import { DRUM_BASE_NOTE, INSTRUMENTS, drumPartName, isDrumKind, paramDef } from "../engine/instruments";
 import type { Track } from "../engine/model";
-import { chordName, noteName, scaleById } from "../engine/music";
+import { chordName, noteName, scaleById, scaleDegree } from "../engine/music";
 import { decodeFile, listSamples, putSample, sampleLabel } from "./samples";
 import { SFX, WT_FRAMES, WT_SIZE } from "../engine/instruments3";
 import { allPresets, applyPreset, deleteUserPreset, presetPosition, saveUserPreset, userPresets, USER_MARK } from "./presets";
@@ -275,7 +275,9 @@ function keyboard(app: App, track: Track): HTMLElement {
     h("button", { class: "oct-btn", "data-nav": "oct-down", onclick: () => octave(-1) }, "◀", h("small", null, `oct ${app.ed.octave}`)),
     h("div", { class: "keyboard" + (app.settings.scaleLock ? " locked" : " chromatic") },
       keys.map((k, i) => {
-        const el = h("button", { class: "key" + (k.black ? " black" : ""), "data-nav": `key${i}`, "data-note": k.pitch },
+        const deg = scaleDegree(k.pitch, song.key, song.scale);
+        const el = h("button", { class: "key" + (k.black ? " black" : "") + (deg ? " inkey" : " outkey") + (deg === 1 ? " root" : ""), "data-nav": `key${i}`, "data-note": k.pitch, title: deg ? (deg === 1 ? "Root (1)" : `Degree ${deg}`) : "Out of key" },
+          deg === 1 ? h("i", { class: "root-dot", "aria-hidden": "true" }) : null,
           h("span", null, k.label), k.sub ? h("small", null, k.sub) : null);
         el.addEventListener("pointerdown", (e) => { e.preventDefault(); el.setPointerCapture(e.pointerId); app.noteInput(k.pitch, 100, true); el.classList.add("down"); });
         const up = () => { if (el.classList.contains("down")) { app.noteInput(k.pitch, 0, false); el.classList.remove("down"); } };

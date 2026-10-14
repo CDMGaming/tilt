@@ -31,6 +31,12 @@ export function inScale(pitch: number, key: number, scaleId: string): boolean {
   return scaleById(scaleId).steps.includes(pc);
 }
 
+/** Scale degree of a pitch (1 = the root), or 0 when it's out of key. */
+export function scaleDegree(pitch: number, key: number, scaleId: string): number {
+  const pc = (((pitch - key) % 12) + 12) % 12;
+  return scaleById(scaleId).steps.indexOf(pc) + 1;
+}
+
 /** Nearest in-scale pitch; ties go down. */
 export function snapToScale(pitch: number, key: number, scaleId: string): number {
   for (let d = 0; d < 12; d++) {

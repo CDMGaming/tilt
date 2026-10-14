@@ -14,6 +14,11 @@ const pairs: [string, string, string, number][] = [
   ["on-button text (cyan)", "--accent-ink", "--cyan", 4.5], ["record button / LOCKED text", "--key-ink", "--coral", 4.5], ["mute on", "--bg", "--ink", 4.5],
   ["solo on", "--key-ink", "--yellow", 4.5], ["key labels", "--key-ink", "--key-white", 4.5], ["chord label on key", "--key-chord", "--key-white", 4.5],
   ["playing button (mint)", "--accent-ink", "--mint", 4.5], ["cyan text on surface", "--cyan", "--panel", 4.5], ["focus ring vs bg", "--yellow", "--bg", 3],
+  // Piano roll: in key vs out of key (labels, degrees, the warning outline, and the rows against each other)
+  ["roll: in-key note name", "--roll-key-in-ink", "--roll-key-in", 4.5], ["roll: root note name", "--roll-key-root-ink", "--roll-key-in", 4.5],
+  ["roll: scale degree", "--roll-key-deg", "--roll-key-in", 4.5], ["roll: out-of-key name (dim, still legible)", "--roll-key-out-ink", "--roll-key-out", 3],
+  ["roll: out-of-key warning outline", "--roll-warn", "--roll-outkey", 3], ["roll: warning outline on in-key row", "--roll-warn", "--roll-inkey", 3],
+  ["roll: out-of-key count (toolbar)", "--roll-warn", "--panel", 4.5], ["roll: in-key row vs out-of-key row", "--roll-inkey", "--roll-outkey", 1.25],
   ...["drums", "analog", "acid", "wobble", "poly", "pad", "lead", "chip", "fm", "wave", "sampler"].flatMap((k): [string, string, string, number][] => [
     [`${k}: name on surface`, `--inst-${k}`, "--panel", 4.5],
     [`${k}: label on lit pad/key`, "--key-ink", `--inst-${k}`, 4.5],

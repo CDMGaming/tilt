@@ -73,7 +73,17 @@
   --roll-bg: #0b101d;
   --roll-row: #121a2b;
   --roll-row2: #0f1625;
-  --roll-hatch: #ffffff12;
+  --roll-hatch: #ffffff2a;
+  /* In key / out of key: brightness, pattern (hatch) and height together, never colour alone. */
+  --roll-inkey: #1d2840;
+  --roll-outkey: #090d17;
+  --roll-key-in: #243049;
+  --roll-key-out: #0b0f1a;
+  --roll-key-in-ink: #eef3ff;
+  --roll-key-root-ink: #ffffff;
+  --roll-key-out-ink: #6b7590;
+  --roll-key-deg: #9fb0d0;
+  --roll-warn: #ffcf4a;
   --roll-root: #36e2ff12;
   --roll-keys: #182035;
   --roll-key-white: #c9d3e8;
@@ -1071,3 +1081,37 @@ body.phone .coach-card.at-top { top: calc(70px + env(safe-area-inset-top)); bott
 body.phone .help tr { display: block; padding: 6px 0; border-bottom: 1px solid var(--line); }
 body.phone .help td { display: block; padding: 0; border: none; }
 body.phone .help td:first-child { font-weight: 700; color: var(--accent); margin-bottom: 2px; }
+
+/* More contrast (OS setting): brighter in-key rows and labels, darker out-of-key rows. */
+@media (prefers-contrast: more) {
+  :root { --roll-inkey: #26334f; --roll-outkey: #05070d; --roll-hatch: #ffffff40; --roll-key-out-ink: #8a93ab; --roll-key-in: #2c3956; }
+}
+
+/* Out-of-key notes in the clip: a warning count in the toolbar (click: snap to scale). */
+.outkey-btn { color: var(--roll-warn); border: 1px dashed color-mix(in srgb, var(--roll-warn) 70%, transparent); }
+.outkey-btn .outkey-mark { font-weight: 900; }
+
+/* On-screen keyboard: in-key keys lit, the root marked with a dot, out-of-key keys dimmed and hatched. */
+.key.inkey:not(.black) { background: var(--key-white); box-shadow: inset 0 -3px 0 #00000022, inset 0 3px 0 color-mix(in srgb, var(--track) 70%, transparent); }
+.key.inkey.black { background: color-mix(in srgb, var(--track) 30%, var(--key-black)); color: var(--ink); }
+.key.outkey { opacity: .6; background-image: repeating-linear-gradient(135deg, transparent 0 4px, #0000002e 4px 6px); }
+.key.outkey.black { background-image: repeating-linear-gradient(135deg, transparent 0 4px, #ffffff1a 4px 6px); }
+.key.root span { font-weight: 800; }
+.key { position: relative; }
+.root-dot { position: absolute; top: 7px; left: 50%; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--track); box-shadow: 0 0 0 2px #00000033; }
+.key.down .root-dot, .key.lit .root-dot { background: var(--key-ink); }
+.key.outkey.down, .key.outkey.lit { opacity: 1; }
+
+/* Share song: the code, the QR code, the link, earlier versions */
+.corner-share { display: block; margin-top: 4px; padding: 2px 8px; font-size: 11px; text-transform: none; letter-spacing: 0; color: var(--accent); }
+.share-code.big { font-size: 26px; letter-spacing: .08em; }
+.share-qr { display: flex; justify-content: center; }
+.share-qr svg { width: 180px; height: 180px; border-radius: 8px; }
+.share-link { font-family: var(--font-mono); font-size: 12px; color: var(--dim); overflow-wrap: anywhere; user-select: all; }
+.share-versions { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--line); padding-top: 8px; }
+.share-version { display: flex; align-items: center; gap: 10px; }
+.share-version code { font-family: var(--font-mono); color: var(--dmd); }
+.share-version .note { flex: 1; margin: 0; }
+.note.warn { color: var(--roll-warn); }
+.share-wait { animation: pulse 1.2s ease-in-out infinite; }
+.lib-shared { color: var(--dmd); }

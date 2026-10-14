@@ -9,6 +9,14 @@ preview_urls = false
 name = "RELAY"
 class_name = "RelayRoom"
 
+[[durable_objects.bindings]]
+name = "LIMITER"
+class_name = "ShareLimit"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["RelayRoom"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["ShareLimit"]

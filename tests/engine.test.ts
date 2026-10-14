@@ -381,3 +381,22 @@ Deno.test("scene played once: no next instance; looping: the same scene again", 
   assertEquals(nextInstance(song, { kind: "scene", sceneId: id, once: true }, first), null);
   assertEquals(nextInstance(song, { kind: "scene", sceneId: id }, first)!.sceneId, id);
 });
+
+Deno.test("scale degree, out-of-key notes and snap to scale", async () => {
+  const { scaleDegree } = await import("../src/engine/music.ts");
+  const { outOfKeyNotes, snapClipToScale } = await import("../src/engine/songops.ts");
+  // A minor: A=1, C=3, E=5; F# and G# are out of key.
+  assertEquals([57, 60, 64, 66, 68].map((p) => scaleDegree(p, 9, "minor")), [1, 3, 5, 0, 0]);
+  const clip = { bars: 1, notes: [
+    { id: 1, pitch: 66, start: 0, len: 24, vel: 100 }, // F#4 -> F4 (ties go down)
+    { id: 2, pitch: 68, start: 24, len: 24, vel: 100 }, // G#4 -> G4
+    { id: 3, pitch: 65, start: 0, len: 24, vel: 100 }, // F4 already there: the snapped F# merges into it
+    { id: 4, pitch: 57, start: 48, len: 24, vel: 100 },
+  ], auto: {} } as unknown as Parameters<typeof snapClipToScale>[0];
+  assertEquals(outOfKeyNotes(clip, 9, "minor").map((n) => n.id), [1, 2]);
+  assertEquals(snapClipToScale(clip, 9, "minor", new Set([2])), 1); // only the selected one
+  assertEquals(clip.notes.find((n) => n.id === 2)!.pitch, 67);
+  assertEquals(snapClipToScale(clip, 9, "minor"), 1);
+  assertEquals(outOfKeyNotes(clip, 9, "minor").length, 0);
+  assertEquals(clip.notes.length, 3); // F# landed on the existing F at the same start
+});

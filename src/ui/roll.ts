@@ -1,13 +1,15 @@
-// Canvas piano roll for one clip. Out-of-scale rows are hatched (or hidden
-// with "fold"), an optional bottom lane shows velocity or one automation
-// lane, the cursor is driven by gamepad/keyboard and the mouse edits directly.
+// Canvas piano roll for one clip. In-key rows are light and full height; out-of-key
+// rows are darker, hatched and shorter (the scale reads like a ladder), or hidden
+// with "fold"; root rows carry the track colour. An optional bottom lane shows
+// velocity or one automation lane, the cursor is driven by gamepad/keyboard and
+// the mouse edits directly.
 
 import { isPhone } from "./phone";
 import { DRUM_BASE_NOTE, drumCount, drumPartName, formatParam, fromUnit, isDrumKind, toUnit } from "../engine/instruments";
 import { getParam, paramInfo } from "../engine/params";
 import { sampleLabel } from "./samples";
 import { PPQ, TICKS_PER_BAR, type Clip, type Note, type Track } from "../engine/model";
-import { inScale, noteName } from "../engine/music";
+import { inScale, noteName, scaleDegree } from "../engine/music";
 import { addNote, ensureClip, laneValue, noteAt, setAutoPoint } from "../engine/songops";
 import type { App } from "./app";
 import { trackColor } from "./theme";
@@ -19,11 +21,14 @@ const AUTO_H = 120;
 const ROW_H = 15;
 /** Note rows: a fingertip needs more height than a mouse pointer. */
 const rowPx = () => (isPhone() ? 24 : ROW_H);
+/** Out-of-key rows are this much of an in-key row's height. */
+const OUT_ROW = 0.6;
 
 export class PianoRoll {
   canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private hatch: CanvasPattern | null = null;
+  private stripes: CanvasPattern | null = null;
   private dragRect: { t0: number; p0: number; t1: number; p1: number } | null = null;
   private dirty = true;
   private lastPlayTick = -1;
@@ -69,7 +74,7 @@ export class PianoRoll {
       }
       if (this.isDrums()) return;
       const rows = this.allRows();
-      const i = Math.max(0, Math.min(rows.length - this.visibleRows(), this.topIdx() + Math.sign(e.deltaY) * 2));
+      const i = Math.max(0, Math.min(this.maxTop(), this.topIdx() + Math.sign(e.deltaY) * 2));
       this.app.ed.topPitch = rows[i];
       this.invalidate();
     }, { passive: false });
@@ -102,23 +107,49 @@ export class PianoRoll {
   /** True when out-of-key rows are hidden. */
   folded() { return !this.isDrums() && this.app.settings.fold; }
 
+  private rowsMemo = { key: "", rows: [] as number[] };
   /** All rows top to bottom (pitches). Folded: only in-key pitches. */
   allRows(): number[] {
-    if (this.isDrums()) return Array.from({ length: this.parts() }, (_, i) => DRUM_BASE_NOTE + this.parts() - 1 - i);
-    const song = this.app.song, out: number[] = [];
-    for (let p = 108; p >= 12; p--) if (!this.folded() || inScale(p, song.key, song.scale)) out.push(p);
+    const song = this.app.song, drums = this.isDrums();
+    const memo = `${drums ? `d${this.parts()}` : "n"}|${song.key}|${song.scale}|${this.folded()}`;
+    if (memo === this.rowsMemo.key) return this.rowsMemo.rows;
+    let out: number[];
+    if (drums) out = Array.from({ length: this.parts() }, (_, i) => DRUM_BASE_NOTE + this.parts() - 1 - i);
+    else { out = []; for (let p = 108; p >= 12; p--) if (!this.folded() || inScale(p, song.key, song.scale)) out.push(p); }
+    this.rowsMemo = { key: memo, rows: out };
     return out;
   }
 
+  private inKey(pitch: number) { return inScale(pitch, this.app.song.key, this.app.song.scale); }
+
+  /** An in-key row's height (drums: one pad's row). */
   rowH() { return this.isDrums() ? Math.max(14, Math.min(60, this.laneH() / this.parts())) : rowPx(); }
-  visibleRows() { return this.isDrums() ? this.parts() : Math.max(4, Math.floor(this.laneH() / rowPx())); }
+  /** This pitch's row height: out-of-key rows are shorter unless they're folded away. */
+  private hOf(pitch: number) { return this.isDrums() || this.inKey(pitch) ? this.rowH() : Math.round(rowPx() * OUT_ROW); }
+
+  /** How many rows fit in the lane starting at row `top`. */
+  private fitFrom(top: number): number {
+    const rows = this.allRows(), lane = this.laneH();
+    let y = 0, n = 0;
+    for (let i = top; i < rows.length; i++) { const hh = this.hOf(rows[i]); if (y + hh > lane + 0.5) break; y += hh; n++; }
+    return Math.max(1, n);
+  }
+  /** The lowest top row that still fills the lane down to the last row. */
+  private maxTop(): number {
+    if (this.isDrums()) return 0;
+    const rows = this.allRows(), lane = this.laneH();
+    let y = 0;
+    for (let i = rows.length - 1; i >= 0; i--) { y += this.hOf(rows[i]); if (y > lane) return Math.min(rows.length - 1, i + 1); }
+    return 0;
+  }
+  visibleRows() { return this.isDrums() ? this.parts() : this.fitFrom(this.topIdx()); }
 
   /** Index (in allRows) of the top visible row. */
   private topIdx(): number {
     if (this.isDrums()) return 0;
     const rows = this.allRows(), top = this.app.ed.topPitch;
     const i = rows.findIndex((p) => p <= top);
-    return Math.max(0, Math.min(rows.length - this.visibleRows(), i < 0 ? 0 : i));
+    return Math.max(0, Math.min(this.maxTop(), i < 0 ? 0 : i));
   }
 
   private rowOf(pitch: number): number { return this.allRows().indexOf(pitch); }
@@ -128,13 +159,13 @@ export class PianoRoll {
     this.scrollToTick(this.app.ed.tick);
     this.lastNav = performance.now();
     if (this.isDrums()) return;
-    const ed = this.app.ed, rows = this.allRows(), vis = this.visibleRows();
+    const ed = this.app.ed, rows = this.allRows(), max = this.maxTop();
     const r = rows.indexOf(ed.pitch);
     if (r < 0) return;
     let top = this.topIdx();
     if (r < top + 1) top = r - 2;
-    if (r > top + vis - 2) top = r - vis + 3;
-    ed.topPitch = rows[Math.max(0, Math.min(rows.length - vis, top))];
+    while (top < max && r > top + this.fitFrom(top) - 3) top++;
+    ed.topPitch = rows[Math.max(0, Math.min(max, top))];
   }
 
   // ---- horizontal zoom: a window of `viewTicks` starting at `scroll`
@@ -172,7 +203,13 @@ export class PianoRoll {
   private lastNav = 0;
   private pxPerTick() { return (this.size().w - KEYS_W) / this.viewTicks(); }
   private xOf(tick: number) { return KEYS_W + (tick - this.scroll()) * this.pxPerTick(); }
-  private yOf(pitch: number) { return RULER_H + (this.rowOf(pitch) - this.topIdx()) * this.rowH(); }
+  private yOf(pitch: number) {
+    const rows = this.allRows(), top = this.topIdx(), i = rows.indexOf(pitch);
+    let y = RULER_H;
+    if (i >= top) for (let k = top; k < i; k++) y += this.hOf(rows[k]);
+    else for (let k = i; k < top; k++) y -= this.hOf(rows[k]);
+    return y;
+  }
   private tickAt(x: number) { return (x - KEYS_W) / this.pxPerTick() + this.scroll(); }
 
   /** Clip drawing to the note area (right of the key column), between y0 and y1. */
@@ -183,8 +220,11 @@ export class PianoRoll {
     g.clip();
   }
   private pitchAt(y: number) {
-    const rows = this.allRows();
-    return rows[Math.max(0, Math.min(rows.length - 1, this.topIdx() + Math.floor((y - RULER_H) / this.rowH())))];
+    const rows = this.allRows(), top = this.topIdx();
+    let yy = RULER_H;
+    if (y < yy) return rows[top];
+    for (let i = top; i < rows.length; i++) { const hh = this.hOf(rows[i]); if (y < yy + hh) return rows[i]; yy += hh; }
+    return rows[rows.length - 1];
   }
 
   // ------------------------------------------------------------ drawing
@@ -210,6 +250,7 @@ export class PianoRoll {
       this.canvas.width = Math.round(w * dpr);
       this.canvas.height = Math.round(h * dpr);
       this.hatch = null;
+      this.stripes = null;
     }
     const g = this.ctx;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -220,41 +261,59 @@ export class PianoRoll {
     const drums = this.isDrums();
     const rowH = this.rowH(), allRows = this.allRows(), top = this.topIdx();
     const rows = Math.min(this.visibleRows(), allRows.length - top);
-    const laneBottom = RULER_H + rows * rowH;
+    let laneBottom = RULER_H;
+    for (let r = 0; r < rows; r++) laneBottom += this.hOf(allRows[top + r]);
     const color = trackColor(track);
-    if (!this.hatch) this.hatch = this.makeHatch(col("--roll-hatch"));
+    if (!this.hatch) this.hatch = this.makeHatch(col("--roll-hatch"), 6, 1.5);
+    if (!this.stripes) this.stripes = this.makeHatch("#00000066", 5, 2);
 
     g.fillStyle = col("--roll-bg");
     g.fillRect(0, 0, w, h);
 
-    // rows
-    for (let r = 0; r < rows; r++) {
-      const pitch = allRows[top + r];
-      const y = RULER_H + r * rowH;
-      const black = [1, 3, 6, 8, 10].includes(((pitch % 12) + 12) % 12);
-      g.fillStyle = drums ? (r % 2 ? col("--roll-row2") : col("--roll-row")) : black ? col("--roll-row2") : col("--roll-row");
-      g.fillRect(KEYS_W, y, w - KEYS_W, rowH);
-      if (!drums && !inScale(pitch, song.key, song.scale)) {
-        g.fillStyle = this.hatch!;
-        g.fillRect(KEYS_W, y, w - KEYS_W, rowH);
-      }
-      if (!drums && (((pitch - song.key) % 12) + 12) % 12 === 0) {
-        g.fillStyle = col("--roll-root");
-        g.fillRect(KEYS_W, y, w - KEYS_W, rowH);
-      }
-      // key column
-      g.fillStyle = drums ? col("--roll-keys") : black ? col("--roll-key-black") : col("--roll-key-white");
-      g.fillRect(0, y, KEYS_W - 2, rowH - 1);
-      g.fillStyle = drums || black ? col("--ink") : col("--roll-key-ink");
-      g.font = `${Math.min(12, rowH - 3)}px system-ui`;
-      g.textBaseline = "middle";
+    // rows: in-key light and full height, out-of-key dark, hatched and short, the root tinted
+    g.textBaseline = "middle";
+    for (let r = 0, y = RULER_H; r < rows; r++) {
+      const pitch = allRows[top + r], hh = this.hOf(pitch);
       if (drums) {
+        g.fillStyle = r % 2 ? col("--roll-row2") : col("--roll-row");
+        g.fillRect(KEYS_W, y, w - KEYS_W, hh);
+        g.fillStyle = col("--roll-keys");
+        g.fillRect(0, y, KEYS_W - 2, hh - 1);
+        g.fillStyle = col("--ink");
+        g.font = `${Math.min(12, hh - 3)}px system-ui`;
         const part = pitch - DRUM_BASE_NOTE;
-        g.fillText(track.kind === "sampler" ? sampleLabel(track.samples?.[part], track.sampleNames, part) : drumPartName(track.params, part, track.kind), 6, y + rowH / 2 - (rowH > 26 ? 6 : 0));
-        if (rowH > 26) { g.fillStyle = col("--dim"); g.font = "10px system-ui"; g.fillText(`pad ${part + 1}`, 6, y + rowH / 2 + 8); }
-      } else if ((((pitch % 12) + 12) % 12) === 0 || rowH >= 15) {
-        g.fillText(noteName(pitch), 6, y + rowH / 2);
+        g.fillText(track.kind === "sampler" ? sampleLabel(track.samples?.[part], track.sampleNames, part) : drumPartName(track.params, part, track.kind), 6, y + hh / 2 - (hh > 26 ? 6 : 0));
+        if (hh > 26) { g.fillStyle = col("--dim"); g.font = "10px system-ui"; g.fillText(`pad ${part + 1}`, 6, y + hh / 2 + 8); }
+        y += hh;
+        continue;
       }
+      const deg = scaleDegree(pitch, song.key, song.scale), root = deg === 1;
+      // A 1 px gap of background between rows makes the ladder.
+      g.fillStyle = deg ? col("--roll-inkey") : col("--roll-outkey");
+      g.fillRect(KEYS_W, y, w - KEYS_W, hh - 1);
+      if (!deg) { g.fillStyle = this.hatch!; g.fillRect(KEYS_W, y, w - KEYS_W, hh - 1); }
+      if (root) {
+        g.globalAlpha = 0.16; g.fillStyle = color; g.fillRect(KEYS_W, y, w - KEYS_W, hh - 1);
+        g.globalAlpha = 0.85; g.fillRect(0, y, w, 1); g.globalAlpha = 1; // the thin line above the root
+      }
+      // key column: in-key names bright (the root bold, with its degree), out-of-key dim
+      g.fillStyle = deg ? col("--roll-key-in") : col("--roll-key-out");
+      g.fillRect(0, y + (root ? 1 : 0), KEYS_W - 2, hh - 1 - (root ? 1 : 0));
+      if (root) { g.fillStyle = color; g.fillRect(0, y + 1, 3, hh - 2); }
+      const fs = Math.min(12, hh - 2);
+      if (fs >= 7) {
+        g.font = `${root ? "700 " : ""}${fs}px system-ui`;
+        g.fillStyle = root ? col("--roll-key-root-ink") : deg ? col("--roll-key-in-ink") : col("--roll-key-out-ink");
+        g.fillText(noteName(pitch), 6, y + hh / 2);
+        if (deg && hh >= 12) {
+          g.font = `${root ? "700 " : ""}${Math.min(10, fs - 1)}px system-ui`;
+          g.textAlign = "right";
+          g.fillStyle = root ? color : col("--roll-key-deg");
+          g.fillText(String(deg), KEYS_W - 6, y + hh / 2);
+          g.textAlign = "left";
+        }
+      }
+      y += hh;
     }
 
     // grid
@@ -295,20 +354,23 @@ export class PianoRoll {
       for (const n of clip.notes) {
         const r = this.rowOf(n.pitch) - top;
         if (r < 0 || r >= rows) continue; // off screen, or hidden by fold
-        const x = this.xOf(n.start), y = this.yOf(n.pitch);
+        const x = this.xOf(n.start), y = this.yOf(n.pitch), nh = this.hOf(n.pitch);
         const nw = Math.max(3, n.len * this.pxPerTick() - 1);
         const sounding = playTick >= n.start && playTick < n.start + n.len;
+        const off = !drums && !this.inKey(n.pitch); // out of key: stripes and a dashed warning outline
         g.globalAlpha = sounding ? 1 : 0.45 + 0.55 * (n.vel / 127);
         g.fillStyle = color;
         if (sounding) { g.shadowColor = color; g.shadowBlur = 10; }
-        roundRect(g, x + 1, y + 1, nw - 1, rowH - 2, 3);
+        roundRect(g, x + 1, y + 1, nw - 1, nh - 2, 3);
         g.fill();
         g.shadowBlur = 0;
-        if (sounding) { g.globalAlpha = 0.35; g.fillStyle = "#fff"; roundRect(g, x + 1, y + 1, nw - 1, Math.max(2, (rowH - 2) * 0.35), 3); g.fill(); }
+        if (off) { g.globalAlpha = 1; g.fillStyle = this.stripes!; roundRect(g, x + 1, y + 1, nw - 1, nh - 2, 3); g.fill(); }
+        if (sounding) { g.globalAlpha = 0.35; g.fillStyle = "#fff"; roundRect(g, x + 1, y + 1, nw - 1, Math.max(2, (nh - 2) * 0.35), 3); g.fill(); }
         g.globalAlpha = 1;
-        if (ed.sel.has(n.id)) { g.strokeStyle = "#fff"; g.lineWidth = 2; roundRect(g, x + 1, y + 1, nw - 1, rowH - 2, 3); g.stroke(); }
+        if (off) { g.strokeStyle = col("--roll-warn"); g.lineWidth = 1.5; g.setLineDash([3, 2]); roundRect(g, x + 0.5, y + 0.5, nw, nh - 1, 3); g.stroke(); g.setLineDash([]); }
+        if (ed.sel.has(n.id)) { g.strokeStyle = "#fff"; g.lineWidth = 2; roundRect(g, x + 1, y + 1, nw - 1, nh - 2, 3); g.stroke(); }
         // the part that hangs past the clip end (it wraps when looping)
-        if (n.start + n.len > ct) { g.fillStyle = color; g.globalAlpha = 0.25; g.fillRect(this.xOf(0), y + 2, (n.start + n.len - ct) * this.pxPerTick(), rowH - 4); g.globalAlpha = 1; }
+        if (n.start + n.len > ct) { g.fillStyle = color; g.globalAlpha = 0.25; g.fillRect(this.xOf(0), y + 2, (n.start + n.len - ct) * this.pxPerTick(), nh - 4); g.globalAlpha = 1; }
       }
     }
 
@@ -326,7 +388,7 @@ export class PianoRoll {
         if (r < 0 || r >= rows) continue;
         const x = this.xOf(n.start), y = this.yOf(n.pitch), nw = Math.max(8, n.len * this.pxPerTick() - 1);
         g.globalAlpha = pulse;
-        roundRect(g, x + 2, y + 2, nw - 3, rowH - 4, 3);
+        roundRect(g, x + 2, y + 2, nw - 3, this.hOf(n.pitch) - 4, 3);
         g.stroke();
       }
       g.restore();
@@ -336,7 +398,7 @@ export class PianoRoll {
     const sr = this.dragRect ?? (ed.selAnchor && app.ed.focus === "roll" ? { t0: ed.selAnchor.tick, p0: ed.selAnchor.pitch, t1: ed.tick + grid, p1: ed.pitch } : null);
     if (sr) {
       const x0 = this.xOf(Math.min(sr.t0, sr.t1)), x1 = this.xOf(Math.max(sr.t0, sr.t1));
-      const y0 = this.yOf(Math.max(sr.p0, sr.p1)), y1 = this.yOf(Math.min(sr.p0, sr.p1)) + rowH;
+      const y0 = this.yOf(Math.max(sr.p0, sr.p1)), y1 = this.yOf(Math.min(sr.p0, sr.p1)) + this.hOf(Math.min(sr.p0, sr.p1));
       g.fillStyle = col("--sel-fill");
       g.fillRect(x0, y0, x1 - x0, y1 - y0);
       g.strokeStyle = col("--accent");
@@ -353,7 +415,7 @@ export class PianoRoll {
       const cw = (under && ed.placing === under.id ? under.len : grid) * this.pxPerTick();
       g.strokeStyle = ed.focus === "roll" ? col("--accent") : col("--dim");
       g.lineWidth = ed.focus === "roll" ? 2.5 : 1;
-      g.strokeRect(cx + 1, this.yOf(ed.pitch) + 1, Math.max(4, cw - 2), rowH - 2);
+      g.strokeRect(cx + 1, this.yOf(ed.pitch) + 1, Math.max(4, cw - 2), this.hOf(ed.pitch) - 2);
     }
 
     // playhead
@@ -434,16 +496,17 @@ export class PianoRoll {
     g.restore();
   }
 
-  private makeHatch(color: string): CanvasPattern | null {
+  /** Diagonal lines every `step` px (a tile the pattern repeats). */
+  private makeHatch(color: string, step = 8, width = 1.5): CanvasPattern | null {
     const c = document.createElement("canvas");
-    c.width = c.height = 8;
+    c.width = c.height = step;
     const g = c.getContext("2d")!;
     g.strokeStyle = color;
-    g.lineWidth = 1.5;
+    g.lineWidth = width;
     g.beginPath();
-    g.moveTo(0, 8); g.lineTo(8, 0);
+    g.moveTo(0, step); g.lineTo(step, 0);
     g.moveTo(-2, 2); g.lineTo(2, -2);
-    g.moveTo(6, 10); g.lineTo(10, 6);
+    g.moveTo(step - 2, step + 2); g.lineTo(step + 2, step - 2);
     g.stroke();
     return this.ctx.createPattern(c, "repeat");
   }
@@ -707,7 +770,7 @@ export class PianoRoll {
     if (this.zoomed()) ed.scrollTick = this.clampScroll(Math.round((g.scroll - (cx - g.cx) / pxPerTick) / PPQ) * PPQ);
     if (!this.isDrums()) {
       const rows = this.allRows();
-      const i = Math.max(0, Math.min(rows.length - this.visibleRows(), g.top + Math.round((cy - g.cy) / rowPx())));
+      const i = Math.max(0, Math.min(this.maxTop(), g.top + Math.round((cy - g.cy) / rowPx())));
       ed.topPitch = rows[i];
     }
     this.lastNav = performance.now();
