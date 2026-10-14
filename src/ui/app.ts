@@ -945,6 +945,8 @@ export class App {
   }
 
   openSystemMenu?: () => void;
+  /** The DICE screen (a new jam): the rail's Dice button and the menu's "New jam". */
+  openDice?: () => void;
   openShortcut?: () => void;
   stuck?: () => void;
   toggleScope?: () => void;

@@ -685,3 +685,18 @@ body.phone .thumplab .pads.four { grid-template-rows: repeat(2, 60px); }
 @keyframes tilt-blink { 50% { opacity: .15; } }
 @media (prefers-reduced-motion: reduce) { .tilt-flash .dmd { animation: none; } }
 .row-btn.extra-ball { color: var(--dmd); border-color: color-mix(in srgb, var(--dmd) 45%, var(--line)); font-family: var(--font-display); letter-spacing: .12em; }
+
+/* ---------- A: the screen rail (desktop left; phones right / bottom) ---------- */
+body:not(.phone) #app { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+body:not(.phone) .topbar.rails { display: contents; }
+body:not(.phone) .rail-screens { grid-column: 1; grid-row: 1 / 3; border-right: 1px solid var(--line); }
+body:not(.phone) .topstrip { grid-column: 2; grid-row: 1; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; min-width: 0; }
+body:not(.phone) .screen-host { grid-column: 2; grid-row: 2; min-width: 0; }
+body:not(.phone) .rail-btn { width: 60px; }
+.rail-sep { width: 70%; height: 1px; background: var(--line); margin: 4px 0; flex: none; }
+/* Phones: the shared rail sits where the old right rail was. */
+body.phone .rail-screens { grid-column: 3; grid-row: 1; border-left: 1px solid var(--line); }
+@media (orientation: portrait) {
+  body.phone .rail-screens { grid-column: 1; grid-row: 3; border-left: none; border-top: 1px solid var(--line); justify-content: space-around; }
+  body.phone .rail-screens .rail-gap, body.phone .rail-screens .rail-sep { display: none; }
+}

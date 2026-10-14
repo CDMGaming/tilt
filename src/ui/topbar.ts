@@ -4,6 +4,7 @@ import { NOTE_NAMES, scaleById } from "../engine/music";
 import { challengeStatus } from "../engine/challenges";
 import type { App } from "./app";
 import { exportDialog, playTogetherDialog, settingsDialog, songSettings } from "./dialogs";
+import { libraryDialog } from "./library";
 import { fmtTime, h } from "./dom";
 import { isPhone } from "./phone";
 import { dmdText } from "./dmd";
@@ -12,12 +13,14 @@ export function bindTopbar(app: App, el: HTMLElement) {
   const timerEl = h("div", { class: "timer" });
   const render = () => {
     const s = app.song;
-    if (app.screenName === "dice" || !s) { el.replaceChildren(); el.classList.add("hidden"); return; }
+    if (!s) { el.replaceChildren(); el.classList.add("hidden"); return; }
     el.classList.remove("hidden");
+    el.classList.add("rails");
     if (isPhone()) { renderRails(); return; }
-    el.classList.remove("rails");
+    // Desktop: the screen rail down the left (shared with phones), the top strip beside it.
+    if (app.screenName === "dice") { el.replaceChildren(screenRail()); return; }
     const playing = app.engine.playing;
-    el.replaceChildren(
+    el.replaceChildren(screenRail(), h("div", { class: "topstrip" },
       h("button", { class: "brand", onclick: () => app.openSystemMenu?.(), title: "Menu (Start / F1)", "aria-label": "TILT menu" }, dmdText("TILT", { height: 15, slant: 7, unlit: false })),
       h("button", { class: "chip-btn title", onclick: () => songSettings(app) }, s.title),
       h("button", { class: "chip-btn", onclick: () => songSettings(app), title: "Key and scale" }, `${NOTE_NAMES[s.key]} ${scaleById(s.scale).name}`),
@@ -37,22 +40,39 @@ export function bindTopbar(app: App, el: HTMLElement) {
           st.map((c) => h("p", { class: "note big" }, `${c.met ? "✅" : "⬜"} ${c.text}`)),
           h("button", { class: "row-btn primary", "data-nav": "ok", onclick: close }, "Back to it"))) }, `🃏 ${st.filter((c) => c.met).length}/${st.length}`);
       })() : "",
-      h("button", { class: "chip-btn stuck", onclick: () => app.stuck?.(), disabled: app.locked, title: "Stuck? Open the phrase grid of ideas for this scene" }, "💡 Stuck?"),
       app.locked ? h("span", { class: "locked-badge" }, "LOCKED") : "",
       h("div", { class: "spacer" }),
-      ...(app.couch ? [
-        h("button", { class: "chip-btn on couch-chip", onclick: () => app.show("couch"), title: "Back to the couch screen" }, `${app.couch.online ? `🌐 Online · ${app.couch.online.room}` : "🛋 Couch"} · ${app.couch.seats.length} player${app.couch.seats.length === 1 ? "" : "s"}`),
-      ] : [
-        h("button", { class: "chip-btn", onclick: () => playTogetherDialog(app), disabled: !s.tracks.length, title: "Couch mode (and online, soon)" }, "👥 Together"),
-        h("button", { class: "chip-btn" + (app.screenName === "song" ? " on" : ""), onclick: () => app.show("song") }, "Song"),
-        h("button", { class: "chip-btn" + (app.screenName === "edit" ? " on" : ""), onclick: () => app.show("edit"), disabled: !s.tracks.length }, "Edit"),
-        h("button", { class: "chip-btn" + (app.screenName === "mix" ? " on" : ""), onclick: () => app.show("mix"), disabled: !s.tracks.length, title: "Mixer (F4)" }, "Mix"),
-      ]),
       h("button", { class: "chip-btn", onclick: () => exportDialog(app), title: "Export WAV, stems or MIDI" }, "⬇ Export"),
       h("button", { class: "chip-btn", onclick: () => app.toggleScope?.(), title: "Oscilloscope" }, "∿"),
       h("button", { class: "chip-btn", onclick: () => settingsDialog(app), title: "Settings" }, "⚙"),
-    );
+    ));
     updateTimer();
+  };
+
+  const icon = (glyph: string, label: string, onclick: () => void, cls = "", disabled = false, title = label) =>
+    h("button", { class: `rail-btn ${cls}`, onclick, title, "aria-label": label, disabled }, h("span", { class: "rail-glyph" }, glyph), h("span", { class: "rail-label" }, label));
+
+  /**
+   * The screens, one rail for desktop (left) and phones (right / bottom): Song, Edit, Mix,
+   * then Dice and the song library below a gap, then Together and Stuck?.
+   */
+  const screenRail = () => {
+    const s = app.song, none = !s.tracks.length;
+    const on = (name: string) => (app.screenName === name ? " on" : "");
+    return h("nav", { class: "rail rail-screens", "aria-label": "Screens" },
+      ...(app.couch
+        ? [icon(app.couch.online ? "🌐" : "🛋", app.couch.online ? app.couch.online.room : "Couch", () => app.show("couch"), "on", false, "Back to the shared screen")]
+        : [
+          icon("▦", "Song", () => app.show("song"), on("song"), false, "Song (F2)"),
+          icon("♪", "Edit", () => app.show("edit"), on("edit"), none, "Edit (F3)"),
+          icon("⫼", "Mix", () => app.show("mix"), on("mix"), none, "Mixer (F4)"),
+        ]),
+      h("div", { class: "rail-gap" }),
+      icon("⚄", "Dice", () => app.openDice?.(), on("dice"), false, "Roll a new jam"),
+      icon("▤", "Songs", () => libraryDialog(app, { onOpen: () => app.show("song") }), "", false, "Song library"),
+      h("div", { class: "rail-sep" }),
+      app.couch ? "" : icon("👥", "Together", () => playTogetherDialog(app), "", none, "Play together: couch or online"),
+      icon("💡", "Stuck?", () => app.stuck?.(), "", app.locked || none, "Stuck? Ideas for this scene"));
   };
   /**
    * Phones (after Flip): two rails. Left: menu, song info, undo / redo, metronome, record, play.
@@ -60,10 +80,7 @@ export function bindTopbar(app: App, el: HTMLElement) {
    */
   const renderRails = () => {
     const s = app.song, playing = app.engine.playing;
-    el.classList.add("rails");
-    const icon = (glyph: string, label: string, onclick: () => void, cls = "", disabled = false) =>
-      h("button", { class: `rail-btn ${cls}`, onclick, title: label, "aria-label": label, disabled }, h("span", { class: "rail-glyph" }, glyph), h("span", { class: "rail-label" }, label));
-    const on = (name: string) => (app.screenName === name ? " on" : "");
+    if (app.screenName === "dice") { el.replaceChildren(screenRail()); return; }
     const tempo = app.engine.externalTempo ? `EXT ${Math.round(app.engine.externalTempo)}` : `${s.tempo}`;
     el.replaceChildren(
       h("div", { class: "rail rail-left" },
@@ -79,17 +96,7 @@ export function bindTopbar(app: App, el: HTMLElement) {
         icon("♩", "Click", () => app.edit("Metronome", () => (s.metronome = !s.metronome)), s.metronome ? "on" : ""),
         icon("●", "Rec", () => app.toggleRecord(), "rec" + (app.recording ? " on" : "")),
         icon(playing ? "■" : "▶", playing ? "Stop" : "Play", () => app.togglePlay(), "play" + (playing ? " on" : ""))),
-      h("div", { class: "rail rail-right" },
-        ...(app.couch
-          ? [icon(app.couch.online ? "🌐" : "🛋", app.couch.online ? app.couch.online.room : "Couch", () => app.show("couch"), "on")]
-          : [
-            icon("▦", "Song", () => app.show("song"), on("song")),
-            icon("♪", "Edit", () => app.show("edit"), on("edit"), !s.tracks.length),
-            icon("⫼", "Mix", () => app.show("mix"), on("mix"), !s.tracks.length),
-            icon("👥", "Together", () => playTogetherDialog(app), "", !s.tracks.length),
-          ]),
-        icon("💡", "Stuck?", () => app.stuck?.(), "", app.locked),
-        app.locked ? h("span", { class: "locked-badge" }, "LOCKED") : ""),
+      screenRail(),
     );
     updateTimer();
   };
