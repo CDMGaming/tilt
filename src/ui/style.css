@@ -895,3 +895,19 @@ button.rail-btn.rec.on .rail-label, button.rail-btn.play.on .rail-label { color:
 
 /* Song screen: + Track stays reachable at the end of the track header row, however many tracks. */
 .song-grid > .add-track { position: sticky; right: 0; z-index: 3; background: var(--bg); box-shadow: -8px 0 10px var(--bg); }
+
+/* Notes from the computer keyboard, MIDI, Push or a gamepad light the key / pad they play. */
+.key.lit { background: var(--track); color: var(--key-ink); box-shadow: inset 0 -1px 0 #00000022, 0 0 12px color-mix(in srgb, var(--track) 45%, transparent); }
+.key.black.lit { background: color-mix(in srgb, var(--track) 80%, #000); color: var(--ink); }
+.pad.lit { background: var(--track); color: var(--key-ink); box-shadow: 0 0 14px color-mix(in srgb, var(--track) 50%, transparent); }
+
+/* Thump Lab on desktop: big pads | the four drum modules 2x2 | master, across the whole width. */
+body:not(.phone) .panel-body.thumplab { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) auto; grid-template-areas: "pads mods master"; align-items: stretch; gap: 14px; }
+body:not(.phone) .thumplab .pads.four { grid-area: pads; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(70px, 1fr)); gap: 8px; }
+body:not(.phone) .thumplab .pad { width: auto; padding: 10px 12px; }
+body:not(.phone) .thumplab .pad-label { font-size: 17px; }
+body:not(.phone) .thumplab .modules { grid-area: mods; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+body:not(.phone) .thumplab .module { max-width: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; justify-items: center; gap: 2px; padding: 6px 8px 6px; }
+body:not(.phone) .thumplab .module-title { grid-column: 1 / -1; justify-self: start; }
+body:not(.phone) .thumplab .module .knob { width: auto; }
+body:not(.phone) .thumplab > .knob-row { grid-area: master; flex-direction: column; justify-content: center; padding-left: 14px; border-left: 1px solid var(--line); }

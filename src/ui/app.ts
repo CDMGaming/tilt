@@ -723,9 +723,18 @@ export class App {
     if (!track) return;
     if (on) { this.engine.noteOn(track.id, pitch, vel); this.flashPad(track, pitch); }
     else this.engine.noteOff(track.id, pitch);
+    this.lightKey(track, pitch, on);
     if (!this.editing || track.id !== this.ed.trackId || this.locked) return;
     if (this.recording && this.engine.playing) this.recordNote(pitch, vel, on, perfMs);
     else if (this.ed.stepInput && !this.engine.playing) this.stepNote(track, pitch, vel, on);
+  }
+
+  /**
+   * Keyboard / MIDI / Push / gamepad notes light the matching key or pad on the open
+   * instrument panel while they're held, like playing it with the mouse.
+   */
+  private lightKey(track: Track, pitch: number, on: boolean) {
+    for (const el of document.querySelectorAll<HTMLElement>(`[data-panel-track="${track.id}"] [data-note="${pitch}"]`)) el.classList.toggle("lit", on);
   }
 
   /** Light the matching pad on the open drum panel for a moment. */

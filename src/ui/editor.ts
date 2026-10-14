@@ -113,6 +113,7 @@ export class EditorScreen implements Screen {
     this.el.classList.toggle("layout-roll", lay === "roll");
     this.el.classList.toggle("layout-panel", lay === "panel");
     this.panelWrap.replaceChildren(buildPanel(app, track));
+    this.panelWrap.dataset.panelTrack = String(track.id); // keys / pads light up for notes from any input
     app.markLearned(this.panelWrap, track.id);
     this.roll.invalidate();
     this.paintFocus();
