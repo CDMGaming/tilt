@@ -635,3 +635,33 @@ body.phone .editor, body.phone .couch-ed .ed-toolbar { min-width: 0; }
   body.phone .couch-ed .tb-tools { gap: 3px; }
   body.phone .couch-ed .tb-tools .tb-value { min-width: 0; padding: 0 3px; }
 }
+/* Thump Lab on a phone: big pads 2x2, the four drum modules 2x2 (desktop keeps its row layout). */
+body.phone .panel-body.thumplab { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "pads" "mods" "master"; gap: 10px; padding: 8px; }
+body.phone .thumplab .pads.four { grid-area: pads; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, 68px); gap: 8px; }
+body.phone .thumplab .pad { width: auto; padding: 8px 10px; }
+body.phone .thumplab .pad-label { font-size: 17px; }
+body.phone .thumplab .modules { grid-area: mods; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+body.phone .thumplab .module { max-width: none; justify-content: space-evenly; align-content: flex-start; padding: 6px 4px 4px; }
+body.phone .thumplab .module-title { padding-left: 4px; }
+body.phone .thumplab > .knob-row { grid-area: master; justify-content: center; }
+@media (orientation: landscape) {
+  body.phone .panel-body.thumplab { grid-template-columns: 220px minmax(0, 1fr); grid-template-areas: "pads mods" "master mods"; align-items: start; }
+}
+/* Phones: the preset bar on one line (the instrument's description is for the big screen). */
+body.phone .preset-bar { flex-wrap: nowrap; min-width: 0; }
+body.phone .inst-role { display: none; }
+body.phone .inst-name { white-space: nowrap; flex: none; }
+body.phone .preset-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.phone .preset-save { flex: none; padding-left: 8px; padding-right: 8px; }
+body.phone .thumplab .pads.four { grid-template-rows: repeat(2, 60px); }
+@media (orientation: landscape) {
+  body.phone .thumplab .module { flex-wrap: nowrap; gap: 0; justify-content: space-between; }
+  body.phone .thumplab .module-title { position: absolute; }
+  body.phone .thumplab .module { position: relative; padding-top: 18px; }
+}
+@media (orientation: landscape) {
+  body.phone .thumplab .module-title { top: 3px; left: 8px; }
+  body.phone .thumplab .module .knob { width: auto; flex: 1 1 0; min-width: 0; }
+  body.phone .thumplab .module .knob-label { font-size: 9px; letter-spacing: 0; }
+  body.phone .thumplab .module .knob-value { font-size: 10px; }
+}
