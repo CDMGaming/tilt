@@ -338,7 +338,7 @@ export class App {
     this.refresh();
   }
 
-  private relayUrl() { return this.settings.relayUrl || `ws://${location.hostname || "localhost"}:8787`; }
+  private relayUrl() { return this.settings.relayUrl || defaultRelayUrl(); }
 
   /** Host an online game with this song: you are P1 and the conductor. Resolves with the room code. */
   async hostOnline(): Promise<string> {
@@ -1019,3 +1019,13 @@ export const STEP_GRIDS = [
   { label: "1/8", grid: PPQ / 2 },
   { label: "1/16", grid: PPQ / 4 },
 ];
+
+/**
+ * Where the online server is when the player hasn't set one: next to the app
+ * (wss://<site>/relay, as on Tower behind Cloudflare), or, on the dev server,
+ * the separate relay on port 8787.
+ */
+export function defaultRelayUrl(): string {
+  if (import.meta.env.DEV) return `ws://${location.hostname || "localhost"}:8787`;
+  return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/relay`;
+}

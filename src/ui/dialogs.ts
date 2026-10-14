@@ -1,6 +1,7 @@
 // Dialogs: instrument picker, song settings (tempo/tap/swing/key/scale),
 // WAV export, settings, the time-up flow and the system menu.
 
+import { defaultRelayUrl } from "./app";
 import { autoArrange, canArrange } from "../engine/arranger";
 import { pickPreset, usedPresets } from "../engine/dice";
 import { ALL_KINDS, INSTRUMENTS } from "../engine/instruments";
@@ -276,7 +277,7 @@ export function onlineDialog(app: App, mode: "host" | "join") {
   const st = app.settings;
   const name = h("input", { class: "text-input", "data-nav": "name", value: st.netName, placeholder: "Your name", maxlength: 20 }) as HTMLInputElement;
   const code = h("input", { class: "text-input code-input", "data-nav": "code", placeholder: "Game code (4 letters)", maxlength: 4 }) as HTMLInputElement;
-  const server = h("input", { class: "text-input", "data-nav": "server", value: st.relayUrl, placeholder: `ws://${location.hostname || "localhost"}:8787` }) as HTMLInputElement;
+  const server = h("input", { class: "text-input", "data-nav": "server", value: st.relayUrl, placeholder: defaultRelayUrl() }) as HTMLInputElement;
   const status = h("p", { class: "note" }, "");
   app.overlays.dialog(mode === "host" ? "Host an online game" : "Join an online game", (close) => {
     const go = async () => {
@@ -307,7 +308,7 @@ export function onlineDialog(app: App, mode: "host" | "join") {
       h("label", { class: "field" }, "Your name", name),
       mode === "join" ? h("label", { class: "field" }, "Game code", code) : "",
       h("details", { class: "advanced" }, h("summary", null, "Online server"), server,
-        h("p", { class: "note" }, "Leave empty to use the server on this computer (run: deno run -A tools/relay.ts).")),
+        h("p", { class: "note" }, "Leave empty to use the server this page came from. Everyone in a game must use the same one.")),
       status,
       h("button", { class: "row-btn primary", "data-nav": "go", onclick: () => void go() }, mode === "host" ? "Open the game" : "Join"),
       h("button", { class: "row-btn", "data-nav": "cancel", onclick: close }, "Cancel"));

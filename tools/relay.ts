@@ -90,21 +90,26 @@ export class Rooms {
   }
 }
 
+/** Upgrade a request to a relay connection (any path: /relay when served with the app). */
+export function relaySocket(rooms: Rooms, req: Request): Response {
+  const u = new URL(req.url);
+  const { socket, response } = Deno.upgradeWebSocket(req);
+  socket.onopen = () => {
+    const ok = rooms.open(socket, { create: u.searchParams.has("create"), room: u.searchParams.get("room") ?? "", name: u.searchParams.get("name") ?? "" });
+    if (ok) console.log(`[relay] ${rooms.rooms.size} room(s)`);
+  };
+  socket.onmessage = (e) => { if (typeof e.data === "string") rooms.message(socket, e.data); };
+  socket.onclose = () => rooms.close(socket);
+  socket.onerror = () => rooms.close(socket);
+  return response;
+}
+
 if (import.meta.main) {
   const port = Number(Deno.args[0] ?? 8787);
   const rooms = new Rooms();
   Deno.serve({ port, hostname: "0.0.0.0" }, (req) => {
     if (req.headers.get("upgrade") !== "websocket") return new Response("Rollbox relay: connect with a WebSocket\n", { headers: { "access-control-allow-origin": "*" } });
-    const u = new URL(req.url);
-    const { socket, response } = Deno.upgradeWebSocket(req);
-    socket.onopen = () => {
-      const ok = rooms.open(socket, { create: u.searchParams.has("create"), room: u.searchParams.get("room") ?? "", name: u.searchParams.get("name") ?? "" });
-      if (ok) console.log(`[relay] ${rooms.rooms.size} room(s)`);
-    };
-    socket.onmessage = (e) => { if (typeof e.data === "string") rooms.message(socket, e.data); };
-    socket.onclose = () => rooms.close(socket);
-    socket.onerror = () => rooms.close(socket);
-    return response;
+    return relaySocket(rooms, req);
   });
   console.log(`[relay] listening on ws://0.0.0.0:${port}`);
 }
