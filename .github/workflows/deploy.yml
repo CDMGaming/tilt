@@ -26,11 +26,13 @@ jobs:
       - name: Tidy the secrets (a pasted space or line break breaks wrangler)
         if: env.RAW_TOKEN != ''
         run: |
-          account=$(printf %s "$RAW_ACCOUNT" | tr -cd '[:alnum:]')
+          # The ID is 32 hex characters; take it out of a longer paste (a dashboard URL, a label).
+          account=$(printf %s "$RAW_ACCOUNT" | tr 'A-F' 'a-f' | grep -oE '[0-9a-f]{32}' | head -1 || true)
+          if [ -z "$account" ]; then echo "::error::CLOUDFLARE_ACCOUNT_ID has no 32-character account ID in it"; exit 1; fi
           token=$(printf %s "$RAW_TOKEN" | tr -d '[:space:]"')
           echo "::add-mask::$account"
           echo "::add-mask::$token"
-          echo "account id: ${#account} characters"
+          echo "account id: found ($(printf %s "$RAW_ACCOUNT" | grep -oE '[0-9a-fA-F]{32}' | wc -l) candidate(s) in the secret)"
           echo "CLOUDFLARE_ACCOUNT_ID=$account" >> "$GITHUB_ENV"
           echo "CLOUDFLARE_API_TOKEN=$token" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v5
