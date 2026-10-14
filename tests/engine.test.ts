@@ -283,15 +283,50 @@ Deno.test("a scene change at the next bar cuts the playing scene at the bar line
   assertEquals(barCut(4 * bar, 0), 4 * bar, "not started yet: nothing to cut");
 });
 
-Deno.test("NUDGE re-rolls one die and keeps the rest", async () => {
-  const { DICE, nudge } = await import("../src/engine/dice.ts");
-  for (let seed = 1; seed < 60; seed++) {
-    const s = roll(null, NO_LOCKS, seed);
-    for (const die of DICE.filter((d) => d !== "cards")) {
-      const n = nudge(s, die, seed * 31);
-      for (const other of ["key", "scale", "tempo", "swing"] as const) if (other !== die) assertEquals(n[other], s[other], `${die} nudge kept ${other}`);
-      if (die !== "lineup" && die !== "presets") assertEquals(n.lineup.map((l) => l.kind), s.lineup.map((l) => l.kind), `${die} nudge kept the lineup`);
-      assertEquals(decodeSetup(encodeSetup(n)), n, "a nudged roll still makes a share code");
-    }
+Deno.test("NUDGE re-rolls what isn't held: fields, lineup slots, sounds, count", async () => {
+  const { NO_HOLDS, defaultSpec, nudgeSetup, lineupHeld, soundsHeld } = await import("../src/engine/dice.ts");
+  for (let seed = 1; seed < 80; seed++) {
+    const first = nudgeSetup(null, NO_HOLDS, defaultSpec(), seed);
+    assert(first.lineup.length >= 3 && first.lineup.length <= 5, "default: 3-5 instruments");
+    const kinds = first.lineup.map((l) => l.kind);
+    assertEquals(new Set(kinds).size, kinds.length, "? slots get distinct instruments");
+    // Hold key + tempo, choose slot 2's instrument and slot 1's sound, fix the count at 4.
+    const spec = defaultSpec();
+    spec.count = 4; spec.slots[1] = "fm"; spec.presets[0] = 1;
+    const next = nudgeSetup(first, { ...NO_HOLDS, key: true, tempo: true }, spec, seed + 1000);
+    assertEquals(next.key, first.key);
+    assertEquals(next.tempo, first.tempo);
+    assertEquals(next.lineup.length, 4);
+    assertEquals(next.lineup[1].kind, "fm");
+    assertEquals(next.lineup[0].preset, 1);
+    assertEquals(decodeSetup(encodeSetup(next)), next, "the share code still reproduces the whole result");
+    // Everything chosen: NUDGE leaves the lineup and sounds alone.
+    const all = defaultSpec();
+    all.count = next.lineup.length;
+    next.lineup.forEach((l, i) => { all.slots[i] = l.kind; all.presets[i] = l.preset; });
+    assert(lineupHeld(all, next.lineup.length) && soundsHeld(all, next.lineup.length));
+    assertEquals(nudgeSetup(next, NO_HOLDS, all, seed + 7).lineup, next.lineup);
   }
+  // Fixed counts 1..8, and a random range.
+  for (let c = 1; c <= 8; c++) { const sp = defaultSpec(); sp.count = c; assertEquals(nudgeSetup(null, NO_HOLDS, sp, c).lineup.length, c); }
+  const sp = defaultSpec(); sp.min = 2; sp.max = 2;
+  assertEquals(nudgeSetup(null, NO_HOLDS, sp, 5).lineup.length, 2);
+});
+
+Deno.test("editing the lineup applies at once and keeps the other slots", async () => {
+  const { NO_HOLDS, defaultSpec, nudgeSetup, conformSetup } = await import("../src/engine/dice.ts");
+  const spec = defaultSpec(); spec.count = 4;
+  const s = nudgeSetup(null, NO_HOLDS, spec, 11);
+  spec.slots[2] = "wave";
+  const c = conformSetup(s, spec, 3);
+  assertEquals(c.lineup[2].kind, "wave");
+  for (const i of [0, 1, 3]) assertEquals(c.lineup[i], s.lineup[i], `slot ${i} unchanged`);
+  spec.count = 6;
+  const grown = conformSetup(c, spec, 4);
+  assertEquals(grown.lineup.length, 6);
+  assertEquals(grown.lineup.slice(0, 4), c.lineup);
+  spec.count = 2;
+  assertEquals(conformSetup(grown, spec, 5).lineup, grown.lineup.slice(0, 2));
+  spec.presets[1] = 0;
+  assertEquals(conformSetup(grown, spec, 6).lineup[1].preset, 0);
 });

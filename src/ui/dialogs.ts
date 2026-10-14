@@ -140,6 +140,32 @@ export function exportDialog(app: App, then?: () => void) {
 
 // ------------------------------------------------------------ settings
 
+/**
+ * Game mode: the pinball side of TILT. Off (the default) it's a quick-start DAW: a timer
+ * just stops playback and says TIME. On: challenge cards, editing locks at zero, the TILT
+ * flash and buzz, then SONG COMPLETE with one EXTRA BALL.
+ */
+export function gameModeDialog(app: App, onChange?: () => void) {
+  const st = app.settings;
+  app.overlays.dialog("Game mode", (_close, rerender) => h("div", { class: "form" },
+    h("button", { class: "switch-row" + (st.gameMode ? " on" : ""), "data-nav": "game", onclick: () => { st.gameMode = !st.gameMode; app.saveSettings(); rerender(); app.renderHeader(); onChange?.(); } },
+      h("span", { class: "switch-row-label" }, "Game mode"), h("span", { class: "switch-row-value" }, st.gameMode ? "ON" : "OFF")),
+    h("p", { class: "note" }, "With game mode on:"),
+    h("ul", { class: "note game-list" },
+      h("li", null, "Challenge cards: dealt on the setup screen, shown in the top bar."),
+      h("li", null, "When the timer hits zero, editing locks: TILT flashes with a buzz, then SONG COMPLETE."),
+      h("li", null, "EXTRA BALL: two more minutes, once per session."),
+    ),
+    h("p", { class: "note" }, "Off (the default), the timer just stops playback and the display says TIME. Nothing locks."),
+    st.gameMode ? stepper("cards", "Challenge cards", app.dice.cards ? String(app.dice.cards) : "Off", (d) => {
+      app.dice.cards = Math.max(0, Math.min(3, app.dice.cards + d));
+      app.saveDice();
+      rerender();
+      onChange?.();
+    }) : "",
+    h("button", { class: "row-btn primary", "data-nav": "ok", onclick: () => _close() }, "Done")));
+}
+
 export function settingsDialog(app: App) {
   let devices: MediaDeviceInfo[] = [];
   const refreshDevices = async () => {
@@ -331,6 +357,7 @@ export function systemMenu(app: App, newJam: () => void) {
     { label: app.couch ? "🛋 Back to the couch" : "👥 Together: couch or online…", run: () => (app.couch ? app.show("couch") : playTogetherDialog(app)) },
     { label: "⬇ Export (WAV, stems, MIDI)…", run: () => exportDialog(app) },
     { label: "⚙ Settings…", run: () => settingsDialog(app) },
+    { label: "🎮 Game mode…", checked: app.settings.gameMode, run: () => gameModeDialog(app, () => app.refresh()) },
     { label: "💡 Stuck? Phrase grid for this scene…", disabled: app.locked, run: () => phraseGridDialog(app, { sceneId: app.currentSceneId(), onDone: () => app.refresh() }) },
     { label: "Song settings…", run: () => songSettings(app) },
     { label: "Song screen", hint: "F2", run: () => app.show("song") },
@@ -354,7 +381,7 @@ export function helpDialog(app: App) {
       row("A", "Place / delete note, open, confirm. Hold A + left/right: note length"),
       row("B", "Back"),
       row("X", "Context menu"),
-      row("Y", "Play / stop. Hold: record"),
+      row("Y", "Play / stop. Hold: record. On the setup screen: NUDGE (hold: new song)"),
       row("Right stick", "Turn knob. In the roll: length (←→), velocity (↑↓), or draw the automation lane (↑↓) when one is open. Delete removes the lane point at the cursor"),
       row("LT / ZL (hold)", "Fine adjust"),
       row("RT / ZR (hold) + move", "Select a range"),
@@ -365,7 +392,7 @@ export function helpDialog(app: App) {
       row("Arrows, Enter, Esc", "Move, confirm (hold Enter + ←→: length), back"),
       row("A S D F G H J K L ; '", "Play notes (scale degrees when scale lock is on), Q-row = octave up"),
       row("Z / X", "Octave down / up"),
-      row("Space / Shift+Space", "Play-stop / record"),
+      row("Space / Shift+Space", "Play-stop / record. On the setup screen: NUDGE / new song"),
       row("Shift + arrows", "Select a range"),
       row("M", "Context menu.  Tab: roll ↔ panel.  ` (hold): jump overlay"),
       row(", .  /  - =", "Knob / note length  ·  velocity"),
@@ -373,6 +400,12 @@ export function helpDialog(app: App) {
       row("Delete", "Delete notes.  F1: app menu.  F2/F3/F4: song / editor / mixer"),
       h("tr", null, h("th", null, "MIDI"), h("th", null, "")),
       row("MIDI learn", "App menu → MIDI learn: touch a knob, move a hardware control. Transport CCs in Settings"),
+      h("tr", null, h("th", null, "Setup screen"), h("th", null, "")),
+      row("A / Enter on a value", "Pick it from a list (or − / + for tempo and swing). Editing a field HOLDs it"),
+      row("HOLD", "Held fields stay put. Lineup / Sounds: HOLD keeps every slot; each slot can also be chosen on its own or left as ?"),
+      row("NUDGE (Y, Space)", "Re-roll everything that isn't held.  Release all: let go of every hold"),
+      row("Setups ▾ / Save setup…", "Save the held fields and slots under a name; loading one brings them back held"),
+      row("Game mode…", "Challenge cards, lock at zero, extra ball, the TILT flash (off by default)"),
     ),
     h("button", { class: "row-btn primary", "data-nav": "done", onclick: close }, "Done"),
   ), { wide: true });

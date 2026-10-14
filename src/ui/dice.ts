@@ -1,130 +1,276 @@
-// DICE screen: roll a setup, lock what you like, pick a timer, go.
+// The setup screen: a quick start for a new song. Every field (key, scale, tempo,
+// swing, the lineup and its sounds) can be set directly; editing a field HOLDs it.
+// NUDGE re-rolls whatever isn't held, so randomness is there when you want a push.
+// Game features (challenge cards, locking at zero) live behind Game mode.
 
-import { DICE, decodeSetup, encodeSetup, nudge, roll, songFromSetup, type LockKey, type Setup } from "../engine/dice";
+import {
+  ALL_KINDS_FOR_SETUP, NO_HOLDS, conformSetup, decodeSetup, defaultSpec, encodeSetup, lineupHeld, nudgeSetup, songFromSetup, soundsHeld,
+  type HoldKey, type LineupSpec,
+} from "../engine/dice";
 import { INSTRUMENTS } from "../engine/instruments";
-import { newSong } from "../engine/model";
+import { newSong, type InstrumentKind } from "../engine/model";
 import { NOTE_NAMES, SCALES, scaleById } from "../engine/music";
 import { randomSeed } from "../engine/rng";
 import type { Action } from "./actions";
-import { App, type Screen } from "./app";
+import { App, STORE_PREFIX, type Screen } from "./app";
 import { h } from "./dom";
 import { SpatialNav } from "./nav";
 import { challengeById } from "../engine/challenges";
 import { libraryDialog } from "./library";
 import { phraseGridDialog } from "./phrasegrid";
 import { dmdText } from "./dmd";
+import { gameModeDialog } from "./dialogs";
+import type { MenuItem } from "./overlay";
 
 const TIMERS = [0, 10, 20, 30];
+const RANGES: [number, number][] = [[1, 3], [2, 4], [3, 5], [4, 6], [5, 8]];
+const SETUPS_KEY = STORE_PREFIX + "setups.v1";
+
+/** A saved setup: the fields that were held (and their values) and the lineup spec. */
+interface SavedSetup { name: string; holds: Record<HoldKey, boolean>; values: { key?: number; scale?: string; tempo?: number; swing?: number }; spec: LineupSpec }
+
+function loadSetups(): SavedSetup[] {
+  try { return JSON.parse(localStorage.getItem(SETUPS_KEY) ?? "[]") as SavedSetup[]; } catch { return []; }
+}
+function storeSetups(list: SavedSetup[]) {
+  try { localStorage.setItem(SETUPS_KEY, JSON.stringify(list)); } catch { /* storage full or blocked */ }
+}
 
 export class DiceScreen implements Screen {
   el = h("div", { class: "dice-screen" });
   private nav = new SpatialNav(() => this.el);
   private rolling = 0;
-  private shown: Setup;
-  /** The die that just got nudged (it gives a little shake). */
-  private nudged: LockKey | null = null;
+  private shown;
 
-  constructor(private app: App) {
-    this.shown = app.dice.setup;
-  }
+  constructor(private app: App) { this.shown = app.dice.setup; }
+
+  private get d() { return this.app.dice; }
+  private get cardsOn() { return this.app.settings.gameMode; }
+
+  /** Something changed: remember it, redraw. */
+  private changed() { this.app.saveDice(); this.shown = this.d.setup; this.render(); }
 
   render() {
-    const app = this.app, d = app.dice, s = this.shown;
-    const locks = d.locks;
-    // A reel per die, its HOLD lamp underneath (lit amber while held). Click / A on a reel toggles HOLD.
-    const item = (key: LockKey, label: string, value: string, extra?: HTMLElement) =>
-      h("button", { class: `die reel reel-${key}` + (locks[key] ? " locked" : "") + (this.rolling ? " rolling" : "") + (this.nudged === key ? " nudged" : ""), "data-nav": key, "aria-pressed": String(locks[key]), title: `${label}: click to ${locks[key] ? "release" : "hold"}`, onclick: () => { locks[key] = !locks[key]; this.render(); } },
+    const app = this.app, d = this.d, s = this.shown, holds = d.holds, spec = d.spec, n = s.lineup.length;
+    const anchor = (e: Event) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); return { x: r.left, y: r.bottom + 4 }; };
+    const holdBtn = (id: string, held: boolean, part: boolean, onclick: () => void, title: string) =>
+      h("button", { class: "hold" + (held ? " on" : part ? " part" : ""), "data-nav": `hold-${id}`, "aria-pressed": String(held), onclick, title }, "HOLD");
+    // A plain field: its value opens a list; − / + where it's a number. Editing it HOLDs it.
+    const field = (key: HoldKey, label: string, value: string, menu: () => MenuItem[], step?: (dir: -1 | 1) => void, unit?: string) =>
+      h("div", { class: `die reel reel-${key}` + (holds[key] ? " locked" : "") + (this.rolling && !holds[key] ? " rolling" : "") },
         h("div", { class: "die-label" }, label),
-        h("div", { class: "reel-window" }, value ? h("div", { class: "die-value" }, value) : "", extra ?? ""),
-        h("div", { class: "hold" + (locks[key] ? " on" : "") }, "HOLD"));
-    const saved = App.savedSong();
+        h("div", { class: "reel-window" },
+          h("button", { class: "reel-value", "data-nav": key, title: `Choose the ${label.toLowerCase()} (holds it)`, onclick: (e: Event) => app.overlays.menu(label, menu, anchor(e)) },
+            h("span", { class: "die-value" }, value), unit ? h("span", { class: "die-unit" }, unit) : ""),
+          step ? h("div", { class: "reel-step" },
+            h("button", { class: "step-btn", "data-nav": `${key}-down`, onclick: () => step(-1), title: `${label} down` }, "−"),
+            h("button", { class: "step-btn", "data-nav": `${key}-up`, onclick: () => step(1), title: `${label} up` }, "+")) : ""),
+        holdBtn(key, holds[key], false, () => { holds[key] = !holds[key]; this.changed(); }, holds[key] ? "Held: NUDGE leaves it. Click to release" : "Hold: NUDGE leaves it alone"));
+    const set = (key: HoldKey, apply: () => void) => { apply(); holds[key] = true; this.changed(); };
+
+    const chosenSlots = spec.slots.slice(0, n).filter(Boolean).length, chosenSounds = spec.presets.slice(0, n).filter((p) => p !== null).length;
+    const countLabel = spec.count !== null ? `${spec.count}` : `Random ${spec.min}–${spec.max}`;
+
     this.el.replaceChildren(
       h("div", { class: "dice-head" },
-        h("div", { class: "logo" }, dmdText("TILT", { height: 56, slant: 7 })),
+        h("div", { class: "logo" }, dmdText("TILT", { height: 48, slant: 7 })),
         h("div", { class: "tagline" }, "Just a Nudge")),
       h("div", { class: "reels" },
-        item("key", "Key", NOTE_NAMES[s.key]),
-        item("scale", "Scale", scaleById(s.scale).name),
-        item("tempo", "Tempo", `${s.tempo}`, h("div", { class: "die-unit" }, "bpm")),
-        item("swing", "Swing", s.swing ? `${s.swing}%` : "straight"),
-        item("lineup", "Lineup", "", h("div", { class: "lineup" }, s.lineup.map((l) => h("span", { class: `chip kind-${l.kind}` }, INSTRUMENTS[l.kind].name)))),
-        item("presets", "Sounds", "", h("div", { class: "lineup" }, s.lineup.map((l) => h("span", { class: "chip" }, INSTRUMENTS[l.kind].presets[l.preset]?.name ?? "")))),
-        item("cards", "Challenges", s.cards?.length ? "" : "none", h("div", { class: "cards" }, (s.cards ?? []).map((c) => h("div", { class: "card" }, challengeById(c)?.text ?? c)))),
+        field("key", "Key", NOTE_NAMES[s.key], () => NOTE_NAMES.map((nm, i) => ({ label: nm, checked: s.key === i, run: () => set("key", () => (d.setup = { ...d.setup, key: i })) }))),
+        field("scale", "Scale", scaleById(s.scale).name, () => SCALES.map((sc) => ({ label: sc.name, checked: s.scale === sc.id, run: () => set("scale", () => (d.setup = { ...d.setup, scale: sc.id })) }))),
+        field("tempo", "Tempo", `${s.tempo}`, () => [
+          ...[60, 70, 80, 90, 100, 110, 120, 124, 128, 135, 140, 150, 160, 174].map((t) => ({ label: `${t} bpm`, checked: s.tempo === t, run: () => set("tempo", () => (d.setup = { ...d.setup, tempo: t })) })),
+          { label: "Other…", run: () => { const v = Number(prompt("Tempo (40-250 bpm)", String(s.tempo))); if (v >= 40 && v <= 250) set("tempo", () => (d.setup = { ...d.setup, tempo: Math.round(v) })); } },
+        ], (dir) => set("tempo", () => (d.setup = { ...d.setup, tempo: Math.max(40, Math.min(250, d.setup.tempo + dir)) })), "bpm"),
+        field("swing", "Swing", s.swing ? `${s.swing}%` : "straight", () => [0, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60].map((v) => ({ label: v ? `${v}%` : "Straight", checked: s.swing === v, run: () => set("swing", () => (d.setup = { ...d.setup, swing: v })) })),
+          (dir) => set("swing", () => (d.setup = { ...d.setup, swing: Math.max(0, Math.min(100, d.setup.swing + dir * 5)) }))),
+        // The lineup: how many, and per slot an instrument or "?" (filled by NUDGE).
+        h("div", { class: "die reel reel-lineup" + (lineupHeld(spec, n) ? " locked" : "") },
+          h("div", { class: "die-label" }, "Lineup"),
+          h("div", { class: "reel-window" },
+            h("button", { class: "count-btn", "data-nav": "count", title: "How many instruments: a fixed number, or a random one in a range", onclick: (e: Event) => app.overlays.menu("Instruments", () => this.countMenu(), anchor(e)) }, countLabel),
+            h("div", { class: "slots" }, s.lineup.map((l, i) => {
+              const chosen = !!spec.slots[i];
+              return h("button", { class: `chip slot kind-${l.kind}` + (chosen ? " chosen" : " surprise"), "data-nav": `slot${i}`, title: chosen ? "Chosen: NUDGE leaves it" : "?: NUDGE picks one", onclick: (e: Event) => app.overlays.menu(`Slot ${i + 1}`, () => this.slotMenu(i), anchor(e)) },
+                chosen ? "" : h("span", { class: "q" }, "?"), INSTRUMENTS[l.kind].name);
+            }))),
+          holdBtn("lineup", lineupHeld(spec, n), chosenSlots > 0, () => this.toggleLineup(), "Hold every slot (and the count) / release them all")),
+        h("div", { class: "die reel reel-presets" + (soundsHeld(spec, n) ? " locked" : "") },
+          h("div", { class: "die-label" }, "Sounds"),
+          h("div", { class: "reel-window" },
+            h("div", { class: "slots" }, s.lineup.map((l, i) => {
+              const chosen = spec.presets[i] !== null;
+              return h("button", { class: "chip slot" + (chosen ? " chosen" : " surprise"), "data-nav": `sound${i}`, title: chosen ? "Chosen: NUDGE leaves it" : "?: NUDGE picks one", onclick: (e: Event) => app.overlays.menu(`${INSTRUMENTS[l.kind].name} sound`, () => this.soundMenu(i), anchor(e)) },
+                chosen ? "" : h("span", { class: "q" }, "?"), INSTRUMENTS[l.kind].presets[l.preset]?.name ?? "");
+            }))),
+          holdBtn("presets", soundsHeld(spec, n), chosenSounds > 0, () => this.toggleSounds(), "Hold every sound / release them all")),
+        this.cardsOn ? h("div", { class: "die reel reel-cards" },
+          h("div", { class: "die-label" }, "Challenges"),
+          h("div", { class: "reel-window" }, s.cards?.length
+            ? h("div", { class: "cards" }, s.cards.map((c) => h("div", { class: "card" }, challengeById(c)?.text ?? c)))
+            : h("div", { class: "die-value small" }, "none"))) : "",
       ),
       h("div", { class: "dice-foot" },
+        h("button", { class: "link-btn", "data-nav": "release", onclick: () => this.releaseAll(), title: "Release every HOLD and chosen slot" }, "Release all"),
+        h("button", { class: "small-btn", "data-nav": "setups", onclick: (e: Event) => app.overlays.menu("Setups", () => this.setupsMenu(), anchor(e)), title: "Load a saved setup (its fields come back held)" }, "Setups ▾"),
+        h("button", { class: "small-btn", "data-nav": "save-setup", onclick: () => this.saveSetup(), title: "Save the held fields and lineup slots under a name" }, "Save setup…"),
         h("div", { class: "code" }, h("span", { class: "die-label" }, "Share code "), h("code", null, encodeSetup(s))),
-        h("button", { class: "small-btn", "data-nav": "copy", onclick: () => this.copyCode() }, "Copy code"),
-        h("button", { class: "small-btn", "data-nav": "enter", onclick: () => this.enterCode() }, "Enter a friend's code…"),
-        saved?.tracks.length ? h("button", { class: "small-btn", "data-nav": "continue", onclick: () => this.continueSaved() }, `Continue “${saved.title}”`) : null,
-        h("button", { class: "small-btn", "data-nav": "library", onclick: () => libraryDialog(this.app, { onOpen: () => this.app.show("song") }) }, "Songs…"),
-        h("button", { class: "small-btn", "data-nav": "blank", onclick: () => this.blank() }, "Blank song, no dice"),
+        h("button", { class: "small-btn", "data-nav": "copy", onclick: () => this.copyCode() }, "Copy"),
+        h("button", { class: "small-btn", "data-nav": "enter", onclick: () => this.enterCode() }, "Enter code…"),
+        h("button", { class: "small-btn", "data-nav": "library", onclick: () => libraryDialog(app, { onOpen: () => app.show("song") }) }, "Songs…"),
+        h("button", { class: "small-btn", "data-nav": "blank", onclick: () => this.blank() }, "Blank song"),
       ),
-      // The bar that's always on screen: roll, nudge, timer, challenges, start.
+      // Always on screen: nudge, timer (and game mode), new song.
       h("div", { class: "dice-bar" },
-        h("button", { class: "roll-btn", "data-nav": "roll", onclick: () => this.roll() }, "🎲 ROLL", h("small", null, "Y / Space")),
-        h("button", { class: "roll-btn nudge-btn", "data-nav": "nudge", onclick: () => this.nudge(), title: "Re-roll one die: the one the cursor is on, or a random unlocked one" }, "NUDGE", h("small", null, "one reel")),
+        h("button", { class: "roll-btn nudge-btn", "data-nav": "nudge", onclick: () => this.nudge(), title: "Re-roll everything that isn't held (Y / Space)" }, "NUDGE", h("small", null, "Y / Space")),
         h("div", { class: "timer-pick" },
-          h("div", { class: "die-label" }, "Timer"),
-          h("div", { class: "seg" }, TIMERS.map((m) => h("button", { class: "seg-btn" + (d.minutes === m ? " on" : ""), "data-nav": `t${m}`, onclick: () => { d.minutes = m; this.render(); } }, m ? `${m} min` : "Off")))),
-        h("div", { class: "timer-pick" },
+          h("div", { class: "die-label" }, "Timer ", h("button", { class: "link-btn", "data-nav": "game-mode", onclick: () => gameModeDialog(app, () => this.changed()) }, app.settings.gameMode ? "Game mode: on…" : "Game mode…")),
+          h("div", { class: "seg" }, TIMERS.map((m) => h("button", { class: "seg-btn" + (d.minutes === m ? " on" : ""), "data-nav": `t${m}`, onclick: () => { d.minutes = m; this.changed(); } }, m ? `${m} min` : "Off")))),
+        this.cardsOn ? h("div", { class: "timer-pick" },
           h("div", { class: "die-label" }, "Challenges"),
-          h("div", { class: "seg" }, [0, 1, 2, 3].map((n) => h("button", { class: "seg-btn" + (d.cards === n ? " on" : ""), "data-nav": `cards${n}`, onclick: () => { d.cards = n; d.locks.cards = false; this.roll(); } }, n ? String(n) : "Off")))),
-        h("button", { class: "go-btn", "data-nav": "go", onclick: () => this.start(), title: "Start the jam (Shift+Space / hold Y)" }, h("span", { class: "press-start" }, "PRESS START")),
+          h("div", { class: "seg" }, [0, 1, 2, 3].map((c) => h("button", { class: "seg-btn" + (d.cards === c ? " on" : ""), "data-nav": `cards${c}`, onclick: () => { d.cards = c; d.setup = nudgeSetup(d.setup, { key: true, scale: true, tempo: true, swing: true }, this.heldSpec(), randomSeed(), c); this.changed(); } }, c ? String(c) : "Off")))) : "",
+        h("div", { class: "spacer" }),
+        h("button", { class: "go-btn", "data-nav": "go", onclick: () => this.start(), title: "Make the song (Shift+Space / hold Y)" }, "NEW SONG ▶"),
+        app.song.tracks.length ? h("button", { class: "small-btn continue", "data-nav": "continue", onclick: () => this.continueSaved(), title: "Back to the song you were working on" }, `Continue “${app.song.title}”`) : "",
       ),
     );
     this.nav.paint();
   }
 
+  /** A spec that keeps the whole lineup as it is (for re-dealing cards without touching anything else). */
+  private heldSpec(): LineupSpec {
+    const s = this.d.setup, sp = defaultSpec();
+    sp.count = s.lineup.length;
+    s.lineup.forEach((l, i) => { sp.slots[i] = l.kind; sp.presets[i] = l.preset; });
+    return sp;
+  }
+
+  // ------------------------------------------------------------ lineup editing
+
+  private countMenu(): MenuItem[] {
+    const d = this.d, spec = d.spec;
+    const apply = (fn: () => void) => { fn(); d.setup = conformSetup(d.setup, spec); this.changed(); };
+    return [
+      ...RANGES.map(([a, b]) => ({ label: `Random ${a}–${b}`, checked: spec.count === null && spec.min === a && spec.max === b, run: () => apply(() => { spec.count = null; spec.min = a; spec.max = b; }) })),
+      ...Array.from({ length: 8 }, (_, i) => ({ label: `${i + 1} instrument${i ? "s" : ""}`, checked: spec.count === i + 1, run: () => apply(() => { spec.count = i + 1; }) })),
+    ];
+  }
+
+  private slotMenu(i: number): MenuItem[] {
+    const d = this.d, spec = d.spec;
+    const apply = (k: InstrumentKind | null) => {
+      if (spec.slots[i] !== k) spec.presets[i] = null; // a new instrument: its old sound choice doesn't apply
+      spec.slots[i] = k;
+      if (spec.count === null && i >= spec.min) spec.min = Math.min(spec.max, i + 1);
+      d.setup = conformSetup(d.setup, spec);
+      this.changed();
+    };
+    return [
+      { label: "? Let NUDGE pick", checked: !spec.slots[i], run: () => apply(null) },
+      ...ALL_KINDS_FOR_SETUP.map((k) => ({ label: INSTRUMENTS[k].name, hint: INSTRUMENTS[k].group, checked: spec.slots[i] === k, run: () => apply(k) })),
+    ];
+  }
+
+  private soundMenu(i: number): MenuItem[] {
+    const d = this.d, spec = d.spec, kind = d.setup.lineup[i].kind;
+    const apply = (p: number | null) => { spec.presets[i] = p; d.setup = conformSetup(d.setup, spec); this.changed(); };
+    return [
+      { label: "? Let NUDGE pick", checked: spec.presets[i] === null, run: () => apply(null) },
+      ...INSTRUMENTS[kind].presets.map((p, pi) => ({ label: p.name, checked: spec.presets[i] === pi, run: () => apply(pi) })),
+    ];
+  }
+
+  /** HOLD on the lineup: hold every slot and the count as they are, or release them all. */
+  private toggleLineup() {
+    const d = this.d, spec = d.spec, n = d.setup.lineup.length;
+    if (lineupHeld(spec, n)) { spec.count = null; spec.slots = spec.slots.map(() => null); }
+    else { spec.count = n; d.setup.lineup.forEach((l, i) => (spec.slots[i] = l.kind)); }
+    this.changed();
+  }
+
+  private toggleSounds() {
+    const d = this.d, spec = d.spec, n = d.setup.lineup.length;
+    if (soundsHeld(spec, n)) spec.presets = spec.presets.map(() => null);
+    else d.setup.lineup.forEach((l, i) => (spec.presets[i] = l.preset));
+    this.changed();
+  }
+
+  private releaseAll() {
+    const d = this.d, keep = d.spec;
+    d.holds = { ...NO_HOLDS };
+    d.spec = { ...defaultSpec(), min: keep.min, max: keep.max };
+    this.changed();
+    this.app.overlays.toast("Everything released: NUDGE re-rolls it all", 1500);
+  }
+
+  // ------------------------------------------------------------ saved setups
+
+  private saveSetup() {
+    const d = this.d, s = d.setup;
+    const held = (Object.keys(d.holds) as HoldKey[]).filter((k) => d.holds[k]);
+    const name = prompt(`Save this setup as (holds: ${[...held, d.spec.slots.some(Boolean) ? "lineup slots" : "", d.spec.presets.some((p) => p !== null) ? "sounds" : ""].filter(Boolean).join(", ") || "nothing held yet"})`, "My setup");
+    if (!name?.trim()) return;
+    const values: SavedSetup["values"] = {};
+    for (const k of held) (values as Record<string, unknown>)[k] = s[k];
+    const list = loadSetups().filter((x) => x.name !== name.trim());
+    list.unshift({ name: name.trim().slice(0, 40), holds: { ...d.holds }, values, spec: JSON.parse(JSON.stringify(d.spec)) });
+    storeSetups(list);
+    this.app.overlays.toast(`Saved setup “${name.trim()}”`, 1500);
+  }
+
+  private setupsMenu(): MenuItem[] {
+    const list = loadSetups();
+    if (!list.length) return [{ label: "No saved setups yet (Save setup…)", disabled: true }];
+    return [
+      ...list.map((x) => ({ label: x.name, run: () => this.loadSetup(x) })),
+      { label: "Delete a setup", sub: () => list.map((x) => ({ label: x.name, run: () => { storeSetups(loadSetups().filter((y) => y.name !== x.name)); this.app.overlays.toast(`Deleted “${x.name}”`, 1200); } })) },
+    ];
+  }
+
+  /** Load a setup: its fields come back held; anything it left open is re-rolled to fit. */
+  private loadSetup(x: SavedSetup) {
+    const d = this.d;
+    d.holds = { ...NO_HOLDS, ...x.holds };
+    d.spec = { ...defaultSpec(), ...JSON.parse(JSON.stringify(x.spec)) };
+    d.setup = nudgeSetup({ ...d.setup, ...x.values }, d.holds, d.spec, randomSeed(), this.cardsOn ? d.cards : 0);
+    this.changed();
+    this.app.overlays.toast(`Setup “${x.name}”`, 1200);
+  }
+
+  // ------------------------------------------------------------ actions
+
   handle(a: Action): boolean {
     switch (a.type) {
       case "dir": this.nav.move(a.dir); return true;
       case "confirm": this.nav.focused?.click(); return true;
-      case "play": this.roll(); return true;
+      case "play": this.nudge(); return true;
       case "record": this.start(); return true;
     }
     return false;
   }
 
-  enter() { this.shown = this.app.dice.setup; }
+  enter() { this.shown = this.d.setup; }
 
-  roll() {
-    const d = this.app.dice;
-    const target = roll(d.setup, d.locks, randomSeed(), d.cards);
+  /** NUDGE: re-roll everything that isn't held, with a short tumble on the reels that change. */
+  nudge() {
+    const d = this.d;
+    if (this.rolling) return;
+    const cards = this.cardsOn ? d.cards : 0;
+    const target = nudgeSetup(d.setup, d.holds, d.spec, randomSeed(), cards);
     d.setup = target;
-    // A short tumble: unlocked dice flicker through random values, then land.
+    this.app.saveDice();
     this.rolling = 8;
     const tick = () => {
       if (--this.rolling <= 0) { this.rolling = 0; this.shown = target; this.render(); return; }
-      this.shown = roll(target, d.locks, randomSeed(), d.cards);
+      this.shown = nudgeSetup(target, d.holds, d.spec, randomSeed(), cards);
       this.render();
       setTimeout(tick, 45 + (8 - this.rolling) * 12);
     };
     tick();
   }
 
-  /** Re-roll one die: the one the cursor is on (gamepad / keys), else a random unlocked one. */
-  nudge() {
-    const app = this.app, d = app.dice;
-    if (this.rolling) return;
-    const at = this.nav.focused?.dataset.nav as LockKey | undefined;
-    const usable = (k: LockKey) => !d.locks[k] && (k !== "cards" || d.cards > 0);
-    let die: LockKey | undefined;
-    if (at && DICE.includes(at)) {
-      if (!usable(at)) { app.overlays.toast(d.locks[at] ? "That die is locked" : "No challenge cards to nudge", 1000); return; }
-      die = at;
-    } else {
-      const free = DICE.filter(usable);
-      if (!free.length) { app.overlays.toast("Everything is locked", 1000); return; }
-      die = free[Math.floor(Math.random() * free.length)];
-    }
-    d.setup = this.shown = nudge(d.setup, die, randomSeed(), d.cards);
-    this.nudged = die;
-    this.render();
-    setTimeout(() => { if (this.nudged === die) { this.nudged = null; this.render(); } }, 450);
-  }
-
   private async copyCode() {
-    const code = encodeSetup(this.app.dice.setup);
+    const code = encodeSetup(this.d.setup);
     try { await navigator.clipboard.writeText(code); this.app.overlays.toast(`Copied ${code}`); }
     catch { prompt("Share code", code); }
   }
@@ -134,15 +280,16 @@ export class DiceScreen implements Screen {
     if (!c) return;
     const s = decodeSetup(c);
     if (!s) { this.app.overlays.toast("That code doesn't decode"); return; }
-    this.app.dice.setup = this.shown = s;
-    this.render();
+    this.d.setup = s;
+    this.changed();
   }
 
   start() {
-    const app = this.app;
+    const app = this.app, d = this.d;
     if (this.rolling) return;
-    const song = songFromSetup(app.dice.setup);
-    song.title = `Jam ${new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${NOTE_NAMES[song.key]} ${scaleById(song.scale).name}`;
+    const setup = this.cardsOn ? d.setup : { ...d.setup, cards: undefined };
+    const song = songFromSetup(setup);
+    song.title = `Song ${new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${NOTE_NAMES[song.key]} ${scaleById(song.scale).name}`;
     app.engine.stop();
     app.replaceSong(song);
     app.startTimer(0);
@@ -151,9 +298,9 @@ export class DiceScreen implements Screen {
     app.ed.sceneId = song.scenes[0].id;
     app.ed.focus = "roll";
     const go = () => {
-      app.startTimer(app.dice.minutes);
+      app.startTimer(d.minutes);
       app.show(app.song.tracks.some((t) => t.clips[app.song.scenes[0].id]?.notes.length) ? "song" : "edit");
-      app.overlays.toast(app.dice.minutes ? `${app.dice.minutes} minutes. Go!  Stuck? Hit the bulb` : "Go!  Stuck? Hit the bulb", 3500);
+      app.overlays.toast(d.minutes ? `${d.minutes} minutes on the clock.  Stuck? Hit the bulb` : "New song.  Stuck? Hit the bulb", 3500);
     };
     // Start from a blank page; the phrase grid waits behind the 💡 Stuck? button
     // (or opens here first if the player turned that on in Settings).
@@ -162,10 +309,7 @@ export class DiceScreen implements Screen {
   }
 
   private continueSaved() {
-    const app = this.app, s = App.savedSong();
-    if (!s) return;
-    app.replaceSong(s);
-    app.startTimer(0);
+    const app = this.app;
     app.show("song");
   }
 

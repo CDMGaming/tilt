@@ -11,7 +11,7 @@ import { DRUM_BASE_NOTE } from "../engine/instruments";
 import { PPQ, TICKS_PER_BAR, assignShades, idLanes, normalizeSong, type Song, type Track } from "../engine/model";
 import { scaleById, snapToScale } from "../engine/music";
 import { addNote, addTrack, clearAutoRange, ensureClip, quantizeNotes, setAutoPoint } from "../engine/songops";
-import { NO_LOCKS, roll, type Locks, type Setup } from "../engine/dice";
+import { NO_HOLDS, defaultSpec, nudgeSetup, type Holds, type LineupSpec, type Setup } from "../engine/dice";
 import { mods, type Action } from "./actions";
 import { h } from "./dom";
 import { GamepadInput, bindKeyboard, connectedPads, type MusicKey } from "./input";
@@ -85,6 +85,8 @@ export interface Settings {
   transport: { play?: { ch: number; cc: number }; record?: { ch: number; cc: number } };
   midiSync: SyncMode; // internal clock, follow external, or auto (follow when clock arrives)
   netName: string; // your name in online games
+  /** Game mode: challenge cards, editing locks at zero, extra ball, the TILT flash. Off: TILT is a quick-start DAW. */
+  gameMode: boolean;
   relayUrl: string; // the online server ("" = this computer, port 8787)
   clockOut: string; // MIDI output id to send clock to ("" = off)
   outputDevice: string;
@@ -95,6 +97,25 @@ import { saveToLibrary } from "./library";
 export { STORE_PREFIX };
 const SONG_KEY = STORE_PREFIX + "song.v1";
 const SETTINGS_KEY = STORE_PREFIX + "settings.v1";
+const DICE_KEY = STORE_PREFIX + "dice.v1";
+
+export interface DiceState { setup: Setup; holds: Holds; spec: LineupSpec; minutes: number; cards: number }
+
+/** The last setup screen (holds and lineup choices included), or a fresh one: timer off, nothing held. */
+function loadDice(): DiceState {
+  const fresh = (): DiceState => ({ setup: nudgeSetup(null, NO_HOLDS, defaultSpec()), holds: { ...NO_HOLDS }, spec: defaultSpec(), minutes: 0, cards: 0 });
+  try {
+    const raw = localStorage.getItem(DICE_KEY);
+    if (!raw) return fresh();
+    const d = JSON.parse(raw) as Partial<DiceState>;
+    const f = fresh();
+    if (!d.setup?.lineup?.length) return f;
+    const spec = { ...f.spec, ...(d.spec ?? {}) };
+    spec.slots = [...(spec.slots ?? []), ...f.spec.slots].slice(0, f.spec.slots.length);
+    spec.presets = [...(spec.presets ?? []), ...f.spec.presets].slice(0, f.spec.presets.length);
+    return { setup: d.setup, holds: { ...f.holds, ...(d.holds ?? {}) }, spec, minutes: d.minutes ?? 0, cards: d.cards ?? 0 };
+  } catch { return fresh(); }
+}
 
 export class App {
   engine = new AudioEngine();
@@ -131,8 +152,9 @@ export class App {
     stepInput: false, stepTick: 0, sel: new Set(), selAnchor: null, placing: null, grabbing: false, clipboard: [],
     octave: 3, drumPart: 0, topPitch: 72,
   };
-  settings: Settings = { notePreview: true, scaleLock: true, fold: false, countIn: true, gridAtStart: false, recQuantize: true, padLayout: "auto", outputDevice: "", transport: {}, midiSync: "auto", clockOut: "", netName: "", relayUrl: "" };
-  dice: { setup: Setup; locks: Locks; minutes: number; cards: number } = { setup: roll(null, NO_LOCKS), locks: { ...NO_LOCKS }, minutes: 20, cards: 0 };
+  settings: Settings = { notePreview: true, scaleLock: true, fold: false, countIn: true, gridAtStart: false, recQuantize: true, padLayout: "auto", outputDevice: "", transport: {}, midiSync: "auto", clockOut: "", netName: "", relayUrl: "", gameMode: false };
+  /** The setup screen: the current result, what's held, the lineup spec, the timer (remembered between sessions). */
+  dice: DiceState = loadDice();
   timer = { total: 0, endsAt: 0, running: false, done: false };
   locked = false;
   recording = false;
@@ -999,10 +1021,17 @@ export class App {
     if (performance.now() >= this.timer.endsAt) {
       this.timer.running = false;
       this.timer.done = true;
-      this.locked = true;
       if (this.recording) { this.finishRecording(); this.recording = false; }
+      if (this.settings.gameMode) {
+        this.locked = true;
+        this.renderHeader();
+        this.onTimeUp?.();
+        return;
+      }
+      // Plain timer: playback stops and the display says TIME; you keep working.
+      this.stopLocal();
       this.renderHeader();
-      this.onTimeUp?.();
+      this.overlays.toast("TIME", 3000);
     }
   }
 
@@ -1027,6 +1056,11 @@ export class App {
       const s = localStorage.getItem(SONG_KEY);
       return s ? normalizeSong(JSON.parse(s) as Song) : null;
     } catch { return null; }
+  }
+
+  /** Remember the setup screen (holds, lineup spec, timer) for next time. */
+  saveDice() {
+    try { localStorage.setItem(DICE_KEY, JSON.stringify(this.dice)); } catch { /* storage full or blocked */ }
   }
 
   saveSettings() {

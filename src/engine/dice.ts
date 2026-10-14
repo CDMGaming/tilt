@@ -25,6 +25,9 @@ export const NO_LOCKS: Locks = { key: false, scale: false, tempo: false, swing: 
 // The sampler stays out of the dice (it is for sounds you bring); everything else can be rolled.
 export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "poly", "pad", "fm", "wave", "lead", "chip"];
 
+/** What a lineup slot can be set to by hand: every instrument, the sampler included. */
+export const ALL_KINDS_FOR_SETUP: InstrumentKind[] = [...DICE_KINDS, "sampler"];
+
 const SCALE_WEIGHTS: [string, number][] = [
   ["minor", 6], ["major", 4], ["dorian", 3], ["minpenta", 3], ["majpenta", 2], ["phrygian", 2],
   ["mixolydian", 2], ["harmminor", 2], ["lydian", 1], ["blues", 2],
@@ -38,19 +41,6 @@ const TEMPO_BANDS: [[number, number, number], number][] = [
   [[133, 150, 0.15], 2],
   [[151, 175, 0.1], 1], // dnb-ish
 ];
-
-export const DICE: LockKey[] = ["key", "scale", "tempo", "swing", "lineup", "presets", "cards"];
-
-/**
- * NUDGE: re-roll just one die, keeping everything else as it is. Tries a few
- * seeds so the die actually changes (a die can land on the same face).
- */
-export function nudge(prev: Setup, die: LockKey, seed: number = randomSeed(), cardCount = 0): Setup {
-  const only = Object.fromEntries(DICE.map((k) => [k, k !== die])) as Locks;
-  let next = roll(prev, only, seed, cardCount);
-  for (let i = 1; i < 8 && encodeSetup(next) === encodeSetup(prev); i++) next = roll(prev, only, seed + i * 7919, cardCount);
-  return next;
-}
 
 export function roll(prev: Setup | null, locks: Locks, seed: number = randomSeed(), cardCount = 0): Setup {
   const r = new Rng(seed);
@@ -83,6 +73,94 @@ export function roll(prev: Setup | null, locks: Locks, seed: number = randomSeed
   });
   const cards = keep("cards") && prev?.cards ? prev.cards : cardCount ? dealChallenges(cardCount, seed) : undefined;
   return cards?.length ? { key, scale, tempo, swing, lineup, cards } : { key, scale, tempo, swing, lineup };
+}
+
+// ---------- the setup screen: hold what you like, NUDGE re-rolls the rest ----------
+
+/** The plain fields you can hold (the lineup and its sounds are held slot by slot, see LineupSpec). */
+export type HoldKey = "key" | "scale" | "tempo" | "swing";
+export type Holds = Record<HoldKey, boolean>;
+export const NO_HOLDS: Holds = { key: false, scale: false, tempo: false, swing: false };
+export const MAX_SLOTS = 8;
+
+/**
+ * The lineup: how many instruments (a fixed count, or a random one between min and
+ * max), and per slot a chosen instrument / preset or null ("?", filled on NUDGE).
+ */
+export interface LineupSpec {
+  count: number | null;
+  min: number;
+  max: number;
+  slots: (InstrumentKind | null)[];
+  presets: (number | null)[];
+}
+
+export const defaultSpec = (): LineupSpec => ({ count: null, min: 3, max: 5, slots: Array(MAX_SLOTS).fill(null), presets: Array(MAX_SLOTS).fill(null) });
+
+/** Every slot up to the count chosen: NUDGE won't change the lineup. */
+export const lineupHeld = (spec: LineupSpec, n: number) => spec.count !== null && spec.slots.slice(0, n).every((k) => k !== null);
+export const soundsHeld = (spec: LineupSpec, n: number) => spec.presets.slice(0, n).every((p) => p !== null);
+
+/**
+ * NUDGE: re-roll every field that isn't held. Chosen lineup slots and sounds stay put;
+ * "?" slots get instruments the band doesn't have yet (drums, bass, harmony, lead first),
+ * distinct where possible, and sounds no other track of the same instrument uses.
+ */
+export function nudgeSetup(prev: Setup | null, holds: Holds, spec: LineupSpec, seed: number = randomSeed(), cardCount = 0): Setup {
+  const r = new Rng(seed);
+  const keep = (k: HoldKey) => prev !== null && holds[k];
+  const [lo, hi, swingChance] = r.weighted(TEMPO_BANDS);
+  const tempo = keep("tempo") ? prev!.tempo : r.int(lo, hi);
+  const swing = keep("swing") ? prev!.swing : r.chance(swingChance) ? r.pick([15, 25, 35, 45, 55]) : 0;
+  const key = keep("key") ? prev!.key : r.int(0, 11);
+  const scale = keep("scale") ? prev!.scale : r.weighted(SCALE_WEIGHTS);
+  const clampN = (x: number) => Math.max(1, Math.min(MAX_SLOTS, Math.round(x)));
+  const n = spec.count !== null ? clampN(spec.count) : r.int(clampN(Math.min(spec.min, spec.max)), clampN(Math.max(spec.min, spec.max)));
+  const kinds = fillKinds(spec.slots.slice(0, n).concat(Array(MAX_SLOTS).fill(null)).slice(0, n), r);
+  const lineup = fillPresets(kinds, spec, () => null, r);
+  const cards = cardCount ? dealChallenges(cardCount, seed) : undefined;
+  return cards?.length ? { key, scale, tempo, swing, lineup, cards } : { key, scale, tempo, swing, lineup };
+}
+
+/** Fill the "?" slots: roles the band lacks first, instruments it doesn't have yet where possible. */
+function fillKinds(kinds: (InstrumentKind | null)[], r: Rng): InstrumentKind[] {
+  const ROLES = ["drums", "bass", "harmony", "lead", "harmony", "bass", "lead", "harmony"];
+  for (let i = 0; i < kinds.length; i++) {
+    if (kinds[i]) continue;
+    const have = kinds.filter((k): k is InstrumentKind => !!k);
+    const groups = new Set<string>(have.map((k) => INSTRUMENTS[k].group));
+    const want = ROLES.find((g) => !groups.has(g)) ?? r.pick(ROLES);
+    const unused = DICE_KINDS.filter((k) => !have.includes(k));
+    const inRole = unused.filter((k) => INSTRUMENTS[k].group === want);
+    kinds[i] = r.pick(inRole.length ? inRole : unused.length ? unused : DICE_KINDS);
+  }
+  return kinds as InstrumentKind[];
+}
+
+/** Each slot's sound: the chosen one, else `keep(i)` (what it had), else a new one no same-instrument track uses. */
+function fillPresets(kinds: InstrumentKind[], spec: LineupSpec, keep: (i: number, kind: InstrumentKind) => number | null, r: Rng) {
+  const used: { kind: InstrumentKind; preset: number }[] = [];
+  return kinds.map((kind, i) => {
+    const n = INSTRUMENTS[kind].presets.length, chosen = spec.presets[i], had = keep(i, kind);
+    const taken = used.filter((u) => u.kind === kind).map((u) => u.preset);
+    const preset = chosen !== null && chosen !== undefined && chosen < n ? chosen
+      : had !== null && had < n && !taken.includes(had) ? had
+      : pickPreset(kind, taken, () => r.next());
+    used.push({ kind, preset });
+    return { kind, preset };
+  });
+}
+
+/**
+ * After an edit to the lineup (count, a slot's instrument or sound): apply it right away,
+ * keeping every other slot as it is; new slots are filled, extra ones dropped.
+ */
+export function conformSetup(s: Setup, spec: LineupSpec, seed: number = randomSeed()): Setup {
+  const r = new Rng(seed);
+  const n = spec.count !== null ? Math.max(1, Math.min(MAX_SLOTS, spec.count)) : Math.max(spec.min, Math.min(spec.max, s.lineup.length));
+  const kinds = fillKinds(Array.from({ length: n }, (_, i) => spec.slots[i] ?? s.lineup[i]?.kind ?? null), r);
+  const lineup = fillPresets(kinds, spec, (i, kind) => (s.lineup[i]?.kind === kind ? s.lineup[i].preset : null), r);
+  return { ...s, lineup };
 }
 
 /** A random preset index for `kind`, avoiding `avoid` while there are others left. */

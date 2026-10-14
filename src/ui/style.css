@@ -911,3 +911,48 @@ body:not(.phone) .thumplab .module { max-width: none; display: grid; grid-templa
 body:not(.phone) .thumplab .module-title { grid-column: 1 / -1; justify-self: start; }
 body:not(.phone) .thumplab .module .knob { width: auto; }
 body:not(.phone) .thumplab > .knob-row { grid-area: master; flex-direction: column; justify-content: center; padding-left: 14px; border-left: 1px solid var(--line); }
+
+/* ---------- The setup screen as a quick start: editable reels, HOLD, NUDGE, NEW SONG ---------- */
+.reel-value { background: transparent; border: none; box-shadow: none; padding: 4px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--ink); border-radius: var(--r-s); }
+.reel-value:hover:not(:disabled) { background: #ffffff0c; }
+.reel-step { display: flex; gap: 6px; }
+.step-btn { min-width: 30px; padding: 2px 8px; font-weight: 800; }
+.count-btn { font: 700 13px var(--font-display); letter-spacing: .06em; padding: 4px 10px; color: var(--dmd); border-color: color-mix(in srgb, var(--dmd) 40%, var(--line)); }
+.slots { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+.chip.slot { cursor: pointer; font: inherit; font-size: 12px; padding: 3px 8px; }
+.chip.slot.surprise { opacity: .78; border-style: dashed; }
+.chip.slot .q { color: var(--dmd); font-weight: 900; margin-right: 4px; }
+.chip.slot.chosen { box-shadow: 0 0 0 1px color-mix(in srgb, var(--dmd) 55%, transparent); }
+.hold.part { color: var(--dmd); border-color: color-mix(in srgb, var(--dmd) 50%, var(--line)); background: color-mix(in srgb, var(--dmd) 10%, var(--raise)); }
+.link-btn { background: none; border: none; box-shadow: none; padding: 2px 4px; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; font-size: 12px; text-transform: none; letter-spacing: 0; }
+.link-btn:hover:not(:disabled) { background: none; color: var(--ink); }
+.dice-foot.minor { margin: -6px 0 6px; }
+.dice-bar .spacer { flex: 1; }
+.dice-bar .continue { align-self: center; }
+.go-btn { font-family: var(--font-display); letter-spacing: .06em; }
+.reels { grid-template-columns: minmax(84px, .8fr) minmax(110px, 1.1fr) minmax(96px, .9fr) minmax(96px, .9fr) minmax(170px, 1.7fr) minmax(170px, 1.7fr); }
+.reels:has(.reel-cards) { grid-template-columns: minmax(84px, .8fr) minmax(110px, 1.1fr) minmax(96px, .9fr) minmax(96px, .9fr) minmax(160px, 1.6fr) minmax(160px, 1.6fr) minmax(150px, 1.5fr); }
+.die-value.small { font-size: 16px; color: var(--dim); }
+.preset-nudge { font: 700 11px var(--font-display); letter-spacing: .1em; color: var(--dmd); border-color: color-mix(in srgb, var(--dmd) 45%, var(--line)); padding: 6px 10px; }
+.switch-row { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 10px 14px; font-weight: 700; }
+.switch-row.on { border-color: var(--dmd); color: var(--dmd); }
+.game-list { margin: 0 0 6px 18px; padding: 0; }
+@media (max-width: 1000px) { .reels, .reels:has(.reel-cards) { grid-template-columns: repeat(4, minmax(0, 1fr)); } .reel-lineup, .reel-presets { grid-column: span 2; } }
+/* Big windows: the reels grow, and the bar's controls line up under them instead of hugging the window edges. */
+@media (min-width: 1500px) {
+  .reels { width: min(1480px, 100%); }
+  .dice-bar { padding-inline: max(16px, calc((100% - 1480px) / 2)); }
+  .reel-window { min-height: clamp(160px, calc(100vh - 720px), 320px); }
+  .reel .die-value { font-size: 34px; }
+  .reel-scale .die-value, .reel-swing .die-value { font-size: 22px; }
+  .chip.slot { font-size: 13px; padding: 4px 10px; }
+}
+/* Phones: NUDGE and NEW SONG side by side, the timer one line under them, so the bar stays short. */
+body.phone .dice-bar { display: grid; grid-template-columns: 1fr 1.5fr; gap: 6px 8px; padding: 8px 12px; }
+body.phone .dice-bar .nudge-btn { grid-column: 1; grid-row: 1; padding: 6px 10px; }
+body.phone .dice-bar .nudge-btn small { display: none; }
+body.phone .dice-bar .go-btn { grid-column: 2; grid-row: 1; }
+body.phone .dice-bar .spacer { display: none; }
+body.phone .dice-bar .timer-pick { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 8px; flex-wrap: wrap; }
+body.phone .dice-bar .timer-pick .seg-btn { padding: 4px 9px; }
+body.phone .dice-bar .continue { grid-column: 1 / -1; justify-self: center; padding: 3px 12px; }

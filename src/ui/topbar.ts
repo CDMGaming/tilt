@@ -35,7 +35,7 @@ export function bindTopbar(app: App, el: HTMLElement) {
         h("button", { class: "tp-btn mode", onclick: () => { app.songMode = app.songMode === "scene" ? "song" : "scene"; render(); }, title: "Loop the scene, or play the whole song" },
           app.songMode === "scene" ? "⟳" : s.songLoop ? "⟳" : "→", h("span", { class: "mode-label" }, app.songMode === "scene" ? " Scene" : " Song")),
         h("button", { class: "tp-btn" + (s.metronome ? " on" : ""), onclick: () => app.edit("Metronome", () => (s.metronome = !s.metronome)), title: "Metronome" }, "♩")),
-      s.challenges?.length ? (() => {
+      s.challenges?.length && app.settings.gameMode ? (() => {
         const st = challengeStatus(s);
         return h("button", { class: "chip-btn", title: st.map((c) => `${c.met ? "✓" : "○"} ${c.text}`).join("\n"), onclick: () => app.overlays.dialog("Challenge cards", (close) => h("div", { class: "form" },
           st.map((c) => h("p", { class: "note big" }, `${c.met ? "✅" : "⬜"} ${c.text}`)),
@@ -172,12 +172,12 @@ export function bindTopbar(app: App, el: HTMLElement) {
     if (!isPhone()) {
       timerCell.className = "dmd-timer" + state;
       timerCell.replaceChildren(t.running || t.done
-        ? dmdText(t.done ? "0:00" : fmtTime(left), { height: 30 })
+        ? dmdText(t.done ? (app.settings.gameMode ? "0:00" : "TIME") : fmtTime(left), { height: 30 })
         : h("div", { class: "free-play" }, dmdText("FREE", { height: 13 }), dmdText("PLAY", { height: 13 })));
       return;
     }
     if (!t.running && !t.done) { timerEl.textContent = ""; timerEl.className = "timer"; return; }
-    timerEl.replaceChildren(dmdText(t.done ? "0:00" : fmtTime(left), { height: 16 }));
+    timerEl.replaceChildren(dmdText(t.done ? (app.settings.gameMode ? "0:00" : "TIME") : fmtTime(left), { height: 16 }));
     timerEl.className = "timer on" + state;
   };
   app.renderHeader = render;
