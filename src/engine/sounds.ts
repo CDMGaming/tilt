@@ -21,7 +21,11 @@ const DEFAULT_ROLE: Record<InstrumentKind, Role[]> = {
   fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"],
 };
 const TAGS: Partial<Record<InstrumentKind, Record<string, Role[]>>> = {
-  acid: { "Square Pluck": ["bass", "pluck"], "Acid Arp": ["bass", "arp"], "Bounce Arp": ["bass", "arp"], "Chirp": ["arp", "lead"] },
+  acid: {
+    "Square Pluck": ["bass", "pluck"], "Acid Arp": ["bass", "arp"], "Bounce Arp": ["bass", "arp"], "Chirp": ["arp", "lead"],
+    "Spit": ["bass", "pluck"], "Fizz": ["bass", "pluck"], "Slow Melt": ["bass", "lead"], "Crushed": ["bass", "fx"],
+    "Acid Lead": ["lead"], "Laser Tooth": ["lead", "fx"], "Squeak Arp": ["arp"], "Down Arp": ["arp", "bass"], "Dice Arp": ["arp"],
+  },
   poly: {
     "Stab Club": ["keys", "pluck"], "Slow Strings": ["pad"], "Soft Pad": ["pad"], "Pluck Chords": ["pluck", "keys"],
     "Lead Saw": ["lead"],
@@ -78,7 +82,7 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
   ],
   acid: [
     pick("wave", 0.3, [0, 1]), knob("cutoff", 0.2, 0.15, 0.75), knob("reso", 0.22, 0.1, 0.92), knob("envmod", 0.25), knob("decay", 0.2, 0.05, 0.8),
-    knob("accent", 0.25), knob("bite", 0.25), knob("glide", 0.12), knob("sub", 0.25), pick("arpMode", 0.3, [0, 1, 2, 3]),
+    knob("accent", 0.25), knob("bite", 0.25), knob("gnaw", 0.2, 0, 0.7), knob("glide", 0.12), knob("sub", 0.25), pick("arpMode", 0.3, [0, 1, 2, 3]),
   ],
   poly: [
     pick("wave2", 0.25, [0, 1, 2, 3]), pick("semi2", 0.2, [-12, 0, 0, 5, 7, 12]), knob("detune", 0.2, 0, 0.6),

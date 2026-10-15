@@ -833,9 +833,34 @@ body.phone .dice-bar .roll-btn, body.phone .dice-bar .go-btn { padding: 8px 14px
 .panel.kind-analog .inst-name { color: #2a1607; border: none; border-radius: 4px; padding: 3px 18px;
   background: radial-gradient(circle at 7px 50%, #0006 0 2px, transparent 2.5px), radial-gradient(circle at calc(100% - 7px) 50%, #0006 0 2px, transparent 2.5px), repeating-linear-gradient(90deg, #ffffff14 0 1px, transparent 1px 3px), var(--track); }
 .panel.kind-analog { --cap-dash: 1.2 1.2; --cap-edge: color-mix(in srgb, var(--track) 70%, #000); --cap-edge-w: 1.6; --cap-fill: #2a2018; }
-/* Squelch: a little LCD window; thin bright arcs. */
+/* Squelch: brushed silver, black engraved labels, red pointer knobs, an accent LED. */
 .panel.kind-acid .inst-name { font-family: var(--font-mono); background: #0d1306; color: var(--track); border: 1px solid color-mix(in srgb, var(--track) 45%, #000); box-shadow: inset 0 0 8px #000a; text-shadow: 0 0 6px color-mix(in srgb, var(--track) 60%, transparent); }
-.panel.kind-acid { --arc-w: 3; --cap-fill: #141a10; --knob-dot: var(--track); }
+.panel.kind-acid { --arc-w: 2.5; --cap-fill: #1b1b1d; --cap-edge: #000; --cap-edge-w: 1.4; --knob-dot: #e8322c; --dot-w: 3; }
+.panel-body.squelch { padding: 0; overflow: hidden; border-top-color: #9aa0a6; }
+.sq-plate { position: relative; padding: 10px 16px 8px; color: #141414;
+  background: repeating-linear-gradient(90deg, #ffffff10 0 1px, #00000008 1px 2px, transparent 2px 4px), linear-gradient(180deg, #d9dcdf, #b9bdc2 55%, #a9adb2);
+  box-shadow: inset 0 1px 0 #fff8, inset 0 -1px 0 #0004; }
+.sq-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.sq-logo { font: 800 15px var(--font-display); letter-spacing: .38em; color: #1a1a1a; text-shadow: 0 1px 0 #fff9; }
+.sq-accent { display: inline-flex; align-items: center; gap: 6px; font: 700 10px var(--font-display); letter-spacing: .14em; color: #2a2a2a; }
+.sq-led { width: 9px; height: 9px; border-radius: 50%; border: 1px solid #400; background: color-mix(in srgb, #ff2a1a calc(var(--glow) * 100%), #4a0d0a);
+  box-shadow: 0 0 calc(var(--glow) * 10px) #ff3a2a; }
+.sq-row { align-items: flex-end; gap: 6px 10px; flex-wrap: wrap; }
+.panel .sq-plate .knob-label { color: #161616; opacity: 1; font-weight: 700; text-shadow: 0 1px 0 #fff8; }
+.panel .sq-plate .knob-value { color: #3a3a3a; }
+/* Switches: black rocker bodies with white engraving, the value in red. */
+.panel .sq-plate .switch { background: linear-gradient(180deg, #2b2b2e, #161618); border-color: #000; box-shadow: inset 0 1px 0 #ffffff1c, 0 1px 0 #fff7; }
+.panel .sq-plate .switch-label { color: #d8d8d8; opacity: 1; }
+.panel .sq-plate .switch-value { color: #ff4a3c; }
+.panel .sq-plate .knob-track { stroke: #0000002e; }
+.panel .sq-plate .knob-val { stroke: #c4241e; }
+.sq-char { display: flex; gap: 8px; padding: 4px 8px 2px; border-radius: 10px; background: #00000012; box-shadow: inset 0 1px 2px #0003, 0 1px 0 #fff6; }
+.panel .sq-char .knob-label { color: #8f1612; }
+.sq-lid { display: block; width: 100%; margin-top: 8px; padding: 4px; font: 700 11px var(--font-display); letter-spacing: .2em; color: #1d1d1d;
+  background: linear-gradient(180deg, #c7cbcf, #a9adb2); border: 1px solid #0003; border-radius: 6px; box-shadow: inset 0 1px 0 #fff8; }
+.sq-lid.open { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.sq-on { color: #c4241e; }
+.sq-arp { padding: 8px 12px; background: #00000016; border: 1px solid #0003; border-top: none; border-radius: 0 0 6px 6px; gap: 12px; }
 /* Wobbler: a neon tube in a pill; glowing rims. */
 .panel.kind-wobble .inst-name { border-radius: 999px; background: transparent; border: 2px solid var(--track); box-shadow: 0 0 10px color-mix(in srgb, var(--track) 45%, transparent), inset 0 0 8px color-mix(in srgb, var(--track) 30%, transparent); }
 .panel.kind-wobble { --cap-edge: var(--track); --cap-edge-w: 1.5; --cap-fill: #1f1428; }

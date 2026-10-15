@@ -158,6 +158,13 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** C, one row of big knobs, the arp tucked under a flip-down lid.
 - **Theme:** brushed silver, black engraved labels, red pointer knobs, an LED for accent.
 - **Presets:** 28 (classic 303-style lines, dirty, rubbery, acid leads, arps).
+- **Status: built.** Gnaw is new (0 = off, so old songs sound as before). Bite already did what the
+  table says. The MORE page is gone; filter 2, LFOs and the built-in effect are now hidden voicing
+  that presets set (Wah Wah, Hollow Square, Wet Rubber, Phase Line, Duck Bass, Crushed, Acid Lead).
+  The original 10 presets keep their places (setup codes point at presets by position); 18 new
+  ones follow. Near-duplicates removed: none (the 10 were already distinct). Every preset is
+  level-matched to about -18.5 dB RMS. Previews: `deno run -A --sloppy-imports tools/preview.ts acid <dir>`
+  (rendered locally, not in git).
 
 ### Chordette: one-finger chords
 - **Idea:** play one key, hear a chord in the song's scale, with a workstation's choice of sounds.

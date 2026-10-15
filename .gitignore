@@ -5,3 +5,6 @@ dist/
 docs/reference/
 # wrangler pages dev (tools/pages-dev.ts): local KV / R2 stand-ins
 .wrangler/
+
+# Audio previews: rendered locally by tools/preview.ts, too big for git
+docs/redesign8/

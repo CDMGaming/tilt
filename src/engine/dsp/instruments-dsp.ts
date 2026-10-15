@@ -94,6 +94,7 @@ export class AcidDSP implements InstrumentDSP {
   private sub = new Osc();
   private filt = new Ladder();
   private dc = new OnePole();
+  private gnawHp = new OnePole();
   private held: number[] = []; // in press order
   private freq = 110; // current (gliding) frequency
   private target = 110;
@@ -177,7 +178,10 @@ export class AcidDSP implements InstrumentDSP {
     const wave = Math.round(p.wave ?? 0);
     const decayK = Math.exp(-4.6 / ((p.decay ?? 0.35) * sr));
     const glideK = 1 - Math.exp(-1 / ((p.glide ?? 0.06) * sr));
-    const reso = Math.min(0.97, p.reso ?? 0.6);
+    // Gnaw: the oscillator frequency-modulates the cutoff at audio rate, resonance tilts up
+    // and a little low end is trimmed (0 = off, exactly as before).
+    const gnaw = p.gnaw ?? 0;
+    const reso = Math.min(0.97, (p.reso ?? 0.6) + gnaw * 0.15);
     const bite = p.bite ?? 0.3;
     const accent = (p.accent ?? 0.5) * this.accentNow;
     const level = (p.level ?? 0.7) * 0.4;
@@ -195,12 +199,14 @@ export class AcidDSP implements InstrumentDSP {
       this.amp = smooth(this.amp, ampTarget, this.gate ? 0.02 : 0.004);
       this.fenv *= decayK;
       this.cut = smooth(this.cut, p.cutoff ?? 500, 0.002);
-      const fc = Math.min(sr * 0.42, this.cut * Math.pow(2, this.fenv * ((p.envmod ?? 0.5) * 5 + accent * 2.5)));
       const fq = this.freq * voiceMod.pitch;
       let x = this.osc.next(fq, sr, wave === 1 ? 1 : 0);
+      const fm = gnaw > 0 ? Math.pow(2, gnaw * 2.5 * x) : 1;
+      const fc = Math.min(sr * 0.42, this.cut * fm * Math.pow(2, this.fenv * ((p.envmod ?? 0.5) * 5 + accent * 2.5)));
       if (subLv > 0) x += this.sub.next(fq * 0.5, sr, 1) * subLv * 0.7;
       x *= 1 + bite * 3; // "bite": drive into the saturating ladder input
       let y = this.filt.process(x, fc, reso, sr) * (1 + reso * 1.5);
+      if (gnaw > 0) y = this.gnawHp.hp(y, 20 + gnaw * 160, sr) * (1 + gnaw * 0.9); // trimmed, not quieter
       if (bite > 0.01) y = Math.tanh(y * (1 + bite * 2.5));
       y = this.dc.hp(y, 20, sr) * this.amp * level;
       L[i] += y;

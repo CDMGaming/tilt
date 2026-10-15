@@ -19,6 +19,11 @@ import { h } from "./dom";
 import { trackColor } from "./theme";
 import { control, type ControlHost } from "./knob";
 
+/** Instruments rebuilt in the overhaul (docs/instruments.md): their own panel only, no MORE page. */
+const REDESIGNED = new Set<Track["kind"]>(["acid"]);
+/** Squelch's arp lid, open or shut (per session). */
+let squelchLid = false;
+
 export function buildPanel(app: App, track: Track): HTMLElement {
   const host: ControlHost = {
     get: (id) => getParam(track, id),
@@ -153,13 +158,23 @@ export function buildPanel(app: App, track: Track): HTMLElement {
       ),
     );
   } else if (track.kind === "acid") {
+    // Squelch: one row of big knobs (Bite and Gnaw are the character controls), the arp under a lid.
+    const arpOn = (track.params.arpOn ?? 0) >= 0.5;
     body = h("div", { class: "panel-body squelch" },
-      h("div", { class: "knob-row" },
-        ctl("wave", "Wave"), ctl("cutoff", "Cutoff", "l"), ctl("reso", "Reso", "l"), ctl("envmod", "Env mod"),
-        ctl("decay", "Decay"), ctl("accent", "Accent"), ctl("bite", "BITE", "l")),
-      h("div", { class: "knob-row" },
-        ctl("glide", "Glide"), ctl("sub", "Sub"), ctl("level", "Level"),
-        h("div", { class: "section-title small" }, "Arp"), ctl("arpOn", "Arp"), ctl("arpMode", "Mode"), ctl("arpRate", "Rate"), ctl("arpRange", "Oct")),
+      h("div", { class: "sq-plate" },
+        h("div", { class: "sq-head" },
+          h("span", { class: "sq-logo" }, "SQUELCH"),
+          h("span", { class: "sq-accent" }, h("span", { class: "sq-led", style: `--glow:${(track.params.accent ?? 0.5).toFixed(2)}` }), "ACCENT")),
+        h("div", { class: "knob-row sq-row" },
+          ctl("wave", "Wave"), ctl("cutoff", "Cutoff", "l"), ctl("reso", "Reso", "l"), ctl("envmod", "Env"), ctl("decay", "Decay"),
+          h("div", { class: "sq-char" }, ctl("bite", "★ Bite", "l"), ctl("gnaw", "★ Gnaw", "l")),
+          ctl("accent", "Accent"), ctl("glide", "Slide")),
+        h("button", {
+          class: "sq-lid" + (squelchLid ? " open" : ""), "data-nav": "arp-lid", "aria-expanded": String(squelchLid),
+          title: "The arpeggiator: hold notes and it plays them in steps, locked to the song",
+          onclick: () => { squelchLid = !squelchLid; app.screens.edit.render(); },
+        }, squelchLid ? "ARP ▴" : "ARP ▾", arpOn ? h("span", { class: "sq-on" }, " · ON") : ""),
+        squelchLid ? h("div", { class: "knob-row sq-arp" }, ctl("arpOn", "Arp"), ctl("arpMode", "Mode"), ctl("arpRate", "Rate"), ctl("arpRange", "Oct")) : null),
       keyboard(app, track),
     );
   } else {
@@ -175,7 +190,8 @@ export function buildPanel(app: App, track: Track): HTMLElement {
     );
   }
   // Synths: SOUND (their own knobs, unchanged) | MORE (the voice toolkit) | XY.
-  if (!hasToolkit(track.kind)) return h("div", { class: `panel kind-${track.kind}`, style: `--track:${trackColor(track)}` }, presetBar, body);
+  // A redesigned instrument has only its own panel: the toolkit is hidden voicing its presets set.
+  if (!hasToolkit(track.kind) || REDESIGNED.has(track.kind)) return h("div", { class: `panel kind-${track.kind}`, style: `--track:${trackColor(track)}` }, presetBar, body);
   const hasXy = !!XY_PARAMS[track.kind];
   const page = !hasXy && app.ed.panelPage === "xy" ? "main" : app.ed.panelPage ?? "main";
   const tab = (id: "main" | "more" | "xy", label: string, title: string) => h("button", {
