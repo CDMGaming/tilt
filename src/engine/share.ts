@@ -2,7 +2,7 @@
 // same code and any edit a new one), what a shared song may contain, and the
 // no-server fallback link (#song=...). Pure: runs in the app, the Pages Functions and tests.
 
-import { MAX_BARS, MAX_SCENES, MAX_TRACKS, type Song } from "./model";
+import { MAX_BARS, MAX_SCENES, MAX_TRACKS, normalizeSong, type Song } from "./model";
 import { SCALES } from "./music";
 
 /** Caps: the song as JSON, and all its user samples together. */
@@ -26,11 +26,14 @@ export const showCode = (code: string) => `TILT-${code}`;
 /** Fields that aren't the song itself: where it sits in your library, its share history. */
 const LOCAL_FIELDS = ["libId", "shares", "sharedFrom"] as const;
 
-/** The song as it's shared: a deep copy without the local fields. */
+/**
+ * The song as it's shared: a deep copy, filled in the way opening a song fills it in (mixer,
+ * FX slots...), without the local fields. So a song you open and share again untouched keeps its code.
+ */
 export function shareable(song: Song): Song {
-  const s = JSON.parse(JSON.stringify(song)) as Song & Record<string, unknown>;
+  const s = normalizeSong(JSON.parse(JSON.stringify(song))) as Song & Record<string, unknown>;
   for (const k of LOCAL_FIELDS) delete s[k];
-  return s;
+  return JSON.parse(JSON.stringify(s));
 }
 
 /** JSON with object keys sorted at every level: the same song always gives the same text. */

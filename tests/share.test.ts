@@ -188,3 +188,14 @@ Deno.test("samples: the 2 GB total cap refuses new samples (507), already-stored
   assertEquals(await put(b), 507);
   assertEquals(await put(a), 200); // the same sample again: nothing new to store
 });
+
+Deno.test("an opened shared song, shared again untouched, keeps its code", async () => {
+  const { normalizeSong } = await import("../src/engine/model.ts");
+  const env: ShareEnv = { SHARES: memKV(), SAMPLES: memR2() };
+  const song = demo(); // not normalized, as a song built in code can be
+  const { code } = await (await postShare(post({ song }), env)).json();
+  const opened = normalizeSong((await (await getShare(code, env)).json()).song); // what the app does when it opens it
+  Object.assign(opened, { libId: "s999", sharedFrom: code });
+  assertEquals(await songCode(opened), code);
+  assertEquals((await (await postShare(post({ song: opened }), env)).json()).code, code);
+});
