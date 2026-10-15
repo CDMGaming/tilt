@@ -1,22 +1,20 @@
 // Standard MIDI File export and import.
 
-import { DRUM_BASE_NOTE, INSTRUMENTS, KIT_SAMPLES, drumCount } from "./instruments";
+import { DRUM_BASE_NOTE, INSTRUMENTS, drumCount } from "./instruments";
 import { PPQ, TICKS_PER_BAR, newSong, type InstrumentKind, type Song, type Track } from "./model";
 import { addNote, addTrack, ensureClip } from "./songops";
 import { expandPitch, firstInstance, nextInstance, swingTicks, type PlayMode } from "./timeline";
 
 // General MIDI drum notes for our drum sounds, so the file drops onto any drum rack.
-const GM_BY_SAMPLE: Record<string, number> = {
-  "kick-deep": 36, "kick-punch": 36, "kick-boom": 35, "snare-crack": 38, "snare-body": 40, clap: 39, rim: 37,
-  "hat-closed": 42, "hat-open": 46, "hat-pedal": 44, "tom-low": 45, "tom-high": 48, cowbell: 56, shaker: 70, crash: 49, zap: 81,
-};
+/** General MIDI drum notes for Kitbox sounds, by part (kick, snare, clap, hats, tom, rim, perc). */
+const GM_KIT_PART = [36, 38, 39, 42, 46, 45, 37, 56];
 const GM_ANALOG = [36, 38, 39, 42, 46, 45, 50, 37]; // kick, snare, clap, hats, toms, rim
 
 function gmDrum(track: Track, pitch: number): number {
   const part = pitch - DRUM_BASE_NOTE;
   if (track.kind === "analog") return GM_ANALOG[part] ?? pitch;
-  const smp = KIT_SAMPLES[Math.round(track.params[`p${part}smp`] ?? 0)];
-  return GM_BY_SAMPLE[smp] ?? pitch;
+  const smp = Math.round(track.params[`p${part}smp`] ?? part);
+  return GM_KIT_PART[smp % 8] ?? pitch;
 }
 
 // ------------------------------------------------------------ export

@@ -109,6 +109,13 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
   shuffle, Minimal, Industrial, and 2-3 synthesised kits (rendered by tools/make-kit.ts like today's).
   Only CC0 samples (§7).
 - **Presets:** each kit plus 1-2 variants = 24 or more.
+- **Status: built.** 12 kits, all synthesised by tools/make-kit.ts (CC0, ours): Classic, House, Techno,
+  Trap, Electro, Lo-fi, Minimal, Industrial, Garage, Boom Bap, Disco, Chip. The Acoustic and Breaks kits
+  need recorded samples, so they wait for a CC0 download you approve (with Garage, Phase 4). Kits load
+  when a song first uses them (~200 KB each). Punch: kick / tom transient + low end + glue compression
+  on the kit; Smack: snare / clap transient + 200 Hz body + more room. Per-channel defaults balance the
+  parts (every sample is normalised to the same peak). 24 presets (each kit + a variant), level-matched
+  partway like Thump Lab.
 
 ### Thump Lab: analog drum machine
 - **Idea:** synthesised drums in colourful modules, every part tweakable, nothing sampled.

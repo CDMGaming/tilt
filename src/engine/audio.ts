@@ -52,7 +52,7 @@ export class AudioEngine {
     this.ctx = new AudioContext(opts);
     await this.ctx.audioWorklet.addModule(processorUrl);
     this.master = buildMaster(this.ctx);
-    await this.loadKit();
+    await this.loadKitSounds([0, 1, 2, 3, 4, 5, 6, 7]); // the first kit, so the first beat is instant
     this.sync(song);
   }
 
@@ -61,13 +61,42 @@ export class AudioEngine {
     return (this.ctx.baseLatency || 0) + (this.ctx.outputLatency || 0);
   }
 
-  private async loadKit() {
-    const bufs = await Promise.all(KIT_SAMPLES.map(async (name) => {
-      const res = await fetch(`${import.meta.env.BASE_URL}kit/${name}.wav`);
-      return this.ctx.decodeAudioData(await res.arrayBuffer());
-    }));
+  private kitLoads = new Map<number, Promise<void>>();
+
+  /** Kitbox sounds are fetched when a song first uses them (a kit is ~200 KB; there are twelve). */
+  private loadKitSounds(indices: number[]): Promise<void> {
+    if (!this.samples.length) this.samples = KIT_SAMPLES.map(() => new Float32Array(0));
     this.samplesRate = this.ctx.sampleRate; // decodeAudioData resamples to the context rate
-    this.samples = bufs.map((b) => b.getChannelData(0).slice());
+    return Promise.all(indices.filter((i) => i >= 0 && i < KIT_SAMPLES.length).map((i) => {
+      let p = this.kitLoads.get(i);
+      if (!p) {
+        p = fetch(`${import.meta.env.BASE_URL}kit/${KIT_SAMPLES[i]}.wav`)
+          .then((r) => r.arrayBuffer())
+          .then((b) => this.ctx.decodeAudioData(b))
+          .then((buf) => { this.samples[i] = buf.getChannelData(0).slice(); })
+          .catch(() => { this.kitLoads.delete(i); });
+        this.kitLoads.set(i, p);
+      }
+      return p;
+    })).then(() => undefined);
+  }
+
+  /** The kit sounds a drum track uses. */
+  private kitSoundsOf(t: Track): number[] {
+    return Array.from({ length: 8 }, (_, i) => Math.round(t.params[`p${i}smp`] ?? i));
+  }
+
+  /** Load any kit sound the song's drum tracks use but we don't have yet, then hand them to those tracks. */
+  private fetchMissingKitSounds(song: Song) {
+    const missing = [...new Set(song.tracks.filter((t) => t.kind === "drums").flatMap((t) => this.kitSoundsOf(t)))]
+      .filter((i) => !this.kitLoads.has(i));
+    if (!missing.length) return;
+    void this.loadKitSounds(missing).then(() => {
+      for (const t of this.song.tracks) {
+        const tn = this.tracks.get(t.id);
+        if (t.kind === "drums" && tn) this.post(tn, { t: "samples", samples: this.samples, samplesRate: this.samplesRate });
+      }
+    });
   }
 
   // ------------------------------------------------------------ track graph
@@ -101,6 +130,7 @@ export class AudioEngine {
       tn.sendGain.gain.setTargetAtTime(audible, this.ctx.currentTime, 0.01);
     }
     for (const [id, tn] of this.tracks) if (!seen.has(id)) { this.dispose(tn); this.tracks.delete(id); }
+    this.fetchMissingKitSounds(song);
     applyMaster(this.master, song.master, this.ctx.currentTime);
     if (this.playing) this.reanchor();
   }
@@ -515,7 +545,8 @@ export class AudioEngine {
     const soloing = song.tracks.some((t) => t.solo);
     const byTrack = new Map<number, TimedEvent[]>();
     for (const ev of events) push(byTrack, ev);
-    // Re-decode the kit at the offline rate so drums play at the right pitch.
+    // Every kit sound the song uses, then at the offline rate so drums play at the right pitch.
+    await this.loadKitSounds([...new Set(song.tracks.filter((t) => t.kind === "drums").flatMap((t) => this.kitSoundsOf(t)))]);
     const samples = this.samplesRate === sr ? this.samples : await resample(this.samples, this.samplesRate, sr);
     for (const t of song.tracks) {
       if (opts.onlyTrack !== undefined && t.id !== opts.onlyTrack) continue;
@@ -660,6 +691,7 @@ function scheduleFade(g: AudioParam, inst: SceneInstance) {
 
 async function resample(data: Float32Array[], from: number, to: number): Promise<Float32Array[]> {
   return Promise.all(data.map(async (d) => {
+    if (!d.length) return d; // a kit sound the song doesn't use (not loaded)
     const len = Math.ceil((d.length * to) / from);
     const off = new OfflineAudioContext(1, len, to);
     const b = off.createBuffer(1, d.length, from);

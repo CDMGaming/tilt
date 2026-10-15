@@ -1,7 +1,7 @@
 // Instrument panels: each instrument has its own layout and look, plus a
 // keyboard (synths, scale-locked by default) or pads (drums).
 
-import { DRUM_BASE_NOTE, INSTRUMENTS, drumPartName, formatParam, fromUnit, isDrumKind, paramDef, toUnit } from "../engine/instruments";
+import { DRUM_BASE_NOTE, DRUM_PART_LABELS, INSTRUMENTS, KITS, drumPartName, kitSoundName, formatParam, fromUnit, isDrumKind, paramDef, toUnit } from "../engine/instruments";
 import { LEAD_KINDS, POLY_KINDS, XY_PARAMS, hasToolkit } from "../engine/toolkit";
 import { FX_TYPES } from "../engine/params";
 import type { Track } from "../engine/model";
@@ -20,7 +20,9 @@ import { trackColor } from "./theme";
 import { control, type ControlHost } from "./knob";
 
 /** Instruments rebuilt in the overhaul (docs/instruments.md): their own panel only, no MORE page. */
-const REDESIGNED = new Set<Track["kind"]>(["acid", "analog"]);
+const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums"]);
+/** Kitbox: the channel whose More drawer is open (per session). */
+let kitboxMore: number | null = null;
 /** Squelch's arp lid, open or shut (per session). */
 let squelchLid = false;
 
@@ -48,18 +50,32 @@ export function buildPanel(app: App, track: Track): HTMLElement {
 
   let body: HTMLElement;
   if (track.kind === "drums") {
-    const part = app.ed.drumPart;
+    // Kitbox: the kit on a phosphor LCD with the master controls (Punch and Smack are the
+    // character controls), then eight channel strips; a strip's More opens its drawer.
+    const kit = Math.round(track.params.kit ?? 0);
+    const more = kitboxMore !== null && kitboxMore < 8 ? kitboxMore : null;
+    const strip = (i: number) => h("div", { class: `kb-strip c${i}` + (app.ed.drumPart === i ? " sel" : "") },
+      pad(app, track, i),
+      h("button", { class: "kb-sound", "data-nav": `sound${i}`, title: "Choose this channel's sound (any kit)", onclick: (e: Event) => kitSoundMenu(app, track, i, e.currentTarget as HTMLElement) },
+        kitSoundName(Math.round(track.params[`p${i}smp`] ?? i)), " ▾"),
+      h("div", { class: "kb-knobs" }, ctl(`p${i}tune`, "Tune", "s"), ctl(`p${i}decay`, "Time", "s"), ctl(`p${i}pan`, "Pan", "s"), ctl(`p${i}send`, "Room", "s")),
+      ctl(`p${i}level`, "Level"),
+      h("button", { class: "kb-more" + (more === i ? " on" : ""), "data-nav": `more${i}`, "aria-expanded": String(more === i), title: "One-shot / gate, reverse, choke group, velocity, filter, start",
+        onclick: () => { kitboxMore = more === i ? null : i; app.ed.drumPart = i; app.screens.edit.render(); } }, more === i ? "More ▴" : "More ▾"));
+    const stepKit = (d: number) => setKit(app, track, (kit + d + KITS.length) % KITS.length);
     body = h("div", { class: "panel-body kitbox" },
-      h("div", { class: "pads" }, Array.from({ length: 8 }, (_, i) => pad(app, track, i))),
-      h("div", { class: "part-edit" },
-        h("div", { class: "section-title" }, `Pad ${part + 1} · ${drumPartName(track.params, part, track.kind)}`),
-        h("div", { class: "knob-row" },
-          ctl(`p${part}smp`, "Sound", "l"), ctl(`p${part}tune`, "Tune"), ctl(`p${part}decay`, "Decay"),
-          ctl(`p${part}level`, "Level"), ctl(`p${part}pan`, "Pan")),
-        h("div", { class: "knob-row" },
-          h("div", { class: "section-title small" }, "Part FX"), ctl(`p${part}drive`, "Drive"), ctl(`p${part}tone`, "Tone"),
-          h("div", { class: "section-title small" }, "Master"), ctl("choke", "Hat choke"), ctl("level", "Level")),
-      ),
+      h("div", { class: "kb-top" },
+        h("div", { class: "kb-lcd" },
+          h("button", { class: "kb-step", "data-nav": "kit-prev", title: "Previous kit", onclick: () => stepKit(-1) }, "◀"),
+          h("button", { class: "kb-kit", "data-nav": "kit", title: "Choose a kit: loads its eight sounds", onclick: (e: Event) => kitMenu(app, track, e.currentTarget as HTMLElement) },
+            h("span", { class: "kb-lcd-small" }, `KIT ${String(kit + 1).padStart(2, "0")}`), h("span", { class: "kb-lcd-big" }, KITS[kit].toUpperCase())),
+          h("button", { class: "kb-step", "data-nav": "kit-next", title: "Next kit", onclick: () => stepKit(1) }, "▶")),
+        h("div", { class: "kb-master" }, ctl("punch", "★ Punch", "l"), ctl("smack", "★ Smack", "l"), ctl("time", "Time"), ctl("room", "Room"), ctl("level", "Level"))),
+      h("div", { class: "kb-strips" }, Array.from({ length: 8 }, (_, i) => strip(i))),
+      more !== null ? h("div", { class: `kb-drawer c${more}` },
+        h("span", { class: "kb-drawer-title" }, `${more + 1} · ${DRUM_PART_LABELS[more]}`),
+        ctl(`p${more}gate`, "Play"), ctl(`p${more}rev`, "Reverse"), ctl(`p${more}choke`, "Choke"),
+        ctl(`p${more}vel`, "Velocity"), ctl(`p${more}tone`, "Filter"), ctl(`p${more}start`, "Start")) : null,
     );
   } else if (track.kind === "analog") {
     // Thump Lab: eight compact modules, each with only the controls that matter for that drum,
@@ -284,13 +300,43 @@ function xyPage(app: App, track: Track, host: ControlHost): HTMLElement {
     h("p", { class: "note" }, "While recording, moves are written into the clip as automation for both parameters."));
 }
 
+/** Load a kit: its eight sounds go to the eight channels; the rest of the settings stay. */
+function setKit(app: App, track: Track, k: number) {
+  app.edit("Kit", () => {
+    track.params.kit = k;
+    for (let i = 0; i < 8; i++) track.params[`p${i}smp`] = k * 8 + i;
+  });
+  setTimeout(() => app.engine.preview(track.id, DRUM_BASE_NOTE, 100, 0.4), 250); // after the kit has loaded
+}
+
+function kitMenu(app: App, track: Track, el: HTMLElement) {
+  const r = el.getBoundingClientRect();
+  app.overlays.menu("Kits", () => KITS.map((name, k) => ({
+    label: name, checked: Math.round(track.params.kit ?? 0) === k, keepOpen: true, run: () => setKit(app, track, k),
+  })), { x: r.left, y: r.bottom + 4 });
+}
+
+/** A channel's sound: the same part from every kit first, then any sound of any kit. */
+function kitSoundMenu(app: App, track: Track, part: number, el: HTMLElement) {
+  const r = el.getBoundingClientRect();
+  const set = (smp: number) => {
+    app.edit("Sound", () => (track.params[`p${part}smp`] = smp));
+    setTimeout(() => app.engine.preview(track.id, DRUM_BASE_NOTE + part, 100, 0.4), 200);
+  };
+  const cur = Math.round(track.params[`p${part}smp`] ?? part);
+  app.overlays.menu(`${part + 1} · ${DRUM_PART_LABELS[part]} sound`, () => [
+    ...KITS.map((_, k) => ({ label: kitSoundName(k * 8 + part), checked: cur === k * 8 + part, keepOpen: true, run: () => set(k * 8 + part) })),
+    { label: "Any sound", sub: () => KITS.map((name, k) => ({
+      label: name, sub: () => Array.from({ length: 8 }, (_, q) => ({ label: kitSoundName(k * 8 + q), checked: cur === k * 8 + q, keepOpen: true, run: () => set(k * 8 + q) })),
+    })) },
+  ], { x: r.left, y: r.bottom + 4 });
+}
+
 function previewSound(app: App, track: Track) {
   const g = INSTRUMENTS[track.kind].group;
   app.engine.preview(track.id, isDrumKind(track.kind) ? DRUM_BASE_NOTE : (g === "bass" ? 36 : 60) + app.song.key, 100, 0.4);
 }
 
-/** Previous / next through factory then user presets. */
-/** A random sound for this track (not the one it has, nor one another track of the same instrument uses). */
 /** The sound a track has now, as a dice sound (a user preset counts as the first built-in one). */
 export function trackSound(t: Track): SoundRef {
   if (t.gen !== undefined) return { kind: t.kind, preset: genBase(t.kind, t.gen), gen: t.gen };

@@ -69,12 +69,14 @@ const knob = (id: string, spread: number, lo?: number, hi?: number): Move => ({ 
 const pick = (id: string, flip: number, values: number[]): Move => ({ id, flip, values });
 const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 
-const KIT_SOUNDS = [[0, 1, 2], [3, 4], [5, 6], [7, 9], [8], [10, 11], [6, 12, 13], [12, 13, 14, 15]];
+/** Kitbox: a part may swap to the same part of another kit (12 kits, 8 parts each). */
+const KIT_SOUNDS = Array.from({ length: 8 }, (_, p) => Array.from({ length: 12 }, (_, k) => k * 8 + p));
 
 export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
-  drums: KIT_SOUNDS.flatMap((sounds, i) => [
-    pick(`p${i}smp`, 0.35, sounds), knob(`p${i}tune`, 0.08), knob(`p${i}decay`, 0.12), knob(`p${i}drive`, 0.15, 0, 0.6), knob(`p${i}tone`, 0.12, 0.2, 0.8),
-  ]),
+  drums: [
+    knob("punch", 0.25), knob("smack", 0.25), knob("time", 0.15), knob("room", 0.2, 0, 0.7),
+    ...KIT_SOUNDS.flatMap((sounds, i) => [pick(`p${i}smp`, 0.3, sounds), knob(`p${i}tune`, 0.08), knob(`p${i}decay`, 0.1), knob(`p${i}drive`, 0.15, 0, 0.6), knob(`p${i}tone`, 0.1, 0.3, 0.7)]),
+  ],
   analog: [
     pick("model", 0.2, [0, 1, 2, 3, 4]),
     knob("kTune", 0.12), knob("kDecay", 0.18), knob("kBend", 0.22), knob("kBoost", 0.2, 0, 0.8), knob("kClick", 0.2),

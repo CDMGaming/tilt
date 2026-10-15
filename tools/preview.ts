@@ -2,9 +2,9 @@
 // worklet uses (instrument DSP, hidden voicing toolkit, built-in effect), plus a loudness table.
 //   deno run -A --sloppy-imports tools/preview.ts <kind> <outDir> [--no-wav]
 
-import { INSTRUMENTS, presetParams } from "../src/engine/instruments.ts";
+import { INSTRUMENTS, KIT_SAMPLES, presetParams } from "../src/engine/instruments.ts";
 import type { InstrumentKind } from "../src/engine/model.ts";
-import { AcidDSP, PolyDSP, type InstrumentDSP } from "../src/engine/dsp/instruments-dsp.ts";
+import { AcidDSP, DrumsDSP, PolyDSP, type InstrumentDSP } from "../src/engine/dsp/instruments-dsp.ts";
 import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.ts";
 import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
 import { ChipDSP, FmDSP } from "../src/engine/dsp/instruments3-dsp.ts";
@@ -46,8 +46,18 @@ function phrase(params: Record<string, number>): Ev[] {
   return [{ t: 0, len: 1.5, pitch: 60, vel: 100 }];
 }
 
+/** Kitbox's sounds, read from public/kit (16-bit mono WAVs at 32 kHz). */
+const KIT_RATE = 32000;
+const kitSounds = kind === "drums" ? KIT_SAMPLES.map((name) => {
+  const b = Deno.readFileSync(new URL(`../public/kit/${name}.wav`, import.meta.url)), v = new DataView(b.buffer);
+  const n = (b.length - 44) / 2, x = new Float32Array(n);
+  for (let i = 0; i < n; i++) x[i] = v.getInt16(44 + i * 2, true) / 32768;
+  return x;
+}) : [];
+
 function dspFor(params: Record<string, number>, clock: { bpm: number; zero: number }): InstrumentDSP {
   switch (kind) {
+    case "drums": { const d = new DrumsDSP(params, kitSounds, SR); d.samplesRate = KIT_RATE; return d; }
     case "acid": return new AcidDSP(params, SR, clock);
     case "lead": return new LeadDSP(params, SR);
     case "analog": return new ThumpLabDSP(params, SR);

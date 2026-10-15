@@ -439,7 +439,6 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .panel .key small { color: var(--key-chord); }
 
 /* drum machines lay out side by side: pads, then the editor */
-.panel.kind-drums .panel-body { flex-direction: row; flex-wrap: wrap; gap: 16px; }
 .pads { display: grid; grid-template-columns: repeat(4, 84px); grid-template-rows: repeat(2, 72px); gap: 8px; }
 .pads.four { grid-template-columns: repeat(2, 84px); grid-template-rows: repeat(2, 72px); }
 .pad { background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-m); display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between;
@@ -800,7 +799,44 @@ body.phone .dice-bar .roll-btn, body.phone .dice-bar .go-btn { padding: 8px 14px
 
 /* Kitbox: a stencilled hardware plate; flat caps, chunky arcs. */
 .panel.kind-drums .inst-name { background: var(--track); color: #1a0a0c; border: none; border-radius: 3px; letter-spacing: .2em; box-shadow: inset 0 -2px 0 #0003; }
-.panel.kind-drums { --arc-w: 5.5; --arc-cap: butt; --cap-fill: #241a22; --cap-edge: color-mix(in srgb, var(--track) 40%, #000); }
+/* Kitbox: matte black rubber, a green phosphor LCD, a coloured cap per channel. */
+.panel.kind-drums { --arc-w: 3.5; --arc-cap: butt; --cap-fill: #2a2a2d; --cap-edge: #000; --knob-dot: #e9e9e9; }
+.panel-body.kitbox { padding: 10px; gap: 10px; background: radial-gradient(#ffffff06 1px, transparent 1.4px) 0 0 / 4px 4px, #141416; border-top-color: #333; }
+.kb-top { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.kb-lcd { display: flex; align-items: stretch; gap: 0; border-radius: 6px; padding: 3px; background: #050a05; box-shadow: inset 0 0 0 2px #000, inset 0 0 14px #000, 0 1px 0 #ffffff14; }
+.kb-lcd button { background: transparent; border: none; color: #7dff8a; font-family: var(--font-mono); text-shadow: 0 0 6px #3dff5a99; }
+.kb-step { padding: 0 10px; font-size: 14px; }
+.kb-kit { display: flex; flex-direction: column; align-items: flex-start; min-width: 180px; padding: 4px 10px;
+  background: repeating-linear-gradient(0deg, #ffffff05 0 1px, transparent 1px 3px) !important; }
+.kb-lcd-small { font-size: 10px; letter-spacing: .2em; opacity: .7; }
+.kb-lcd-big { font-size: 22px; letter-spacing: .12em; font-weight: 700; }
+.kb-master { display: flex; gap: 6px 10px; align-items: flex-end; flex-wrap: wrap; }
+.kb-master .knob:nth-child(-n+2) .knob-label { color: #ffcf4a; opacity: 1; }
+.kb-strips { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; }
+.kb-strip { --cap: #e8644f; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; padding: 0 3px 5px; border-radius: 8px;
+  background: linear-gradient(180deg, #232326, #19191b); box-shadow: inset 0 1px 0 #ffffff12, 0 2px 3px #0008; }
+.kb-strip.c0, .kb-drawer.c0 { --cap: #ef5a4a; } .kb-strip.c1, .kb-drawer.c1 { --cap: #f29a3a; } .kb-strip.c2, .kb-drawer.c2 { --cap: #f0cf47; } .kb-strip.c3, .kb-drawer.c3 { --cap: #8fd14f; }
+.kb-strip.c4, .kb-drawer.c4 { --cap: #47c9a8; } .kb-strip.c5, .kb-drawer.c5 { --cap: #4fa3ea; } .kb-strip.c6, .kb-drawer.c6 { --cap: #a387ef; } .kb-strip.c7, .kb-drawer.c7 { --cap: #ee7cb8; }
+.kb-strip.sel { box-shadow: inset 0 0 0 2px var(--cap), 0 2px 3px #0008; }
+.kb-strip .pad { width: 100%; min-height: 40px; border-radius: 8px 8px 4px 4px; padding: 4px 6px; border: none; color: #111;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--cap) 88%, #fff), color-mix(in srgb, var(--cap) 80%, #000)); box-shadow: inset 0 -2px 0 #0004; }
+.kb-strip .pad.selected { filter: brightness(1.15); }
+.kb-strip .pad-num { color: #0009; font-weight: 800; }
+.kb-strip .pad-label { color: #111; font-weight: 800; font-size: 12px; text-transform: uppercase; }
+.kb-sound { width: 100%; padding: 3px 2px; font: 600 10px var(--font-mono); color: #7dff8a; background: #050a05; border: 1px solid #000; border-radius: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kb-knobs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); justify-items: center; width: 100%; }
+.kb-strip .knob { width: auto; }
+.kb-strip .knob-val { stroke: var(--cap); }
+.kb-more { width: 100%; padding: 3px 0; font: 700 10px var(--font-display); letter-spacing: .12em; background: #0006; border: 1px solid #0008; color: #bbb; border-radius: 4px; }
+.kb-more.on { color: #111; background: var(--cap, #888); }
+.kb-strip .kb-more.on { background: var(--cap); }
+.kb-drawer { display: flex; gap: 6px 12px; align-items: center; flex-wrap: wrap; padding: 8px 12px; border-radius: 8px; background: #1f1f22; border-left: 4px solid var(--cap); }
+.kb-drawer-title { font: 800 12px var(--font-display); letter-spacing: .1em; color: var(--cap); text-transform: uppercase; min-width: 90px; }
+@media (max-width: 1100px) { .kb-strips { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+body.phone .kb-strips { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+body.phone .kb-top { justify-content: center; }
+body.phone .kb-kit { min-width: 140px; }
 /* Thump Lab: brushed metal with screws; knurled caps. */
 .panel.kind-analog .inst-name { color: #2a1607; border: none; border-radius: 4px; padding: 3px 18px;
   background: radial-gradient(circle at 7px 50%, #0006 0 2px, transparent 2.5px), radial-gradient(circle at calc(100% - 7px) 50%, #0006 0 2px, transparent 2.5px), repeating-linear-gradient(90deg, #ffffff14 0 1px, transparent 1px 3px), var(--track); }

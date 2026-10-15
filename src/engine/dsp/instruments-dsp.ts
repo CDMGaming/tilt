@@ -2,6 +2,7 @@
 // sample indices [i0, i1). Runs in the AudioWorklet.
 
 import { ADSR, Ladder, OnePole, Osc, SVF, mtof, smooth, voiceMod } from "./units";
+import { Reverb } from "./fx-dsp";
 import { DRUM_BASE_NOTE, DRUM_PARTS } from "../instruments";
 
 export interface Clock { bpm: number; zero: number } // zero = context time of song tick 0
@@ -22,66 +23,123 @@ const panR = (p: number) => Math.sin(((p + 1) * Math.PI) / 4);
 
 // ---------------------------------------------------------------- drums
 
-interface DrumVoice { part: number; pos: number; rate: number; amp: number; decayK: number; vel: number; kill: number }
+interface DrumVoice { part: number; pos: number; rate: number; amp: number; decayK: number; vel: number; kill: number; age: number; data: Float32Array }
 
+/**
+ * Kitbox: eight sample channels. Per channel: tune, time (decay), level, pan, room send, and
+ * in the More drawer one-shot / gate, reverse, choke group, velocity, filter and start.
+ * Punch and Smack are the character controls: Punch shapes the kick and tom attack, adds low
+ * end and glues the kit; Smack shapes the snare and clap attack, adds a 200 Hz body and room.
+ */
 export class DrumsDSP implements InstrumentDSP {
   private voices: DrumVoice[] = [];
   private filters = Array.from({ length: DRUM_PARTS }, () => new OnePole());
-  constructor(public params: Record<string, number>, private samples: Float32Array[], private sr: number) {}
+  private lows = Array.from({ length: DRUM_PARTS }, () => new OnePole());
+  private body = Array.from({ length: DRUM_PARTS }, () => new SVF());
+  private room: Reverb;
+  private rl = new Float32Array(128);
+  private rr = new Float32Array(128);
+  private dl = new Float32Array(128);
+  private dr = new Float32Array(128);
+  private il = new Float32Array(128);
+  private ir = new Float32Array(128);
+  private glue = 1;
+  constructor(public params: Record<string, number>, private samples: Float32Array[], private sr: number) {
+    this.room = new Reverb(sr, 0.55);
+  }
 
   setSamples(s: Float32Array[]) { this.samples = s; }
 
   noteOn(pitch: number, vel: number) {
     const part = pitch - DRUM_BASE_NOTE;
     if (part < 0 || part >= DRUM_PARTS) return;
-    const p = this.params;
-    // Retrigger and hat choke: fade the old voice fast instead of cutting (no clicks).
+    const p = this.params, pp = (k: string, d: number) => p[`p${part}${k}`] ?? d;
+    // Retrigger and choke groups: fade the old voice fast instead of cutting (no clicks).
+    const group = Math.round(pp("choke", 0));
     for (const v of this.voices) {
-      if (v.part === part || (p.choke >= 0.5 && part === 3 && v.part === 4)) v.kill = 1;
+      if (v.part === part || (group > 0 && Math.round(p[`p${v.part}choke`] ?? 0) === group)) v.kill = 1;
     }
-    const smp = Math.round(p[`p${part}smp`] ?? 0);
-    if (!this.samples[smp]) return;
-    const decay = p[`p${part}decay`] ?? 1;
+    let data = this.samples[Math.round(pp("smp", part))];
+    if (!data || data.length < 2) return;
+    if (pp("rev", 0) >= 0.5) data = data.slice().reverse();
+    const sens = pp("vel", 1), v = vel / 127;
+    const decay = pp("decay", 1.2) * (p.time ?? 1);
     this.voices.push({
-      part, pos: 0, vel: velGain(vel / 127),
-      rate: Math.pow(2, (p[`p${part}tune`] ?? 0) / 12) * (this.samplesRate / this.sr),
-      amp: 1, decayK: Math.exp(-4.6 / (decay * this.sr)), kill: 0,
+      part, data, pos: Math.floor(pp("start", 0) * data.length), vel: 1 - sens + sens * velGain(v),
+      rate: Math.pow(2, pp("tune", 0) / 12) * (this.samplesRate / this.sr),
+      amp: 1, decayK: Math.exp(-4.6 / (decay * this.sr)), kill: 0, age: 0,
     });
     if (this.voices.length > 24) this.voices.shift();
   }
   samplesRate = 48000; // sample data rate (set by processor)
-  noteOff() { /* one-shot */ }
+  noteOff(pitch: number) {
+    const part = pitch - DRUM_BASE_NOTE;
+    if ((this.params[`p${part}gate`] ?? 0) < 0.5) return; // one-shot
+    for (const v of this.voices) if (v.part === part) v.kill = 1;
+  }
   allOff() { for (const v of this.voices) v.kill = 1; }
 
   render(L: Float32Array, R: Float32Array, i0: number, i1: number) {
-    const p = this.params;
-    const master = p.level ?? 0.85;
+    const p = this.params, sr = this.sr;
+    const master = (p.level ?? 0.85) * 0.7;
+    const punch = p.punch ?? 0.3, smack = p.smack ?? 0.3;
+    const n = i1 - i0;
+    if (this.rl.length < n) { this.rl = new Float32Array(n); this.rr = new Float32Array(n); this.dl = new Float32Array(n); this.dr = new Float32Array(n); this.il = new Float32Array(n); this.ir = new Float32Array(n); }
+    const rl = this.rl, rr = this.rr, dryL = this.dl, dryR = this.dr;
+    rl.fill(0, 0, n); rr.fill(0, 0, n); dryL.fill(0, 0, n); dryR.fill(0, 0, n);
     for (const v of this.voices) {
-      const data = this.samples[Math.round(p[`p${v.part}smp`] ?? 0)];
-      if (!data) { v.amp = 0; continue; }
-      const level = (p[`p${v.part}level`] ?? 0.8) * v.vel * master;
-      const pan = p[`p${v.part}pan`] ?? 0;
+      const pp = (k: string, d: number) => p[`p${v.part}${k}`] ?? d;
+      const data = v.data;
+      const level = pp("level", 0.8) * v.vel;
+      const pan = pp("pan", 0);
       const gl = panL(pan) * level, gr = panR(pan) * level;
-      const drive = p[`p${v.part}drive`] ?? 0;
-      const dg = 1 + drive * 10, dn = Math.tanh(dg);
-      const tone = p[`p${v.part}tone`] ?? 0;
+      const drive = pp("drive", 0), dg = 1 + drive * 10, dn = Math.tanh(dg);
+      const tone = pp("tone", 0);
       const f = this.filters[v.part];
-      for (let i = i0; i < i1; i++) {
+      const lowEnd = v.part === 0 || v.part === 5 ? punch : 0; // kick and tom
+      const snap = v.part === 1 || v.part === 2 ? smack : 0; // snare and clap
+      const send = Math.min(1, pp("send", 0.15) + snap * 0.25);
+      const atk = 1 + (lowEnd || snap) * 1.6;
+      for (let i = 0; i < n; i++) {
         const ip = v.pos | 0;
         if (ip + 1 >= data.length || v.amp < 1e-4) { v.amp = 0; break; }
         const fr = v.pos - ip;
-        let x = data[ip] + (data[ip + 1] - data[ip]) * fr;
-        x *= v.amp;
+        let x = (data[ip] + (data[ip + 1] - data[ip]) * fr) * v.amp;
+        // Transient: the first ~15 ms louder, fading back to 1.
+        if (atk > 1 && v.age < 0.03 * sr) x *= 1 + (atk - 1) * Math.exp(-v.age / (0.006 * sr));
+        if (lowEnd > 0) x += this.lows[v.part].lp(x, 120, sr) * lowEnd * 1.2;
+        if (snap > 0) x += this.body[v.part].lp(x, 200, 0.6, sr) * snap * 0.8 - this.lows[v.part].lp(x, 90, sr) * snap * 0.4;
         if (drive > 0.001) x = Math.tanh(x * dg) / dn;
-        if (tone < -0.02) x = f.lp(x, 18000 * Math.pow(2, tone * 6), this.sr);
-        else if (tone > 0.02) x = f.hp(x, 20 * Math.pow(2, tone * 9), this.sr);
-        L[i] += x * gl;
-        R[i] += x * gr;
+        if (tone < -0.02) x = f.lp(x, 18000 * Math.pow(2, tone * 6), sr);
+        else if (tone > 0.02) x = f.hp(x, 20 * Math.pow(2, tone * 9), sr);
+        dryL[i] += x * gl;
+        dryR[i] += x * gr;
+        rl[i] += x * gl * send;
+        rr[i] += x * gr * send;
         v.pos += v.rate;
+        v.age++;
         v.amp *= v.kill ? 0.995 : v.decayK;
       }
     }
     this.voices = this.voices.filter((v) => v.amp >= 1e-4);
+    // The kit room (a short reverb), then Punch's glue: gentle compression on the whole kit.
+    const roomLv = p.room ?? 0.25;
+    if (roomLv > 0.001) {
+      // The reverb leaves 65% of its input in (dry); keep only the room's own sound.
+      const inL = this.il, inR = this.ir;
+      inL.set(rl.subarray(0, n)); inR.set(rr.subarray(0, n));
+      this.room.process(rl, rr, n, 0.35, 1);
+      for (let i = 0; i < n; i++) { dryL[i] += (rl[i] - inL[i] * 0.65) * roomLv * 2.2; dryR[i] += (rr[i] - inR[i] * 0.65) * roomLv * 2.2; }
+    }
+    const thresh = 0.5 - punch * 0.25, ratio = 1 + punch * 3, makeup = 1 + punch * 0.35;
+    for (let i = 0; i < n; i++) {
+      const lv = Math.max(Math.abs(dryL[i]), Math.abs(dryR[i])) * master;
+      const target = lv > thresh ? (thresh + (lv - thresh) / ratio) / lv : 1;
+      this.glue += (target - this.glue) * (target < this.glue ? 0.02 : 0.0004);
+      const g = master * this.glue * makeup;
+      L[i0 + i] += dryL[i] * g;
+      R[i0 + i] += dryR[i] * g;
+    }
   }
 }
 

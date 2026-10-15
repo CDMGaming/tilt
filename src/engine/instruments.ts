@@ -33,59 +33,90 @@ export interface InstrumentDef {
 
 // ---------- drum machine: "Kitbox" ----------
 
-/** Samples that ship with the app (rendered by tools/make-kit.ts, ours, CC0). */
-export const KIT_SAMPLES = [
-  "kick-deep", "kick-punch", "kick-boom", "snare-crack", "snare-body", "clap", "rim", "hat-closed",
-  "hat-open", "hat-pedal", "tom-low", "tom-high", "cowbell", "shaker", "crash", "zap",
-];
+/** The kits (rendered by tools/make-kit.ts, ours, CC0) and their eight parts, in this order. */
+export const KITS = ["Classic", "House", "Techno", "Trap", "Electro", "Lo-fi", "Minimal", "Industrial", "Garage", "Boom Bap", "Disco", "Chip"];
+const KIT_FILES = ["classic", "house", "techno", "trap", "electro", "lofi", "minimal", "industrial", "garage", "boombap", "disco", "chip"];
+export const KIT_PARTS = ["kick", "snare", "clap", "chat", "ohat", "tom", "rim", "perc"];
+const KIT_PART_NAMES = ["kick", "snare", "clap", "closed hat", "open hat", "tom", "rim", "perc"];
+/** Every kit sound, kit by kit: sound k * 8 + p is kit k's part p (file names under public/kit/). */
+export const KIT_SAMPLES = KIT_FILES.flatMap((k) => KIT_PARTS.map((p) => `${k}-${p}`));
+/** A sound's display name: "House clap". */
+export const kitSoundName = (i: number) => `${KITS[Math.floor(i / 8)] ?? "?"} ${KIT_PART_NAMES[i % 8] ?? ""}`;
 
 export const DRUM_PARTS = 8;
 export const DRUM_BASE_NOTE = 36;
-const PART_DEFAULT_SAMPLE = [0, 3, 5, 7, 8, 10, 6, 12];
 export const DRUM_PART_LABELS = ["Kick", "Snare", "Clap", "C-Hat", "O-Hat", "Tom", "Rim", "Perc"];
+export const CHOKE_GROUPS = ["None", "A", "B", "C"];
 
-const drumParams: ParamDef[] = [];
+const drumParams: ParamDef[] = [
+  { id: "kit", label: "Kit", min: 0, max: KITS.length - 1, def: 0, options: KITS },
+  { id: "punch", label: "Punch", min: 0, max: 1, def: 0.3 },
+  { id: "smack", label: "Smack", min: 0, max: 1, def: 0.3 },
+  { id: "time", label: "Time", min: 0.25, max: 2, def: 1, curve: "exp" },
+  { id: "room", label: "Room", min: 0, max: 1, def: 0.25 },
+  { id: "level", label: "Level", min: 0, max: 1, def: 0.85 },
+];
 for (let i = 0; i < DRUM_PARTS; i++) {
   drumParams.push(
-    { id: `p${i}smp`, label: "Sound", min: 0, max: KIT_SAMPLES.length - 1, def: PART_DEFAULT_SAMPLE[i], options: KIT_SAMPLES },
+    { id: `p${i}smp`, label: "Sound", min: 0, max: KIT_SAMPLES.length - 1, def: i, options: KIT_SAMPLES },
     { id: `p${i}tune`, label: "Tune", min: -12, max: 12, def: 0, unit: "st" },
-    { id: `p${i}decay`, label: "Decay", min: 0.03, max: 2.5, def: 1.2, curve: "exp", unit: "s" },
-    { id: `p${i}level`, label: "Level", min: 0, max: 1, def: 0.8 },
-    { id: `p${i}pan`, label: "Pan", min: -1, max: 1, def: 0 },
+    { id: `p${i}decay`, label: "Time", min: 0.03, max: 2.5, def: 1.2, curve: "exp", unit: "s" },
+    { id: `p${i}level`, label: "Level", min: 0, max: 1, def: [0.9, 0.75, 0.65, 0.42, 0.38, 0.65, 0.5, 0.5][i] },
+    { id: `p${i}pan`, label: "Pan", min: -1, max: 1, def: [0, 0, 0.1, -0.25, -0.25, -0.3, 0.2, 0.3][i] },
+    { id: `p${i}send`, label: "Room", min: 0, max: 1, def: [0.05, 0.25, 0.3, 0.1, 0.15, 0.2, 0.15, 0.2][i] },
+    // The strip's More drawer:
+    { id: `p${i}gate`, label: "Play", min: 0, max: 1, def: 0, options: ["One-shot", "Gate"] },
+    { id: `p${i}rev`, label: "Reverse", min: 0, max: 1, def: 0, options: ["Off", "On"] },
+    { id: `p${i}choke`, label: "Choke", min: 0, max: 3, def: i === 3 || i === 4 ? 1 : 0, options: CHOKE_GROUPS },
+    { id: `p${i}vel`, label: "Velocity", min: 0, max: 1, def: 1 },
+    { id: `p${i}tone`, label: "Filter", min: -1, max: 1, def: 0 }, // <0 darker (LP), >0 thinner (HP)
+    { id: `p${i}start`, label: "Start", min: 0, max: 0.9, def: 0 },
+    // Hidden voicing (presets):
     { id: `p${i}drive`, label: "Drive", min: 0, max: 1, def: 0 },
-    { id: `p${i}tone`, label: "Tone", min: -1, max: 1, def: 0 }, // <0 darker (LP), >0 thinner (HP)
   );
 }
-drumParams.push(
-  { id: "choke", label: "Hat choke", min: 0, max: 1, def: 1, options: ["Off", "On"] },
-  { id: "level", label: "Level", min: 0, max: 1, def: 0.85 },
-);
 
-const drumPreset = (name: string, smp: number[], extra: Record<string, number> = {}) => {
-  const p: Record<string, number> = {};
-  smp.forEach((s, i) => (p[`p${i}smp`] = s));
+/** A kit preset: the kit's eight sounds plus its own settings. */
+const drumPreset = (name: string, kit: number, extra: Record<string, number> = {}) => {
+  const p: Record<string, number> = { kit };
+  for (let i = 0; i < DRUM_PARTS; i++) p[`p${i}smp`] = kit * 8 + i;
   return { name, params: { ...p, ...extra } };
 };
 
 export const DRUMS: InstrumentDef = {
   kind: "drums",
   name: "Kitbox",
-  role: "Sample drum machine, 8 parts",
+  role: "Dance drum machine: twelve kits, eight channel strips",
   group: "drums",
   drumParts: 8,
+  partNames: DRUM_PART_LABELS,
   params: drumParams,
-  macros: ["p0tune", "p0decay", "p1tune", "p1decay", "p3decay", "p4decay", "p0drive", "level"],
+  macros: ["punch", "smack", "time", "p0tune", "p1tune", "p3decay", "room", "level"],
   presets: [
-    drumPreset("Standard", [0, 3, 5, 7, 8, 10, 6, 12]),
-    drumPreset("Punchy", [1, 3, 5, 7, 8, 11, 6, 13], { p0drive: 0.35, p1drive: 0.2 }),
-    drumPreset("Boom Room", [2, 4, 5, 7, 8, 10, 6, 14], { p0decay: 2.2, p0tune: -3 }),
-    drumPreset("Tight", [1, 3, 6, 7, 9, 11, 5, 13], { p0decay: 0.35, p1decay: 0.25, p3decay: 0.06, p4decay: 0.35 }),
-    drumPreset("Lo-fi", [0, 4, 5, 7, 8, 10, 6, 12], { p0tone: -0.5, p1tone: -0.5, p3tone: -0.4, p0drive: 0.5, p1drive: 0.5 }),
-    drumPreset("Tribal", [2, 4, 6, 9, 13, 10, 11, 12], { p5tune: -5, p6tune: 4 }),
-    drumPreset("Electro", [1, 3, 5, 7, 8, 15, 6, 12], { p5tune: 5, p1tune: 2, p0tune: -2 }),
-    drumPreset("Trap-ish", [2, 3, 5, 7, 9, 11, 6, 15], { p0decay: 2.5, p0tune: -5, p3tune: 3 }),
-    drumPreset("Garage", [0, 4, 5, 9, 8, 10, 6, 13], { p1tune: 3 }),
-    drumPreset("Crunch", [1, 3, 5, 7, 8, 10, 6, 15], { p0drive: 0.8, p1drive: 0.8, p2drive: 0.6, p3drive: 0.4 }),
+    drumPreset("Classic", 0, { level: 1.00 }),
+    drumPreset("Classic Tight", 0, { level: 0.75, time: 0.5, punch: 0.6, room: 0.1 }),
+    drumPreset("House", 1, { level: 0.98 }),
+    drumPreset("House Big Room", 1, { level: 0.8, room: 0.6, smack: 0.6, p1send: 0.5, p2send: 0.6 }),
+    drumPreset("Techno", 2, { level: 0.81, punch: 0.5 }),
+    drumPreset("Techno Hard", 2, { level: 0.64, punch: 0.9, p0drive: 0.5, p1drive: 0.4, time: 0.8 }),
+    drumPreset("Trap", 3, { level: 0.86, room: 0.15 }),
+    drumPreset("Trap Long 808", 3, { level: 0.75, p0decay: 2.5, p0tune: -2, room: 0.1, p0send: 0 }),
+    drumPreset("Electro", 4, { level: 1.00 }),
+    drumPreset("Electro Zap", 4, { level: 1.00, p5tune: 5, p7tune: -3, smack: 0.5 }),
+    drumPreset("Lo-fi", 5, { level: 1.00, room: 0.35, punch: 0.15 }),
+    drumPreset("Lo-fi Dusty", 5, { level: 1.00, p0tone: -0.3, p1tone: -0.4, p3tone: -0.3, room: 0.45, time: 0.8 }),
+    drumPreset("Minimal", 6, { level: 1.00, room: 0.2 }),
+    drumPreset("Minimal Clicks", 6, { level: 1.00, time: 0.6, p3tune: 4, p7tune: 5, room: 0.35 }),
+    drumPreset("Industrial", 7, { level: 0.68, punch: 0.6 }),
+    drumPreset("Industrial Crush", 7, { level: 0.57, p0drive: 0.6, p1drive: 0.7, p2drive: 0.7, smack: 0.8, room: 0.4 }),
+    drumPreset("Garage", 8, { level: 1.00, smack: 0.45 }),
+    drumPreset("Garage Shuffle", 8, { level: 1.00, p1tune: 2, p7level: 0.9, p3decay: 0.5, room: 0.3 }),
+    drumPreset("Boom Bap", 9, { level: 1.00, smack: 0.6, room: 0.3 }),
+    drumPreset("Boom Bap Dirty", 9, { level: 0.73, p0drive: 0.4, p1drive: 0.5, p1tone: -0.3, smack: 0.8 }),
+    drumPreset("Disco", 10, { level: 1.00, room: 0.35 }),
+    drumPreset("Disco Syndrum", 10, { level: 1.00, p5decay: 2, p5tune: 3, room: 0.45, smack: 0.5 }),
+    drumPreset("Chip", 11, { level: 1.00, room: 0.1 }),
+    drumPreset("Chip Crunch", 11, { level: 0.73, p0drive: 0.6, p1drive: 0.5, time: 0.7, p0tune: -3 }),
   ],
 };
 
