@@ -100,8 +100,11 @@ export function expandPitch(song: Song, track: Track, pitch: number): number[] {
   const mode = Math.round(track.params.chord ?? 0);
   if (!mode) return [pitch];
   const chord = scaleChord(pitch, song.key, song.scale, mode === 2 ? 4 : 3);
-  if (Math.round(track.params.spread ?? 0) === 1 && chord.length >= 3) chord[1] += 12; // open voicing
-  return chord;
+  // Voicing: close; open (the 3rd up an octave); spread (the root down, the 3rd and 7th up).
+  const voicing = track.params.voicing ?? 0.2;
+  if (chord.length >= 3 && voicing >= 1 / 3) chord[1] += 12;
+  if (chord.length >= 3 && voicing >= 2 / 3) { chord[0] -= 12; if (chord[3] !== undefined) chord[3] += 12; }
+  return chord.sort((a, b) => a - b);
 }
 
 /** All note events of `inst` that start in [t0, t1). */

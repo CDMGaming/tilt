@@ -1,7 +1,7 @@
 // The three Phase 1 instruments' DSP. Each renders stereo into L/R between
 // sample indices [i0, i1). Runs in the AudioWorklet.
 
-import { ADSR, Ladder, OnePole, Osc, SVF, mtof, smooth, voiceMod } from "./units";
+import { ADSR, Ladder, OnePole, Osc, SVF, TAU, mtof, smooth, voiceMod } from "./units";
 import { Reverb } from "./fx-dsp";
 import { DRUM_BASE_NOTE, DRUM_PARTS } from "../instruments";
 
@@ -277,64 +277,139 @@ export class AcidDSP implements InstrumentDSP {
 
 interface PolyVoice {
   pitch: number; vel: number; o1: Osc; o2: Osc; f: SVF; amp: ADSR; fenv: number; pan: number; age: number; held: boolean;
+  /** Samples until it sounds (Strum); 0 = playing. */
+  wait: number;
 }
 
+/** Oscillator gains so every wave sits at about the same loudness (saw, square, triangle, sine). */
+const POLY_WAVE_GAIN = [1, 0.6, 1, 0.82];
+
+/**
+ * Chordette: two oscillators, a filter with its own envelope, an amp envelope. Its three character
+ * controls: Strum (the chord's notes start one after another, softer as they go), Warmth (darker,
+ * wider detune, a little saturation and chorus) and Voicing (close / open / spread chords, set in
+ * expandPitch, and stereo width here).
+ */
 export class PolyDSP implements InstrumentDSP {
   private voices: PolyVoice[] = [];
   private cut = 2500;
   private counter = 0;
+  private fresh: { v: PolyVoice; t: number }[] = [];
+  private strumFlip = false;
+  // chorus (Warmth)
+  private cbL = new Float32Array(2048);
+  private cbR = new Float32Array(2048);
+  private cw = 0;
+  private cph = 0;
+  private bufL = new Float32Array(128);
+  private bufR = new Float32Array(128);
   constructor(public params: Record<string, number>, private sr: number) {}
 
-  noteOn(pitch: number, vel: number) {
+  noteOn(pitch: number, vel: number, t = 0) {
     let v = this.voices.find((x) => x.pitch === pitch && x.held);
     if (!v) {
-      if (this.voices.length >= 12) {
+      if (this.voices.length >= 16) {
         // Steal: prefer released voices, then the oldest.
         const rel = this.voices.filter((x) => !x.held);
         const victim = (rel.length ? rel : this.voices).reduce((a, b) => (a.age < b.age ? a : b));
         this.voices.splice(this.voices.indexOf(victim), 1);
       }
-      v = { pitch, vel: vel / 127, o1: new Osc(), o2: new Osc(), f: new SVF(), amp: new ADSR(), fenv: 1, pan: 0, age: 0, held: true };
+      v = { pitch, vel: vel / 127, o1: new Osc(), o2: new Osc(), f: new SVF(), amp: new ADSR(), fenv: 1, pan: 0, age: 0, held: true, wait: 0 };
       this.voices.push(v);
     }
     v.vel = vel / 127;
     v.age = ++this.counter;
     v.held = true;
-    v.fenv = 1;
     v.pan = ((this.counter % 2) * 2 - 1) * (0.3 + 0.4 * Math.random());
-    v.amp.gate(true);
+    this.fresh.push({ v, t });
   }
 
   noteOff(pitch: number) {
-    for (const v of this.voices) if (v.pitch === pitch && v.held) { v.held = false; v.amp.gate(false); }
+    for (const v of this.voices) if (v.pitch === pitch && v.held) { v.held = false; if (!v.wait) v.amp.gate(false); }
   }
 
-  allOff() { for (const v of this.voices) { v.held = false; v.amp.gate(false); } }
+  allOff() { this.fresh = []; for (const v of this.voices) { v.held = false; v.wait = 0; v.amp.gate(false); } }
+
+  /** Notes that arrived together are a chord: Strum spreads their starts (up, down or alternating). */
+  private startFresh() {
+    const p = this.params, strum = p.strum ?? 0, dir = Math.round(p.strumDir ?? 0);
+    while (this.fresh.length) {
+      const t0 = this.fresh[0].t;
+      const group = this.fresh.filter((x) => Math.abs(x.t - t0) < 0.002);
+      this.fresh = this.fresh.filter((x) => Math.abs(x.t - t0) >= 0.002);
+      const down = dir === 1 || (dir === 2 && (this.strumFlip = !this.strumFlip));
+      // Unison copies share a note's slot: rank by the rounded pitch.
+      const keys = [...new Set(group.map((x) => Math.round(x.v.pitch)))].sort((a, b) => (down ? b - a : a - b));
+      for (const { v } of group) {
+        const rank = keys.indexOf(Math.round(v.pitch));
+        v.wait = Math.round((rank / Math.max(1, keys.length - 1)) * strum * 0.08 * this.sr); // the whole chord within 80 ms
+        v.vel *= 1 - rank * strum * 0.12;
+        if (!v.wait) this.begin(v);
+      }
+    }
+  }
+
+  private begin(v: PolyVoice) {
+    v.wait = 0;
+    v.fenv = 1;
+    v.amp.gate(true);
+    if (!v.held) v.amp.gate(false); // released before it started: a short note
+  }
 
   render(L: Float32Array, R: Float32Array, i0: number, i1: number) {
-    const p = this.params, sr = this.sr;
+    if (this.fresh.length) this.startFresh();
+    const p = this.params, sr = this.sr, n = i1 - i0;
+    const warmth = p.warmth ?? 0.3, voicing = p.voicing ?? 0.2;
     const w1 = Math.round(p.wave1 ?? 0), w2 = Math.round(p.wave2 ?? 1);
-    const ratio2 = Math.pow(2, ((p.semi2 ?? 0) + (p.detune ?? 8) / 100) / 12);
+    const g1 = POLY_WAVE_GAIN[w1] ?? 1, g2 = POLY_WAVE_GAIN[w2] ?? 1;
+    const ratio2 = Math.pow(2, ((p.semi2 ?? 0) + ((p.detune ?? 8) + warmth * 14) / 100) / 12);
     const mix = p.mix ?? 0.4;
     const reso = p.reso ?? 0.2, fenvAmt = p.fenv ?? 0.3;
     const fK = Math.exp(-4.6 / ((p.fdecay ?? 0.5) * sr));
     const a = p.attack ?? 0.01, d = p.decay ?? 0.4, s = p.sustain ?? 0.7, r = p.release ?? 0.4;
-    const width = p.width ?? 0.5;
-    const level = (p.level ?? 0.55) * 0.45;
-    for (let i = i0; i < i1; i++) {
-      this.cut = smooth(this.cut, p.cutoff ?? 2500, 0.002);
+    const width = (p.width ?? 0.5) * (0.4 + voicing * 0.9);
+    const level = (p.level ?? 0.3) * 0.9;
+    const drive = 1 + warmth * 1.5, dn = Math.tanh(drive);
+    const cutTarget = (p.cutoff ?? 2500) * Math.pow(2, -warmth * 1.6);
+    if (this.bufL.length < n) { this.bufL = new Float32Array(n); this.bufR = new Float32Array(n); }
+    const bL = this.bufL, bR = this.bufR;
+    bL.fill(0, 0, n); bR.fill(0, 0, n);
+    for (let i = 0; i < n; i++) {
+      this.cut = smooth(this.cut, cutTarget, 0.002);
       for (const v of this.voices) {
+        if (v.wait > 0) { if (--v.wait === 0) this.begin(v); else continue; }
         if (!v.amp.active) continue;
         const f0 = mtof(v.pitch) * voiceMod.pitch;
-        const x = v.o1.next(f0, sr, w1) * (1 - mix) + v.o2.next(f0 * ratio2, sr, w2) * mix;
+        const x = v.o1.next(f0, sr, w1) * g1 * (1 - mix) + v.o2.next(f0 * ratio2, sr, w2) * g2 * mix;
         v.fenv *= fK;
         const fc = this.cut * Math.pow(2, v.fenv * fenvAmt * 6 * (0.5 + 0.5 * v.vel));
-        const y = v.f.lp(x, fc, reso, sr) * v.amp.next(a, d, s, r, sr) * velGain(v.vel) * level;
+        let y = v.f.lp(x, fc, reso, sr) * v.amp.next(a, d, s, r, sr) * velGain(v.vel);
+        if (warmth > 0.01) y = (Math.tanh(y * drive) / dn) * (1 + warmth * 0.25);
+        y *= level;
         const pan = v.pan * width;
-        L[i] += y * panL(pan) * 1.41;
-        R[i] += y * panR(pan) * 1.41;
+        bL[i] += y * panL(pan) * 1.41;
+        bR[i] += y * panR(pan) * 1.41;
       }
     }
-    this.voices = this.voices.filter((v) => v.amp.active || v.held);
+    // Warmth's chorus: a short modulated delay, opposite phases left and right.
+    const wet = warmth * 0.45, len = this.cbL.length;
+    for (let i = 0; i < n; i++) {
+      let l = bL[i], r = bR[i];
+      if (wet > 0.01) {
+        this.cbL[this.cw] = l; this.cbR[this.cw] = r;
+        this.cph = (this.cph + 0.55 / sr) % 1;
+        const mod = Math.sin(TAU * this.cph) * 0.003 * sr, base = 0.012 * sr;
+        const tap = (buf: Float32Array, dly: number) => {
+          const pos = (this.cw - dly + len) % len, i0 = Math.floor(pos), fr = pos - i0;
+          return buf[i0] + (buf[(i0 + 1) % len] - buf[i0]) * fr;
+        };
+        l = l * (1 - wet * 0.5) + tap(this.cbL, base + mod) * wet;
+        r = r * (1 - wet * 0.5) + tap(this.cbR, base - mod) * wet;
+        this.cw = (this.cw + 1) % len;
+      }
+      L[i0 + i] += l;
+      R[i0 + i] += r;
+    }
+    this.voices = this.voices.filter((v) => v.amp.active || v.held || v.wait > 0);
   }
 }

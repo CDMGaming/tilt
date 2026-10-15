@@ -27,8 +27,11 @@ const TAGS: Partial<Record<InstrumentKind, Record<string, Role[]>>> = {
     "Acid Lead": ["lead"], "Laser Tooth": ["lead", "fx"], "Squeak Arp": ["arp"], "Down Arp": ["arp", "bass"], "Dice Arp": ["arp"],
   },
   poly: {
-    "Stab Club": ["keys", "pluck"], "Slow Strings": ["pad"], "Soft Pad": ["pad"], "Pluck Chords": ["pluck", "keys"],
-    "Lead Saw": ["lead"],
+    "House Stab": ["keys", "pluck"], "Clavish": ["keys", "pluck"], "Stab Club": ["keys", "pluck"], "Pluck Chords": ["pluck", "keys"],
+    "Soft Pad": ["pad"], "Warm Pad": ["pad"], "Sweep Pad": ["pad"], "Dark Pad": ["pad"], "Air Pad": ["pad"], "Choir Haze": ["pad"],
+    "Slow Strings": ["pad"], "Tape Strings": ["pad"], "Chamber": ["pad", "keys"], "Fast Strings": ["keys", "pad"], "Pizzicato": ["pluck"],
+    "Lead Saw": ["lead"], "Rave Hoover": ["lead", "fx"], "Acid Chords": ["keys", "pluck"],
+    "Music Box": ["pluck", "keys"], "Glass Bells": ["keys", "pluck"], "Chime Pad": ["pad", "keys"],
   },
   lead: { "Laser Sweep": ["lead", "fx"], "Pluck Lead": ["pluck", "lead"], "Chip-ish": ["lead", "arp"] },
   wobble: { "Robot": ["bass", "fx"], "Laser Wob": ["bass", "fx"] },
@@ -91,9 +94,10 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
     knob("accent", 0.25), knob("bite", 0.25), knob("gnaw", 0.2, 0, 0.7), knob("glide", 0.12), knob("sub", 0.25), pick("arpMode", 0.3, [0, 1, 2, 3]),
   ],
   poly: [
+    knob("warmth", 0.25), knob("voicing", 0.25), knob("strum", 0.15, 0, 0.6), pick("strumDir", 0.3, [0, 1, 2]),
     pick("wave2", 0.25, [0, 1, 2, 3]), pick("semi2", 0.2, [-12, 0, 0, 5, 7, 12]), knob("detune", 0.2, 0, 0.6),
     knob("mix", 0.25), knob("cutoff", 0.1, 0.4, 0.95), knob("reso", 0.15, 0, 0.6), knob("fenv", 0.15), knob("fdecay", 0.15),
-    knob("attack", 0.06), knob("release", 0.08), knob("width", 0.2), pick("spread", 0.25, [0, 1]),
+    knob("attack", 0.06), knob("release", 0.08), knob("width", 0.2),
   ],
   lead: [
     knob("sync", 0.25), knob("syncEnv", 0.25), pick("unison", 0.2, [0, 1, 2, 3]), knob("detune", 0.2), knob("spread", 0.2),

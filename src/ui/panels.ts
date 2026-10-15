@@ -1,14 +1,14 @@
 // Instrument panels: each instrument has its own layout and look, plus a
 // keyboard (synths, scale-locked by default) or pads (drums).
 
-import { DRUM_BASE_NOTE, DRUM_PART_LABELS, INSTRUMENTS, KITS, drumPartName, kitSoundName, formatParam, fromUnit, isDrumKind, paramDef, toUnit } from "../engine/instruments";
+import { CHORD_CATS, DRUM_BASE_NOTE, DRUM_PART_LABELS, INSTRUMENTS, KITS, drumPartName, kitSoundName, formatParam, fromUnit, isDrumKind, paramDef, toUnit } from "../engine/instruments";
 import { LEAD_KINDS, POLY_KINDS, XY_PARAMS, hasToolkit } from "../engine/toolkit";
 import { FX_TYPES } from "../engine/params";
 import type { Track } from "../engine/model";
 import { chordName, noteName, scaleById, scaleDegree } from "../engine/music";
 import { decodeFile, listSamples, putSample, sampleLabel } from "./samples";
 import { SFX, WT_FRAMES, WT_SIZE } from "../engine/instruments3";
-import { allPresets, applyPreset, deleteUserPreset, presetPosition, saveUserPreset, userPresets, USER_MARK } from "./presets";
+import { allPresets, applyPreset, deleteUserPreset, presetPosition, saveUserPreset, userPresets, USER_MARK, type PresetEntry } from "./presets";
 import { getParam } from "../engine/params";
 import { RECIPES, genBase, mutateParams, pickSound, soundKey, soundRoles, type SoundRef } from "../engine/sounds";
 import { Rng, randomSeed } from "../engine/rng";
@@ -20,7 +20,9 @@ import { trackColor } from "./theme";
 import { control, type ControlHost } from "./knob";
 
 /** Instruments rebuilt in the overhaul (docs/instruments.md): their own panel only, no MORE page. */
-const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums"]);
+const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums", "poly"]);
+/** Chordette: the category its sound list shows (null: the current sound's). */
+let chordetteCat: string | null = null;
 /** Kitbox: the channel whose More drawer is open (per session). */
 let kitboxMore: number | null = null;
 /** Squelch's arp lid, open or shut (per session). */
@@ -201,14 +203,30 @@ export function buildPanel(app: App, track: Track): HTMLElement {
       keyboard(app, track),
     );
   } else {
+    // Chordette: an 80s workstation. Category buttons and a sound list on the LCD, then the
+    // knob row (Strum, Warmth and Voicing are the character controls).
+    const factory = INSTRUMENTS.poly.presets, mine = userPresets("poly");
+    const curCat = factory.find((x) => x.name === track.preset)?.cat ?? (track.preset.startsWith(USER_MARK) ? "User" : "Keys");
+    const cat = chordetteCat ?? curCat;
+    const cats = [...CHORD_CATS, ...(mine.length ? ["User"] : [])];
+    const list: PresetEntry[] = cat === "User"
+      ? mine.map((x) => ({ name: USER_MARK + x.name, params: x.params, user: true }))
+      : factory.filter((x) => x.cat === cat).map((x) => ({ name: x.name, params: x.params, user: false }));
     body = h("div", { class: "panel-body chordette" },
-      h("div", { class: "knob-row" },
-        h("div", { class: "section-title small" }, "Chord"), ctl("chord", "Chord"), ctl("spread", "Voicing"),
-        h("div", { class: "section-title small" }, "Osc"), ctl("wave1", "Osc 1"), ctl("wave2", "Osc 2"), ctl("semi2", "Semi"), ctl("detune", "Detune"), ctl("mix", "Mix")),
-      h("div", { class: "knob-row" },
-        h("div", { class: "section-title small" }, "Filter"), ctl("cutoff", "Cutoff", "l"), ctl("reso", "Reso"), ctl("fenv", "Env"), ctl("fdecay", "F decay"),
-        h("div", { class: "section-title small" }, "Amp"), ctl("attack", "A", "s"), ctl("decay", "D", "s"), ctl("sustain", "S", "s"), ctl("release", "R", "s"),
-        ctl("width", "Width", "s"), ctl("level", "Level", "s")),
+      h("div", { class: "cd-face" },
+        h("div", { class: "cd-left" },
+          h("div", { class: "cd-cats" }, cats.map((c) => h("button", {
+            class: "cd-cat" + (c === cat ? " on" : ""), "data-nav": `cat-${c}`, "aria-pressed": String(c === cat),
+            onclick: () => { chordetteCat = c; app.screens.edit.render(); },
+          }, c))),
+          h("div", { class: "cd-lcd", role: "listbox" }, list.map((x) => h("button", {
+            class: "cd-row" + (x.name === track.preset ? " on" : ""), role: "option", "data-nav": `snd-${x.name}`, "aria-selected": String(x.name === track.preset),
+            onclick: () => { app.edit("Preset", () => applyPreset(track, x)); previewSound(app, track); },
+          }, x.name === track.preset ? "▶ " : "  ", x.name)))),
+        h("div", { class: "cd-knobs" },
+          ctl("chord", "Chord"),
+          h("div", { class: "cd-char" }, ctl("strum", "★ Strum", "l"), ctl("warmth", "★ Warmth", "l"), ctl("voicing", "★ Voicing", "l")),
+          ctl("attack", "Attack"), ctl("release", "Release"), ctl("level", "Level"))),
       keyboard(app, track),
     );
   }

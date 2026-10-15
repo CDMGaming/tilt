@@ -3,7 +3,8 @@
 //   deno run -A --sloppy-imports tools/preview.ts <kind> <outDir> [--no-wav]
 
 import { INSTRUMENTS, KIT_SAMPLES, presetParams } from "../src/engine/instruments.ts";
-import type { InstrumentKind } from "../src/engine/model.ts";
+import type { InstrumentKind, Song, Track } from "../src/engine/model.ts";
+import { expandPitch } from "../src/engine/timeline.ts";
 import { AcidDSP, DrumsDSP, PolyDSP, type InstrumentDSP } from "../src/engine/dsp/instruments-dsp.ts";
 import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.ts";
 import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
@@ -16,7 +17,7 @@ import { encodeWav } from "../src/engine/wav.ts";
 const SR = 44100;
 const kind = Deno.args[0] as InstrumentKind, out = Deno.args[1], wavs = !Deno.args.includes("--no-wav");
 const BPM = 125, step = 60 / BPM / 4;
-const TARGET = -18.5; // dB: every preset of an instrument should sit about here
+const TARGET = -16; // dB short-term max: every preset of an instrument should sit about here
 
 type Ev = { t: number; len: number; pitch: number; vel: number };
 
@@ -42,6 +43,11 @@ function phrase(params: Record<string, number>): Ev[] {
     }
     [[5, 12], [5, 13], [6, 14], [6, 15]].forEach(([part, s]) => out.push({ t: (16 + s) * step, len: step, pitch: 36 + part, vel: 100 }));
     return out;
+  }
+  if (kind === "poly") {
+    // Two chords: i then VI in C minor (Chordette expands each key into a chord itself).
+    const track = { kind: "poly", params } as unknown as Track, song = { key: 0, scale: "minor" } as unknown as Song;
+    return [[48, 0], [44, 16]].flatMap(([root, s]) => expandPitch(song, track, root).map((pitch) => ({ t: s * step, len: 14 * step, pitch, vel: 100 })));
   }
   return [{ t: 0, len: 1.5, pitch: 60, vel: 100 }];
 }
@@ -89,15 +95,22 @@ export function render(params: Record<string, number>, seconds = 32 * step + 0.6
   return [L, R];
 }
 
-/** Loudness in dB (RMS over the sounding part, a rough stand-in for LUFS) and peak. */
+/**
+ * Loudness: `db` is the RMS over the sounding part; `st` the loudest 400 ms (short-term max, closer to
+ * how loud a plucky or decaying sound feels, and what the level matching uses); and the peak.
+ */
 export function measure([L, R]: Float32Array[]) {
   let sum = 0, cnt = 0, peak = 0;
+  const w = Math.round(0.4 * SR), e = new Float64Array(L.length + 1);
   for (let i = 0; i < L.length; i++) {
-    const a = Math.max(Math.abs(L[i]), Math.abs(R[i]));
+    const a = Math.max(Math.abs(L[i]), Math.abs(R[i])), p = (L[i] * L[i] + R[i] * R[i]) / 2;
     peak = Math.max(peak, a);
-    if (a > 1e-4) { sum += (L[i] * L[i] + R[i] * R[i]) / 2; cnt++; }
+    if (a > 1e-4) { sum += p; cnt++; }
+    e[i + 1] = e[i] + p;
   }
-  return { db: 10 * Math.log10(sum / Math.max(1, cnt) + 1e-12), peak };
+  let best = 0;
+  for (let i = 0; i + w <= L.length; i += 441) best = Math.max(best, (e[i + w] - e[i]) / w);
+  return { db: 10 * Math.log10(sum / Math.max(1, cnt) + 1e-12), st: 10 * Math.log10(best + 1e-12), peak };
 }
 
 if (import.meta.main) {
@@ -108,8 +121,8 @@ if (import.meta.main) {
     Math.random = () => ((s = (s * 16807) % 2147483647) / 2147483647);
     const audio = render(presetParams(kind, i));
     const m = measure(audio);
-    const lv = presetParams(kind, i).level ?? 1, want = Math.min(1, lv * Math.pow(10, (TARGET - m.db) / 20));
-    rows.push(`${String(i + 1).padStart(2)} ${p.name.padEnd(18)} ${m.db.toFixed(1).padStart(6)} dB  peak ${m.peak.toFixed(2)}  level ${lv.toFixed(2)} -> ${want.toFixed(2)}`);
+    const lv = presetParams(kind, i).level ?? 1, want = Math.min(1, lv * Math.pow(10, (TARGET - m.st) / 20));
+    rows.push(`${String(i + 1).padStart(2)} ${p.name.padEnd(18)} ${m.st.toFixed(1).padStart(6)} dB st (${m.db.toFixed(1)} rms)  peak ${m.peak.toFixed(2)}  level ${lv.toFixed(2)} -> ${want.toFixed(2)}`);
     if (wavs) Deno.writeFileSync(`${out}/${String(i + 1).padStart(2, "0")}-${p.name.replace(/[^A-Za-z0-9]+/g, "-").toLowerCase()}.wav`, encodeWav({ numberOfChannels: 2, sampleRate: SR, length: audio[0].length, getChannelData: (c: number) => audio[c] } as unknown as AudioBuffer));
   });
   console.log(rows.join("\n"));

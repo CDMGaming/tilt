@@ -197,6 +197,11 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** D, a sound-list LCD on the left, category buttons, then the knob row.
 - **Theme:** an 80s workstation: warm grey, a teal LCD, membrane category buttons.
 - **Presets:** 32 across the categories.
+- **Status: built.** Strum spreads a chord's notes over up to 80 ms (direction up / down / alternating is
+  hidden voicing) and softens the later ones; Warmth darkens, detunes, saturates and adds chorus; Voicing
+  goes close → open → spread (root down, 3rd and 7th up) and widens the stereo. Oscillator waves are
+  gain-matched (a square no longer jumps 11 dB). 32 sounds, 6 categories (+ User when you have saved
+  ones), level-matched by short-term loudness. The MORE page is gone.
 
 ### Razor: sync lead
 - **Idea:** the screaming hard-sync lead, played on faders like a performance synth.

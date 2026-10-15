@@ -28,7 +28,8 @@ export interface InstrumentDef {
   partNames?: string[];
   params: ParamDef[];
   macros: string[]; // exactly 8 param ids
-  presets: { name: string; params: Record<string, number> }[];
+  /** `cat`: a category, for instruments that browse their sounds by kind (Chordette). */
+  presets: { name: string; params: Record<string, number>; cat?: string }[];
 }
 
 // ---------- drum machine: "Kitbox" ----------
@@ -189,14 +190,23 @@ export const ACID: InstrumentDef = {
 
 export const POLY_WAVES = ["Saw", "Square", "Triangle", "Sine"];
 
+export const CHORD_CATS = ["Keys", "Pads", "Strings", "Brass", "Synth", "Bells"];
+const ch = (name: string, cat: string, params: Record<string, number>) => ({ name, cat, params });
+
 export const POLY: InstrumentDef = {
   kind: "poly",
   name: "Chordette",
-  role: "Poly synth; one key plays a chord in the song's scale",
+  role: "One key, a chord in the song's scale, from a workstation's sounds",
   group: "harmony",
   params: [
-    { id: "chord", label: "Chord", min: 0, max: 2, def: 0, options: ["Off", "Triad", "7th"] },
-    { id: "spread", label: "Spread", min: 0, max: 1, def: 0, options: ["Close", "Open"] },
+    { id: "chord", label: "Chord", min: 0, max: 2, def: 1, options: ["Off", "Triad", "7th"] },
+    { id: "strum", label: "Strum", min: 0, max: 1, def: 0 },
+    { id: "warmth", label: "Warmth", min: 0, max: 1, def: 0.3 },
+    { id: "voicing", label: "Voicing", min: 0, max: 1, def: 0.2 },
+    { id: "attack", label: "Attack", min: 0.001, max: 3, def: 0.01, curve: "exp", unit: "s" },
+    { id: "release", label: "Release", min: 0.01, max: 4, def: 0.4, curve: "exp", unit: "s" },
+    { id: "level", label: "Level", min: 0, max: 1, def: 0.3 },
+    // Hidden voicing (each preset is its own sound):
     { id: "wave1", label: "Osc 1", min: 0, max: 3, def: 0, options: POLY_WAVES },
     { id: "wave2", label: "Osc 2", min: 0, max: 3, def: 1, options: POLY_WAVES },
     { id: "semi2", label: "Osc 2 semi", min: -12, max: 12, def: 0, unit: "st" },
@@ -206,25 +216,51 @@ export const POLY: InstrumentDef = {
     { id: "reso", label: "Reso", min: 0, max: 1, def: 0.2 },
     { id: "fenv", label: "Filter env", min: 0, max: 1, def: 0.3 },
     { id: "fdecay", label: "F decay", min: 0.02, max: 3, def: 0.5, curve: "exp", unit: "s" },
-    { id: "attack", label: "Attack", min: 0.001, max: 3, def: 0.01, curve: "exp", unit: "s" },
     { id: "decay", label: "Decay", min: 0.02, max: 3, def: 0.4, curve: "exp", unit: "s" },
     { id: "sustain", label: "Sustain", min: 0, max: 1, def: 0.7 },
-    { id: "release", label: "Release", min: 0.01, max: 4, def: 0.4, curve: "exp", unit: "s" },
     { id: "width", label: "Width", min: 0, max: 1, def: 0.5 },
-    { id: "level", label: "Level", min: 0, max: 1, def: 0.55 },
+    { id: "strumDir", label: "Strum dir", min: 0, max: 2, def: 0, options: ["Up", "Down", "Alternate"] },
   ],
-  macros: ["cutoff", "reso", "fenv", "attack", "release", "detune", "mix", "level"],
+  macros: ["warmth", "strum", "voicing", "chord", "attack", "release", "cutoff", "level"],
   presets: [
-    { name: "Warm Stack", params: { chord: 1 } },
-    { name: "Glass Keys", params: { wave1: 2, wave2: 3, semi2: 12, cutoff: 6000, fenv: 0.2, decay: 0.8, sustain: 0.3, release: 0.8, chord: 1 } },
-    { name: "Stab Club", params: { chord: 2, cutoff: 900, reso: 0.35, fenv: 0.7, fdecay: 0.18, decay: 0.2, sustain: 0, release: 0.15 } },
-    { name: "Slow Strings", params: { attack: 0.6, release: 1.5, cutoff: 3500, detune: 18, mix: 0.5, chord: 1, spread: 1 } },
-    { name: "Square Organ", params: { wave1: 1, wave2: 1, semi2: 12, attack: 0.005, decay: 0.1, sustain: 1, release: 0.05, cutoff: 5000, fenv: 0 } },
-    { name: "Soft Pad", params: { wave1: 2, wave2: 0, attack: 1.2, release: 2.5, cutoff: 1400, detune: 22, chord: 1, spread: 1 } },
-    { name: "Pluck Chords", params: { chord: 1, decay: 0.25, sustain: 0, release: 0.3, fenv: 0.6, fdecay: 0.15, cutoff: 1200 } },
-    { name: "Brassy", params: { wave1: 0, wave2: 0, detune: 12, attack: 0.05, cutoff: 900, fenv: 0.7, fdecay: 0.4, reso: 0.15 } },
-    { name: "Lead Saw", params: { chord: 0, detune: 14, cutoff: 4500, reso: 0.25, fenv: 0.2, sustain: 0.8 } },
-    { name: "Bell Sevenths", params: { chord: 2, wave1: 3, wave2: 2, semi2: 19, mix: 0.35, decay: 1.4, sustain: 0, release: 1.2, cutoff: 8000 } },
+    // Keys
+    ch("Soft Keys", "Keys", { level: 0.33, wave1: 2, wave2: 3, semi2: 12, mix: 0.35, cutoff: 4000, fenv: 0.2, fdecay: 0.4, attack: 0.003, decay: 0.9, sustain: 0.35, release: 0.5 }),
+    ch("Glass Keys", "Keys", { level: 0.41, wave1: 2, wave2: 3, semi2: 12, cutoff: 6000, fenv: 0.2, decay: 0.8, sustain: 0.3, release: 0.8, warmth: 0.1 }),
+    ch("Square Organ", "Keys", { level: 0.26, wave1: 1, wave2: 1, semi2: 12, attack: 0.005, decay: 0.1, sustain: 1, release: 0.05, cutoff: 5000, fenv: 0, warmth: 0.15 }),
+    ch("Drawbar Lite", "Keys", { level: 0.25, wave1: 3, wave2: 3, semi2: 12, mix: 0.5, attack: 0.004, sustain: 1, release: 0.08, cutoff: 8000, fenv: 0, "tk:l1Dest": 1, "tk:l1Rate": 6, "tk:l1Amt": 0.015, "ifx:type": 8, "ifx:a": 0.6, "ifx:b": 0.5 }),
+    ch("House Stab", "Keys", { level: 0.51, chord: 2, wave1: 0, wave2: 1, cutoff: 2200, fenv: 0.5, fdecay: 0.25, decay: 0.45, sustain: 0.1, release: 0.3, warmth: 0.2 }),
+    ch("Clavish", "Keys", { level: 0.73, chord: 0, wave1: 1, wave2: 0, "tk:pw": 0.25, mix: 0.4, cutoff: 4500, reso: 0.3, fenv: 0.5, fdecay: 0.12, decay: 0.35, sustain: 0.5, release: 0.1, warmth: 0.2 }),
+    // Pads
+    ch("Soft Pad", "Pads", { level: 0.27, wave1: 2, wave2: 0, attack: 1.2, release: 2.5, cutoff: 1400, detune: 22, voicing: 0.5 }),
+    ch("Warm Pad", "Pads", { level: 0.24, wave1: 0, wave2: 0, detune: 18, cutoff: 1400, attack: 0.8, release: 2, warmth: 0.6, voicing: 0.5, "tk:uni": 3, "tk:uniDet": 0.4 }),
+    ch("Sweep Pad", "Pads", { level: 0.38, wave1: 0, wave2: 0, detune: 14, cutoff: 600, fenv: 0.6, fdecay: 2.5, attack: 1, release: 2, "ifx:type": 9, "ifx:a": 0.2, "ifx:b": 0.6 }),
+    ch("Dark Pad", "Pads", { level: 0.26, wave1: 2, wave2: 0, mix: 0.5, cutoff: 900, attack: 1.5, release: 3, warmth: 0.7, voicing: 0.7 }),
+    ch("Air Pad", "Pads", { level: 0.24, wave1: 3, wave2: 0, semi2: 12, mix: 0.3, cutoff: 5000, attack: 1.2, release: 2.5, voicing: 0.8, "ifx:type": 15, "ifx:a": 0.6, "ifx:b": 0.4 }),
+    ch("Choir Haze", "Pads", { level: 0.29, wave1: 2, wave2: 2, detune: 25, cutoff: 1800, reso: 0.4, attack: 0.7, release: 2, "tk:l1Dest": 2, "tk:l1Rate": 0.3, "tk:l1Amt": 0.2 }),
+    // Strings
+    ch("Slow Strings", "Strings", { level: 0.30, attack: 0.6, release: 1.5, cutoff: 3500, detune: 18, mix: 0.5, voicing: 0.5 }),
+    ch("Fast Strings", "Strings", { level: 0.30, wave1: 0, wave2: 0, detune: 20, attack: 0.08, release: 0.6, cutoff: 4500, voicing: 0.5, warmth: 0.4 }),
+    ch("Pizzicato", "Strings", { level: 0.75, wave1: 0, wave2: 2, cutoff: 2000, fenv: 0.5, fdecay: 0.12, decay: 0.18, sustain: 0, release: 0.15, strum: 0.25 }),
+    ch("Chamber", "Strings", { level: 0.31, wave1: 0, wave2: 2, cutoff: 3000, attack: 0.3, release: 1, "tk:l1Dest": 1, "tk:l1Rate": 5, "tk:l1Amt": 0.02, "tk:l1Delay": 0.4, voicing: 0.6 }),
+    ch("Tape Strings", "Strings", { level: 0.24, wave1: 0, wave2: 0, detune: 30, cutoff: 2500, attack: 0.4, release: 1.2, warmth: 0.7, "tk:l1Dest": 1, "tk:l1Rate": 0.8, "tk:l1Amt": 0.03 }),
+    // Brass
+    ch("Brassy", "Brass", { level: 0.31, wave1: 0, wave2: 0, detune: 12, attack: 0.05, cutoff: 900, fenv: 0.7, fdecay: 0.4, reso: 0.15 }),
+    ch("Brass Stab", "Brass", { level: 0.50, wave1: 0, wave2: 0, cutoff: 700, fenv: 0.8, fdecay: 0.2, decay: 0.3, sustain: 0.3, release: 0.15 }),
+    ch("Soft Horns", "Brass", { level: 0.24, wave1: 0, wave2: 1, mix: 0.3, attack: 0.12, cutoff: 1100, fenv: 0.4, fdecay: 0.5, sustain: 0.8, warmth: 0.5 }),
+    ch("Swell Brass", "Brass", { level: 0.26, chord: 2, attack: 0.4, cutoff: 500, fenv: 0.9, fdecay: 1.2, reso: 0.2, release: 0.6 }),
+    ch("Fanfare", "Brass", { level: 0.33, wave1: 0, wave2: 0, semi2: 12, mix: 0.3, cutoff: 2000, fenv: 0.5, fdecay: 0.3, voicing: 0.8, strum: 0.15 }),
+    // Synth
+    ch("Stab Club", "Synth", { level: 0.50, chord: 2, cutoff: 900, reso: 0.35, fenv: 0.7, fdecay: 0.18, decay: 0.2, sustain: 0, release: 0.15 }),
+    ch("Pluck Chords", "Synth", { level: 0.50, decay: 0.25, sustain: 0, release: 0.3, fenv: 0.6, fdecay: 0.15, cutoff: 1200 }),
+    ch("Lead Saw", "Synth", { level: 0.48, chord: 0, detune: 14, cutoff: 4500, reso: 0.25, fenv: 0.2, sustain: 0.8, warmth: 0.1 }),
+    ch("Rave Hoover", "Synth", { level: 0.29, wave1: 0, wave2: 0, detune: 40, cutoff: 3000, "tk:uni": 4, "tk:uniDet": 0.8, "tk:pAmt": -12, "tk:pDec": 0.15, warmth: 0.2 }),
+    ch("Detuned Chords", "Synth", { level: 0.25, chord: 2, wave1: 0, wave2: 0, detune: 30, cutoff: 3500, "tk:uni": 3, "tk:uniDet": 0.5 }),
+    ch("Acid Chords", "Synth", { level: 0.64, wave1: 0, wave2: 0, cutoff: 500, reso: 0.6, fenv: 0.7, fdecay: 0.15, decay: 0.2, sustain: 0.2, warmth: 0.1 }),
+    // Bells
+    ch("Bell Sevenths", "Bells", { level: 0.51, chord: 2, wave1: 3, wave2: 2, semi2: 12, mix: 0.35, decay: 1.4, sustain: 0, release: 1.2, cutoff: 8000, warmth: 0 }),
+    ch("Music Box", "Bells", { level: 0.81, chord: 1, strum: 0.3, wave1: 3, wave2: 3, semi2: 12, mix: 0.5, decay: 1, sustain: 0, release: 1, cutoff: 9000, warmth: 0, "ifx:type": 14, "ifx:a": 0.4, "ifx:b": 0.3 }),
+    ch("Glass Bells", "Bells", { level: 0.36, wave1: 2, wave2: 3, semi2: 12, decay: 1.6, sustain: 0, release: 1.5, cutoff: 7000, warmth: 0.05, "ifx:type": 15, "ifx:a": 0.5, "ifx:b": 0.35 }),
+    ch("Chime Pad", "Bells", { level: 0.28, chord: 2, wave1: 3, wave2: 2, attack: 0.01, decay: 2.5, sustain: 0.2, release: 2.5, voicing: 1, strum: 0.4 }),
   ],
 };
 
