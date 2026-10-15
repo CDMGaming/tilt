@@ -10,7 +10,7 @@ import { AUTO_STEP } from "../engine/timeline";
 import { DRUM_BASE_NOTE } from "../engine/instruments";
 import { PPQ, TICKS_PER_BAR, assignShades, idLanes, normalizeSong, type Song, type Track, songChain, chainIndexOf } from "../engine/model";
 import { scaleById, snapToScale } from "../engine/music";
-import { addNote, addTrack, clearAutoRange, ensureClip, quantizeNotes, setAutoPoint } from "../engine/songops";
+import { addNote, addTrack, clearAutoRange, ensureClip, quantizeNotes, setAutoPoint, stepLength, lengthLabel } from "../engine/songops";
 import { NO_HOLDS, defaultSpec, nudgeSetup, type Holds, type LineupSpec, type Setup } from "../engine/dice";
 import { mods, type Action } from "./actions";
 import { h } from "./dom";
@@ -787,6 +787,18 @@ export class App {
     return this.ed.triplet ? (this.ed.grid * 2) / 3 : this.ed.grid;
   }
 
+  /** How long a new note is on this track: the picker's length, remembered per track (else the grid step). */
+  noteLength(track = this.track()): number {
+    return track?.noteLen ?? this.grid();
+  }
+
+  /** The note-length picker: set this track's length for new notes (a preference: saved, not an undo step). */
+  setNoteLength(ticks: number | undefined, track = this.track()) {
+    if (!track) return;
+    if (ticks === undefined) delete track.noteLen; else track.noteLen = ticks;
+    this.changed();
+  }
+
   // ------------------------------------------------------------ note input
 
   /** All live notes (computer keys, on-screen keys/pads, MIDI) go through here. */
@@ -826,7 +838,7 @@ export class App {
       if (this.scratch.stepHeld === 0) { this.history.push(this.song, "Step input"); this.scratch.stepChordTick = this.ed.stepTick; }
       this.scratch.stepHeld++;
       const c = clip ?? ensureClip(this.song, track, this.ed.sceneId);
-      addNote(this.song, c, { pitch, start: this.scratch.stepChordTick, len: this.grid(), vel });
+      addNote(this.song, c, { pitch, start: this.scratch.stepChordTick, len: this.noteLength(track), vel });
       this.changed(false);
     } else if (this.scratch.stepHeld > 0) {
       this.scratch.stepHeld--;
@@ -1029,6 +1041,7 @@ export class App {
       case "screen": if (this.screenName !== "dice") this.show(a.to); return;
       case "system": this.openSystemMenu?.(); return;
       case "playMode": if (this.screenName !== "dice") this.setSongMode(this.songMode === "scene" ? "song" : "scene"); return;
+      case "noteLen": { const t = this.track(); if (t && this.screenName !== "dice") { this.setNoteLength(stepLength(this.noteLength(t), a.d), t); this.overlays.toast(`Note length ${lengthLabel(this.noteLength(t))}`, 800); } return; }
       case "help": this.openHelp?.(); return;
       case "shortcut": if (a.down) this.openShortcut?.(); return;
     }

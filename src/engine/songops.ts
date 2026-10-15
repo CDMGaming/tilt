@@ -1,7 +1,7 @@
 // Edits on the song model. All mutate in place; callers snapshot for undo first.
 
 import {
-  MAX_BARS, MAX_SCENES, MAX_TRACKS, TICKS_PER_BAR, emptyClip, emptyFx, newId, sceneTicks, type AutoPoint, type Clip, type InstrumentKind, type Note, type Scene, type Song, type Track, songChain, type ChainStep,
+  MAX_BARS, MAX_SCENES, PPQ, MAX_TRACKS, TICKS_PER_BAR, emptyClip, emptyFx, newId, sceneTicks, type AutoPoint, type Clip, type InstrumentKind, type Note, type Scene, type Song, type Track, songChain, type ChainStep,
 } from "./model";
 import { INSTRUMENTS, presetParams } from "./instruments";
 import { inScale, snapToScale } from "./music";
@@ -333,4 +333,81 @@ export function snapClipToScale(clip: Clip, key: number, scaleId: string, only?:
   clip.notes = clip.notes.filter((n) => { const k = `${n.pitch}:${n.start}`; if (seen.has(k)) return false; seen.add(k); return true; });
   clip.notes.sort((a, b) => a.start - b.start || a.pitch - b.pitch);
   return moved;
+}
+
+// ---------------------------------------------------------------- note lengths
+
+/** The note-length picker's values: 1/32 to 1 bar, each plain, dotted (x1.5) or triplet (x2/3). */
+export const NOTE_LENGTHS: { ticks: number; label: string }[] = [
+  { ticks: PPQ / 8, label: "1/32" }, { ticks: PPQ / 4, label: "1/16" }, { ticks: PPQ / 2, label: "1/8" },
+  { ticks: PPQ, label: "1/4" }, { ticks: PPQ * 2, label: "1/2" }, { ticks: PPQ * 4, label: "1 bar" },
+];
+export type LengthMod = "" | "dot" | "tri";
+
+/** A length in ticks as base + dotted / triplet, when it's one of the picker's (else null). */
+export function splitLength(ticks: number): { base: number; mod: LengthMod } | null {
+  for (const l of NOTE_LENGTHS) {
+    if (ticks === l.ticks) return { base: l.ticks, mod: "" };
+    if (ticks === l.ticks * 1.5) return { base: l.ticks, mod: "dot" };
+    if (Math.abs(ticks - (l.ticks * 2) / 3) < 1e-6) return { base: l.ticks, mod: "tri" };
+  }
+  return null;
+}
+export function makeLength(base: number, mod: LengthMod): number {
+  return mod === "dot" ? base * 1.5 : mod === "tri" ? (base * 2) / 3 : base;
+}
+/** "1/8", "1/8." (dotted), "1/8T" (triplet). */
+export function lengthLabel(ticks: number): string {
+  const s = splitLength(ticks);
+  if (!s) return `${Math.round(ticks)} t`;
+  const name = NOTE_LENGTHS.find((l) => l.ticks === s.base)!.label;
+  return name + (s.mod === "dot" ? "." : s.mod === "tri" ? "T" : "");
+}
+/** One step longer (+1) or shorter (-1), keeping dotted / triplet. */
+export function stepLength(ticks: number, d: 1 | -1): number {
+  const s = splitLength(ticks) ?? { base: PPQ / 4, mod: "" as LengthMod };
+  const i = NOTE_LENGTHS.findIndex((l) => l.ticks === s.base);
+  const j = Math.max(0, Math.min(NOTE_LENGTHS.length - 1, i + d));
+  return makeLength(NOTE_LENGTHS[j].ticks, s.mod);
+}
+
+/** Split a note at `tick` (inside it): it ends there and a copy starts there. Returns the new note, or null. */
+export function splitNote(song: Song, clip: Clip, note: Note, tick: number): Note | null {
+  if (tick <= note.start || tick >= note.start + note.len) return null;
+  const rest: Note = { ...note, id: newId(song), start: tick, len: note.start + note.len - tick };
+  note.len = tick - note.start;
+  clip.notes.push(rest);
+  clip.notes.sort((a, b) => a.start - b.start || a.pitch - b.pitch);
+  return rest;
+}
+
+/** Join: notes of the same pitch that touch or overlap become one. Returns how many were merged away. */
+export function joinNotes(clip: Clip, notes: Note[]): number {
+  const byPitch = new Map<number, Note[]>();
+  for (const n of notes) byPitch.set(n.pitch, [...(byPitch.get(n.pitch) ?? []), n]);
+  const gone = new Set<Note>();
+  for (const group of byPitch.values()) {
+    group.sort((a, b) => a.start - b.start);
+    let cur = group[0];
+    for (const n of group.slice(1)) {
+      if (n.start <= cur.start + cur.len) { cur.len = Math.max(cur.len, n.start + n.len - cur.start); gone.add(n); }
+      else cur = n;
+    }
+  }
+  clip.notes = clip.notes.filter((n) => !gone.has(n));
+  return gone.size;
+}
+
+/** Legato: each note lasts until the next note starts (any pitch in the clip), the last one to the clip's end. */
+export function legatoNotes(clip: Clip, notes: Note[]) {
+  const starts = [...new Set(clip.notes.map((n) => n.start))].sort((a, b) => a - b);
+  const end = clip.bars * TICKS_PER_BAR;
+  for (const n of notes) {
+    const next = starts.find((s) => s > n.start);
+    n.len = (next ?? end) - n.start;
+  }
+}
+
+export function setNoteLength(notes: Note[], ticks: number) {
+  for (const n of notes) n.len = Math.max(1, Math.round(ticks));
 }

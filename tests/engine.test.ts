@@ -440,3 +440,26 @@ Deno.test("song chain: old songs get the rows; steps repeat, reorder and can pla
   autoArrange(one);
   assertEquals(one.chain!.map((x) => x.sceneId), one.scenes.map((s) => s.id));
 });
+
+Deno.test("note lengths: labels, dotted / triplet, split, join, legato, set length", async () => {
+  const ops = await import("../src/engine/songops.ts");
+  assertEquals([12, 24, 36, 32, 96, 384].map(ops.lengthLabel), ["1/32", "1/16", "1/16.", "1/8T", "1/4", "1 bar"]);
+  assertEquals(ops.stepLength(36, 1), 72); // 1/16. -> 1/8.
+  assertEquals(ops.stepLength(384, 1), 384); // already the longest
+  const song = songFromSetup({ key: 0, scale: "minor", tempo: 120, swing: 0, lineup: [{ kind: "acid", preset: 0 }] });
+  const clip = ensureClip(song, song.tracks[0], song.scenes[0].id);
+  const a = addNote(song, clip, { pitch: 48, start: 0, len: 96, vel: 100 });
+  // Split at a grid line inside the note: two notes, same pitch, touching.
+  const b = ops.splitNote(song, clip, a, 48)!;
+  assertEquals([a.start, a.len, b.start, b.len], [0, 48, 48, 48]);
+  assertEquals(ops.splitNote(song, clip, a, 0), null); // not inside
+  // Join them back.
+  assertEquals(ops.joinNotes(clip, [a, b]), 1);
+  assertEquals(clip.notes.map((n) => [n.start, n.len]), [[0, 96]]);
+  // Legato: each note runs to the next start; the last to the clip's end.
+  const c = addNote(song, clip, { pitch: 50, start: 192, len: 24, vel: 100 });
+  ops.legatoNotes(clip, clip.notes);
+  assertEquals([a.len, c.len], [192, 192]);
+  ops.setNoteLength([a, c], 36);
+  assertEquals([a.len, c.len], [36, 36]);
+});

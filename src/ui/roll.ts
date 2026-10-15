@@ -10,7 +10,7 @@ import { getParam, paramInfo } from "../engine/params";
 import { sampleLabel } from "./samples";
 import { PPQ, TICKS_PER_BAR, type Clip, type Note, type Track } from "../engine/model";
 import { inScale, noteName, scaleDegree } from "../engine/music";
-import { addNote, ensureClip, laneValue, noteAt, setAutoPoint } from "../engine/songops";
+import { addNote, ensureClip, laneValue, noteAt, setAutoPoint, splitNote } from "../engine/songops";
 import type { App } from "./app";
 import { trackColor } from "./theme";
 
@@ -316,13 +316,16 @@ export class PianoRoll {
       y += hh;
     }
 
-    // grid
+    // grid: every other beat lightly shaded; lines strong at bars, medium at beats, faint at steps
     const grid = app.grid(), ct = this.clipTicks();
     this.clipTo(g, 0, laneBottom);
+    g.fillStyle = col("--roll-beat-shade");
+    for (let b = 1; b * PPQ < ct; b += 2) g.fillRect(this.xOf(b * PPQ), RULER_H, PPQ * this.pxPerTick(), laneBottom - RULER_H);
     for (let t = 0; t <= ct; t += grid) {
       const x = Math.round(this.xOf(t)) + 0.5;
-      g.strokeStyle = t % TICKS_PER_BAR === 0 ? col("--roll-bar") : t % PPQ === 0 ? col("--roll-beat") : col("--roll-grid");
-      g.lineWidth = t % TICKS_PER_BAR === 0 ? 1.5 : 1;
+      const bar = t % TICKS_PER_BAR === 0, beat = t % PPQ === 0;
+      g.strokeStyle = bar ? col("--roll-bar") : beat ? col("--roll-beat") : col("--roll-grid");
+      g.lineWidth = bar ? 2 : 1;
       g.beginPath(); g.moveTo(x, RULER_H); g.lineTo(x, laneBottom); g.stroke();
     }
     // ruler
@@ -550,6 +553,12 @@ export class PianoRoll {
       return;
     }
     if (app.locked) { app.overlays.toast("Time's up. Editing is locked."); return; }
+    if (e.altKey && hit) {
+      const at = Math.round(rawTick / grid) * grid;
+      if (at > hit.start && at < hit.start + hit.len) app.edit("Split note", () => splitNote(app.song, clip!, hit, at));
+      else app.overlays.toast("Alt+click inside a note, on a grid line, to split it", 1400);
+      return;
+    }
     try { this.canvas.setPointerCapture(e.pointerId); } catch { /* a quick tap: the finger has already lifted */ }
 
     if (e.shiftKey && !hit) {
@@ -610,11 +619,16 @@ export class PianoRoll {
     }
     app.history.push(app.song, "Add note");
     const c = ensureClip(app.song, track, ed.sceneId);
-    const note = addNote(app.song, c, { pitch, start: ed.tick, len: grid, vel: 100 });
+    const note = addNote(app.song, c, { pitch, start: ed.tick, len: app.noteLength(track), vel: 100 });
     ed.sel.clear();
     if (app.settings.notePreview) app.engine.preview(track.id, pitch);
     app.changed(false);
+    // A click gives the picker's length; dragging sizes it to the grid instead.
+    const x0 = e.clientX;
+    let dragged = false;
     this.track$(e, (tx) => {
+      if (!dragged && Math.abs(this.lastX - x0) < 6) return;
+      dragged = true;
       note.len = Math.max(grid, Math.ceil((tx - note.start) / grid) * grid);
       app.changed(false);
       this.invalidate();

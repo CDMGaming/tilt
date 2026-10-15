@@ -79,6 +79,10 @@ function keyAction(e: KeyboardEvent, ctrl: boolean): Action | null {
       case "KeyD": return { type: "duplicate" };
       case "KeyA": return { type: "selectAll" };
       case "Enter": case "NumpadEnter": return { type: "aux" };
+      case "KeyE": return { type: "noteOp", op: "split" };
+      case "KeyJ": return { type: "noteOp", op: "join" };
+      case "KeyG": return { type: "noteOp", op: "legato" };
+      case "KeyK": return { type: "noteOp", op: "setLen" };
     }
     return null;
   }
@@ -96,6 +100,8 @@ function keyAction(e: KeyboardEvent, ctrl: boolean): Action | null {
     case "KeyM": case "ContextMenu": return { type: "menu" };
     case "F1": return { type: "system" };
     case "KeyC": return { type: "playMode" };
+    case "KeyB": return { type: "noteLen", d: -1 };
+    case "KeyN": return { type: "noteLen", d: 1 };
     case "Backquote": return e.repeat ? null : { type: "shortcut", down: true };
     case "Comma": return { type: "knob", dx: -1, dy: 0 };
     case "Period": return { type: "knob", dx: 1, dy: 0 };
@@ -127,6 +133,7 @@ export class GamepadInput {
   private yDown = 0;
   private rbDown = 0;
   private rbFired = false;
+  private lbLen = false;
   private yFired = false;
   private knobAcc = 0;
   private knobAccY = 0;
@@ -166,11 +173,14 @@ export class GamepadInput {
     if (down(map.B)) s.action({ type: "back" });
     if (down(map.X)) s.action({ type: "menu" });
     // RB: tap = swap roll / panel (as before, now on release); hold = editor layout.
-    if (down(map.RB)) { this.rbDown = now; this.rbFired = false; }
+    // LT held: LB / RB set the length of new notes (shorter / longer).
+    if (mods.fine && down(map.RB)) { this.rbFired = true; s.action({ type: "noteLen", d: 1 }); }
+    else if (down(map.RB)) { this.rbDown = now; this.rbFired = false; }
     if (b(map.RB) && !this.rbFired && now - this.rbDown > Y_HOLD_MS) { this.rbFired = true; s.action({ type: "layout" }); }
     if (up(map.RB) && !this.rbFired) s.action({ type: "focusSwap" });
-    if (down(map.LB)) s.action({ type: "shortcut", down: true });
-    if (up(map.LB)) s.action({ type: "shortcut", down: false });
+    if (mods.fine && down(map.LB)) { this.lbLen = true; s.action({ type: "noteLen", d: -1 }); }
+    else if (down(map.LB)) s.action({ type: "shortcut", down: true });
+    if (up(map.LB)) { if (this.lbLen) this.lbLen = false; else s.action({ type: "shortcut", down: false }); }
     if (down(map.MENU)) s.action({ type: "system" });
     if (down(map.VIEW)) s.action({ type: "undo" });
     if (down(map.L3)) s.action({ type: "playMode" });

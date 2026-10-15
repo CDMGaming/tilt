@@ -62,6 +62,8 @@ export interface Track {
   solo: boolean;
   clips: Record<number, Clip>; // keyed by scene id; a missing key is an empty cell
   color: number; // shade of the instrument's colour: 0 = first of its kind, 1 = second… (see assignShades)
+  /** Length of new notes on this track, in ticks (missing: the grid step). */
+  noteLen?: number;
 }
 
 export interface Scene {

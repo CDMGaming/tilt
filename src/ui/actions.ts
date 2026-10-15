@@ -24,7 +24,9 @@ export type Action =
   | { type: "screen"; to: "song" | "edit" | "mix" }
   | { type: "playMode" } // C / L3: SCENE <-> SONG
   | { type: "help" } // ?: the controls
-  | { type: "aux" }; // Ctrl+Enter / R3: the tutorial's "I'm ready"
+  | { type: "aux" } // Ctrl+Enter / R3: the tutorial's "I'm ready"
+  | { type: "noteLen"; d: -1 | 1 } // B / N, LT + LB / RB: shorter / longer new notes
+  | { type: "noteOp"; op: "split" | "join" | "legato" | "setLen" }; // Ctrl+E / J / G / K
 
 /** Held modifiers, kept by the input layer. */
 export const mods = {

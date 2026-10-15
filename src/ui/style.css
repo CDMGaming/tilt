@@ -89,9 +89,10 @@
   --roll-key-white: #c9d3e8;
   --roll-key-black: #1a2236;
   --roll-key-ink: #10162a;
-  --roll-grid: #ffffff0b;
-  --roll-beat: #ffffff1a;
-  --roll-bar: #ffffff3d;
+  --roll-grid: #ffffff12;
+  --roll-beat: #ffffff24;
+  --roll-bar: #ffffff5c;
+  --roll-beat-shade: #ffffff0e;
   --sel-fill: #ffd23f1f;
   color-scheme: dark;
 }
@@ -1147,3 +1148,6 @@ body.phone .chain-chip { padding: 6px 8px 8px; }
 /* A shared song's Play card */
 .shared-title { font: 800 22px var(--font-display); }
 .play-big { font-size: 20px; padding: 14px; }
+.len-btn { white-space: nowrap; }
+.len-btn.own { color: var(--dmd); border-color: color-mix(in srgb, var(--dmd) 55%, var(--line)); }
+.len-btn .len-note { opacity: .8; }

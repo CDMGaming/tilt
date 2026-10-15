@@ -6,7 +6,10 @@ import { inScale, NOTE_NAMES, scaleById, snapToScale, stepInScale } from "../eng
 import { getParam, paramInfo } from "../engine/params";
 import { fxDef } from "../engine/params";
 import { drumCount, isDrumKind, toUnit } from "../engine/instruments";
-import { addNote, duplicateClip, ensureClip, laneValue, noteAt, outOfKeyNotes, quantizeClip, setAutoPoint, setClipBars, snapClipToScale } from "../engine/songops";
+import {
+  NOTE_LENGTHS, addNote, duplicateClip, ensureClip, joinNotes, laneValue, legatoNotes, lengthLabel, makeLength, noteAt, outOfKeyNotes,
+  quantizeClip, setAutoPoint, setClipBars, setNoteLength, snapClipToScale, splitLength, splitNote, type LengthMod,
+} from "../engine/songops";
 import { mods, type Action } from "./actions";
 import type { App, EditorLayout, Screen } from "./app";
 import { h } from "./dom";
@@ -106,6 +109,7 @@ export class EditorScreen implements Screen {
         btn("1/8", ed.grid === 48, () => this.setGrid(48)),
         btn("1/16", ed.grid === 24, () => this.setGrid(24)),
         btn("3", ed.triplet, () => { ed.triplet = !ed.triplet; this.snapCursor(); this.render(); }, "Triplets")),
+      this.lengthButton(),
       h("div", { class: "tb-group" },
         btn("Step", ed.stepInput, () => this.toggleStep(), "Step input: play notes while stopped, the cursor advances"),
         twin("Velocity", "Vel", ed.velView && !ed.autoKey, () => { ed.velView = !(ed.velView && !ed.autoKey); ed.autoKey = null; this.render(); }, "Velocity lane"),
@@ -156,6 +160,7 @@ export class EditorScreen implements Screen {
           h("span", { class: "tb-value" }, String(clip?.bars ?? "—")),
           btn("+", null, () => this.setBars((clip?.bars ?? 1) + 1)),
           btn("×2", null, () => this.duplicate(), "Double the clip, notes included")),
+        this.lengthButton(),
         h("div", { class: "tb-group" },
           btn("−", null, () => { this.roll.zoom(-1); this.render(); }, "Zoom out"),
           h("span", { class: "tb-value zoom-value" }, this.roll.zoomLabel()),
@@ -353,6 +358,56 @@ export class EditorScreen implements Screen {
     } }, h("span", { class: "outkey-mark", "aria-hidden": "true" }, "⚠"), h("span", { class: "lbl-long" }, ` ${n} out of key`), h("span", { class: "lbl-short" }, ` ${n}`));
   }
 
+  // ------------------------------------------------------------ note length
+
+  /** The toolbar's length picker: what new notes get on this track (B / N, LT + LB / RB on a pad). */
+  private lengthButton(): HTMLElement {
+    const app = this.app, track = app.track();
+    const own = track?.noteLen !== undefined;
+    return h("button", { class: "tb-btn len-btn" + (own ? " own" : ""), "data-coach": "length", title: "Length of new notes (B / N). A drag still sets it by hand", onclick: (e: Event) => {
+      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      app.overlays.menu("New note length", () => this.lengthItems(), { x: r.left, y: r.bottom + 4 });
+    } }, h("span", { class: "len-note", "aria-hidden": "true" }, "♪"), ` ${lengthLabel(app.noteLength(track))} ▾`);
+  }
+
+  private lengthItems(): MenuItem[] {
+    const app = this.app, track = app.track(), cur = app.noteLength(track);
+    const parts = splitLength(cur) ?? { base: cur, mod: "" as LengthMod };
+    const set = (ticks: number | undefined) => { app.setNoteLength(ticks, track); this.render(); };
+    return [
+      ...NOTE_LENGTHS.map((l) => ({ label: l.label, checked: track?.noteLen !== undefined && parts.base === l.ticks, keepOpen: true, run: () => set(makeLength(l.ticks, parts.mod)) })),
+      { label: "Dotted (x1.5)", checked: parts.mod === "dot", keepOpen: true, run: () => set(makeLength(parts.base, parts.mod === "dot" ? "" : "dot")) },
+      { label: "Triplet (x2/3)", checked: parts.mod === "tri", keepOpen: true, run: () => set(makeLength(parts.base, parts.mod === "tri" ? "" : "tri")) },
+      { label: "Same as the grid", checked: track?.noteLen === undefined, keepOpen: true, run: () => set(undefined) },
+      { label: `Set the selected notes to ${lengthLabel(cur)}`, disabled: !this.roll.selectedNotes().length, run: () => this.noteOp("setLen"), hint: "Ctrl+K" },
+    ];
+  }
+
+  /** Split (at the cursor), join, legato, set length: on the selection, or the note under the cursor. */
+  noteOp(op: "split" | "join" | "legato" | "setLen") {
+    const app = this.app, ed = app.ed, clip = this.clip, track = app.track();
+    if (!clip || !track || app.locked) return;
+    const sel = this.roll.selectedNotes(), under = noteAt(clip, ed.tick, ed.pitch);
+    const targets = sel.length ? sel : under ? [under] : [];
+    if (op === "split") {
+      const n = under ?? sel.find((x) => ed.tick > x.start && ed.tick < x.start + x.len);
+      if (!n || ed.tick <= n.start || ed.tick >= n.start + n.len) { app.overlays.toast("Put the cursor inside a note, on the grid line to split at", 1500); return; }
+      app.edit("Split note", () => splitNote(app.song, clip, n, ed.tick));
+      return;
+    }
+    if (op === "join") {
+      if (sel.length < 2) { app.overlays.toast("Select the notes to join (Shift + arrows, or Shift + drag a box)", 1600); return; }
+      let merged = 0;
+      app.edit("Join notes", () => { merged = joinNotes(clip, sel); });
+      if (!merged) app.overlays.toast("Nothing to join: same-pitch notes have to touch", 1500);
+      ed.sel = new Set(clip.notes.filter((n) => ed.sel.has(n.id)).map((n) => n.id));
+      return;
+    }
+    if (!targets.length) { app.overlays.toast("Select notes first (or put the cursor on one)", 1400); return; }
+    if (op === "legato") app.edit("Legato", () => legatoNotes(clip, targets));
+    else app.edit("Set length", () => setNoteLength(targets, app.noteLength(track)));
+  }
+
   private toggleLock() {
     this.app.settings.scaleLock = !this.app.settings.scaleLock;
     this.app.saveSettings();
@@ -386,6 +441,7 @@ export class EditorScreen implements Screen {
     if (a.type === "menu") { this.openMenu(); return true; }
     if (a.type === "layout") { if (!this.compact) this.setLayout(); return true; }
     if (a.type === "shortcut") return false;
+    if (a.type === "noteOp") { this.noteOp(a.op); return true; } // the notes, whichever side has the focus
     if (ed.focus !== "roll") return this.handlePanel(a);
     return this.handleRoll(a);
   }
@@ -488,7 +544,7 @@ export class EditorScreen implements Screen {
           }
           app.edit("Add note", () => {
             const c = ensureClip(app.song, track, ed.sceneId);
-            ed.placing = addNote(app.song, c, { pitch: ed.pitch, start: ed.tick, len: grid, vel: 100 }).id;
+            ed.placing = addNote(app.song, c, { pitch: ed.pitch, start: ed.tick, len: app.noteLength(track), vel: 100 }).id;
           }, { render: false });
           if (app.settings.notePreview) app.engine.preview(track.id, ed.pitch);
         }
@@ -604,6 +660,11 @@ export class EditorScreen implements Screen {
       const sel = this.roll.selectedNotes().length;
       return [
         { label: "Quantize notes", run: () => this.quantize(), hint: "snap to the grid" },
+        { label: "Split note at the cursor", run: () => this.noteOp("split"), hint: "Ctrl+E · Alt+click" },
+        { label: "Join selected notes", disabled: sel < 2, run: () => this.noteOp("join"), hint: "Ctrl+J" },
+        { label: "Legato: to the next note", run: () => this.noteOp("legato"), hint: "Ctrl+G" },
+        { label: `Set length: ${lengthLabel(app.noteLength(track))}`, run: () => this.noteOp("setLen"), hint: "Ctrl+K" },
+        { label: `New note length: ${lengthLabel(app.noteLength(track))}`, sub: () => this.lengthItems(), hint: "B / N" },
         { label: "Duplicate clip (x2)", run: () => this.duplicate(), hint: "Ctrl+D" },
         { label: "Zoom in", keepOpen: true, run: () => { this.roll.zoom(1); this.render(); }, hint: "Ctrl+wheel" },
         { label: "Zoom out", keepOpen: true, run: () => { this.roll.zoom(-1); this.render(); }, hint: this.roll.zoomLabel() },
