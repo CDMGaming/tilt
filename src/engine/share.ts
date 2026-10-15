@@ -74,6 +74,10 @@ export function validateSong(v: unknown): string | null {
     if (!sc || !num(sc.id, 0, 1e9) || typeof sc.name !== "string" || sc.name.length > 60 || !num(sc.repeat, 1, 64)) return "bad scene";
     sceneIds.add(sc.id as number);
   }
+  if (s.chain !== undefined) {
+    if (!Array.isArray(s.chain) || s.chain.length > 64) return "bad song chain";
+    for (const x of s.chain as Record<string, unknown>[]) if (!x || !sceneIds.has(x.sceneId as number) || !num(x.repeat, 1, 64)) return "bad song chain";
+  }
   if (!Array.isArray(s.tracks) || s.tracks.length > MAX_TRACKS) return "bad tracks";
   for (const t of s.tracks as Record<string, unknown>[]) {
     if (!t || !num(t.id, 0, 1e9) || typeof t.kind !== "string" || !t.clips || typeof t.clips !== "object" || !t.params || typeof t.params !== "object") return "bad track";

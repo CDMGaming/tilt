@@ -2,7 +2,7 @@
 // the real-time scheduler (in small look-ahead windows) and the offline
 // WAV renderer (whole song at once).
 
-import { PPQ, TICKS_PER_BAR, sceneTempo, sceneTicks, type Song, type Track } from "./model";
+import { PPQ, TICKS_PER_BAR, sceneTempo, sceneTicks, songChain, type Scene, type Song, type Track } from "./model";
 import { scaleChord } from "./music";
 import { INSTRUMENTS, fromUnit } from "./instruments";
 import { getParam, paramInfo } from "./params";
@@ -16,7 +16,7 @@ export type PlayMode = { kind: "scene"; sceneId: number; once?: boolean } | { ki
 
 export interface SceneInstance {
   sceneId: number;
-  index: number; // position in song.scenes when created
+  index: number; // SONG mode: the step in the chain; SCENE mode: the scene's row
   repeat: number; // 0-based repeat number
   repeats: number;
   startTime: number; // seconds (context time)
@@ -40,9 +40,8 @@ export function secPerTick(bpm: number): number {
   return 60 / (bpm * PPQ);
 }
 
-function makeInstance(song: Song, index: number, repeat: number, startTime: number): SceneInstance {
-  const sc = song.scenes[index];
-  const repeats = Math.max(1, sc.repeat);
+function makeInstance(song: Song, sc: Scene, index: number, repeat: number, repeats: number, startTime: number): SceneInstance {
+  repeats = Math.max(1, repeats);
   return {
     sceneId: sc.id,
     index,
@@ -62,22 +61,30 @@ export function firstInstance(song: Song, mode: PlayMode, startTime: number): Sc
     const i = song.scenes.findIndex((s) => s.id === mode.sceneId);
     if (i < 0) return null;
     // A looped scene ignores repeat count and fades.
-    return { ...makeInstance(song, i, 0, startTime), repeats: 1, fadeIn: false, fadeOut: false };
+    return { ...makeInstance(song, song.scenes[i], i, 0, 1, startTime), fadeIn: false, fadeOut: false };
   }
-  return makeInstance(song, Math.min(mode.fromIndex, song.scenes.length - 1), 0, startTime);
+  return chainInstance(song, Math.max(0, mode.fromIndex), 0, startTime);
+}
+
+/** Step `k` of the song chain, repeat `repeat`, or null past the end. */
+function chainInstance(song: Song, k: number, repeat: number, startTime: number): SceneInstance | null {
+  const chain = songChain(song), step = chain[Math.min(k, chain.length - 1)];
+  const sc = step && song.scenes.find((s) => s.id === step.sceneId);
+  return sc ? makeInstance(song, sc, Math.min(k, chain.length - 1), repeat, step.repeat, startTime) : null;
 }
 
 /** The instance that follows `prev`, or null when the song ends. */
 export function nextInstance(song: Song, mode: PlayMode, prev: SceneInstance): SceneInstance | null {
   const end = prev.startTime + prev.ticks * prev.secPerTick;
   if (mode.kind === "scene") return mode.once ? null : firstInstance(song, mode, end);
-  // The scene list may have been edited while playing: re-find by id.
-  let idx = song.scenes.findIndex((s) => s.id === prev.sceneId);
-  if (idx < 0) idx = Math.min(prev.index, song.scenes.length - 1);
-  const sc = song.scenes[idx];
-  if (sc && prev.repeat + 1 < Math.max(1, sc.repeat)) return makeInstance(song, idx, prev.repeat + 1, end);
-  if (idx + 1 < song.scenes.length) return makeInstance(song, idx + 1, 0, end);
-  if (song.songLoop) return makeInstance(song, 0, 0, end);
+  // The chain may have been edited while playing: if the step moved, find the scene again.
+  const chain = songChain(song);
+  let k = prev.index;
+  if (chain[k]?.sceneId !== prev.sceneId) { const f = chain.findIndex((x) => x.sceneId === prev.sceneId); k = f >= 0 ? f : Math.min(prev.index, chain.length - 1); }
+  const step = chain[k];
+  if (step && step.sceneId === prev.sceneId && prev.repeat + 1 < Math.max(1, step.repeat)) return chainInstance(song, k, prev.repeat + 1, end);
+  if (k + 1 < chain.length) return chainInstance(song, k + 1, 0, end);
+  if (song.songLoop) return chainInstance(song, 0, 0, end);
   return null;
 }
 

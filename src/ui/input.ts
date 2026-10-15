@@ -78,6 +78,7 @@ function keyAction(e: KeyboardEvent, ctrl: boolean): Action | null {
       case "KeyV": return { type: "paste" };
       case "KeyD": return { type: "duplicate" };
       case "KeyA": return { type: "selectAll" };
+      case "Enter": case "NumpadEnter": return { type: "aux" };
     }
     return null;
   }
@@ -173,6 +174,7 @@ export class GamepadInput {
     if (down(map.MENU)) s.action({ type: "system" });
     if (down(map.VIEW)) s.action({ type: "undo" });
     if (down(map.L3)) s.action({ type: "playMode" });
+    if (down(map.R3)) s.action({ type: "aux" });
 
     // Y: tap = play/stop, hold = record.
     if (down(map.Y)) { this.yDown = now; this.yFired = false; }

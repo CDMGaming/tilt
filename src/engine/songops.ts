@@ -1,8 +1,7 @@
 // Edits on the song model. All mutate in place; callers snapshot for undo first.
 
 import {
-  MAX_BARS, MAX_SCENES, MAX_TRACKS, TICKS_PER_BAR, emptyClip, emptyFx, newId, sceneTicks,
-  type AutoPoint, type Clip, type InstrumentKind, type Note, type Scene, type Song, type Track,
+  MAX_BARS, MAX_SCENES, MAX_TRACKS, TICKS_PER_BAR, emptyClip, emptyFx, newId, sceneTicks, type AutoPoint, type Clip, type InstrumentKind, type Note, type Scene, type Song, type Track, songChain, type ChainStep,
 } from "./model";
 import { INSTRUMENTS, presetParams } from "./instruments";
 import { inScale, snapToScale } from "./music";
@@ -30,14 +29,22 @@ export function sceneColor(name: string): string | null {
   return o ? OTHER_SCENE_COLORS[o] : null;
 }
 
-/** Move the scene at `from` to index `to` (clips go with it: they're keyed by scene id). */
+/**
+ * Move the scene at `from` to index `to` (clips go with it: they're keyed by scene id).
+ * A chain that just follows the rows moves with them; an arranged chain stays as it is.
+ */
 export function moveScene(song: Song, from: number, to: number) {
   const n = song.scenes.length;
   if (from < 0 || from >= n) return;
   to = Math.max(0, Math.min(n - 1, to));
   if (from === to) return;
+  const follows = chainFollowsRows(song);
   const [s] = song.scenes.splice(from, 1);
   song.scenes.splice(to, 0, s);
+  if (follows && song.chain) {
+    const rep = new Map(song.chain.map((x) => [x.sceneId, x.repeat]));
+    song.chain = song.scenes.map((sc) => ({ sceneId: sc.id, repeat: rep.get(sc.id) ?? Math.max(1, sc.repeat) }));
+  }
 }
 
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
@@ -103,17 +110,21 @@ export function addScene(song: Song): Scene | null {
 
 export function insertBlankScene(song: Song, afterIndex: number): Scene | null {
   if (song.scenes.length >= MAX_SCENES) return null;
+  const follows = chainFollowsRows(song);
   const s = blankScene(song);
   song.scenes.splice(afterIndex + 1, 0, s);
+  chainNewScene(song, s, follows, song.scenes[afterIndex]?.id);
   return s;
 }
 
 export function duplicateScene(song: Song, index: number): Scene | null {
   if (song.scenes.length >= MAX_SCENES) return null;
+  const follows = chainFollowsRows(song);
   const src = song.scenes[index];
   const s: Scene = { ...clone(src), id: newId(song), name: src.name.replace(/( copy)?$/, " copy") };
   for (const t of song.tracks) if (t.clips[src.id]) t.clips[s.id] = clone(t.clips[src.id]);
   song.scenes.splice(index + 1, 0, s);
+  chainNewScene(song, s, follows, src.id);
   return s;
 }
 
@@ -121,6 +132,71 @@ export function deleteScene(song: Song, index: number) {
   if (song.scenes.length <= 1) return;
   const [s] = song.scenes.splice(index, 1);
   for (const t of song.tracks) delete t.clips[s.id];
+  if (song.chain) {
+    song.chain = song.chain.filter((x) => x.sceneId !== s.id);
+    if (!song.chain.length) song.chain = songChain(song).map((x) => ({ ...x }));
+  }
+}
+
+// ---------------------------------------------------------------- the song chain
+
+/** True while the chain is just the rows in order (each scene once): row edits then carry over to it. */
+export function chainFollowsRows(song: Song): boolean {
+  const c = song.chain;
+  return !c || (c.length === song.scenes.length && c.every((x, i) => x.sceneId === song.scenes[i].id));
+}
+
+/**
+ * A new scene's place in the chain: a chain that follows the rows keeps following them;
+ * otherwise the new scene goes after the last step of `nearId` (or at the end).
+ */
+function chainNewScene(song: Song, s: Scene, follows: boolean, nearId?: number) {
+  if (!song.chain) return;
+  const step = { sceneId: s.id, repeat: Math.max(1, s.repeat) };
+  if (follows) { song.chain.splice(song.scenes.indexOf(s), 0, step); return; }
+  let at = -1;
+  song.chain.forEach((x, i) => { if (x.sceneId === nearId) at = i; });
+  song.chain.splice(at >= 0 ? at + 1 : song.chain.length, 0, step);
+}
+
+/** The chain, materialised so it can be edited (songs without one get the rows in order). */
+export function editableChain(song: Song): ChainStep[] {
+  return (song.chain = songChain(song).map((x) => ({ ...x })));
+}
+
+export const MAX_CHAIN = 64;
+
+export function addChainStep(song: Song, sceneId: number, at?: number): boolean {
+  const c = editableChain(song);
+  if (c.length >= MAX_CHAIN || !song.scenes.some((s) => s.id === sceneId)) return false;
+  const sc = song.scenes.find((s) => s.id === sceneId)!;
+  c.splice(at ?? c.length, 0, { sceneId, repeat: Math.max(1, sc.repeat) });
+  return true;
+}
+
+export function removeChainStep(song: Song, k: number) {
+  const c = editableChain(song);
+  if (c.length <= 1 || k < 0 || k >= c.length) return;
+  c.splice(k, 1);
+}
+
+export function moveChainStep(song: Song, from: number, to: number) {
+  const c = editableChain(song);
+  if (from < 0 || from >= c.length) return;
+  to = Math.max(0, Math.min(c.length - 1, to));
+  if (from === to) return;
+  const [x] = c.splice(from, 1);
+  c.splice(to, 0, x);
+}
+
+export function setChainRepeat(song: Song, k: number, repeat: number) {
+  const c = editableChain(song);
+  if (c[k]) c[k].repeat = Math.max(1, Math.min(64, Math.round(repeat)));
+}
+
+/** Back to one step per scene, in row order, each with its own repeat count. */
+export function resetChain(song: Song) {
+  song.chain = song.scenes.map((s) => ({ sceneId: s.id, repeat: Math.max(1, s.repeat) }));
 }
 
 /** The clip in a cell, created (as long as the scene) if the cell is empty. */

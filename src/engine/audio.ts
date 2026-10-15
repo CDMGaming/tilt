@@ -29,7 +29,7 @@ interface TrackNodes {
   tableIdx?: number; // wavetable: which table the worklet has
 }
 
-export interface Position { sceneId: number; tick: number; ticks: number; repeat: number; repeats: number; instStart: number }
+export interface Position { sceneId: number; index: number; tick: number; ticks: number; repeat: number; repeats: number; instStart: number }
 
 export class AudioEngine {
   ctx!: AudioContext;
@@ -467,7 +467,7 @@ export class AudioEngine {
     const inst = this.currentInstance(t) ?? this.instances[0];
     if (!inst) return null;
     const tick = Math.max(0, Math.min(inst.ticks - 1, (t - inst.startTime) / inst.secPerTick));
-    return { sceneId: inst.sceneId, tick, ticks: inst.ticks, repeat: inst.repeat, repeats: inst.repeats, instStart: inst.startTime };
+    return { sceneId: inst.sceneId, index: inst.index, tick, ticks: inst.ticks, repeat: inst.repeat, repeats: inst.repeats, instStart: inst.startTime };
   }
 
   /**

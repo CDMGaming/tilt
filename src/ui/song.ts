@@ -3,9 +3,10 @@
 import { canArrange, autoArrange } from "../engine/arranger";
 import { encodeSetup, pickPreset, setupFromSong, usedPresets } from "../engine/dice";
 import { ALL_KINDS, INSTRUMENTS, isDrumKind } from "../engine/instruments";
-import { MAX_BARS, MAX_SCENES, TICKS_PER_BAR, newId, type Clip, type Scene, type Track } from "../engine/model";
+import { MAX_BARS, MAX_SCENES, TICKS_PER_BAR, chainIndexOf, newId, songChain, type Clip, type Scene, type Track } from "../engine/model";
 import {
-  QUICK_SCENES, SCENE_NAMES, addScene, changeInstrument, deleteScene, deleteTrack, duplicateClip, duplicateScene,
+  MAX_CHAIN, QUICK_SCENES, SCENE_NAMES, addChainStep, addScene, chainFollowsRows, changeInstrument, deleteScene, deleteTrack, duplicateClip, duplicateScene,
+  moveChainStep, removeChainStep, resetChain, setChainRepeat,
   duplicateTrack, ensureClip, insertBlankScene, loadPreset, moveScene, presetIndex, sceneColor, setClipBars,
 } from "../engine/songops";
 import { mods, type Action } from "./actions";
@@ -24,6 +25,8 @@ const HOLD_MS = 450;
 export class SongScreen implements Screen {
   el = h("div", { class: "song-screen" });
   private grid = h("div", { class: "song-grid" });
+  /** The song chain: what SONG mode plays, as chips (cursor row -2). */
+  private strip = h("div", { class: "chain-strip", role: "list", "aria-label": "Song chain" });
   private clipboard: Clip | null = null;
   /** A clip picked up with "Move / copy to…" (controller-friendly drag and drop). */
   private carry: { trackId: number; sceneId: number } | null = null;
@@ -32,7 +35,7 @@ export class SongScreen implements Screen {
   private holding = false;
 
   constructor(private app: App) {
-    this.el.appendChild(this.grid);
+    this.el.append(this.strip, this.grid);
     this.el.addEventListener("touchmove", (e) => { if (this.holding) e.preventDefault(); }, { passive: false });
     watchInput();
   }
@@ -88,6 +91,7 @@ export class SongScreen implements Screen {
     for (let c = 0; c <= cols; c++) at(song.scenes.length, c, h("div", { class: "filler" }));
 
     this.grid.replaceChildren(...cells);
+    this.renderStrip();
     // Moving a clip: say how to drop it (for the input in use), with a way out that needs no B button.
     this.el.querySelector(".carry-bar")?.remove();
     if (this.carry) {
@@ -121,7 +125,7 @@ export class SongScreen implements Screen {
       h("div", { class: "sh-text" },
         h("button", { class: "sh-name", title: "Name it: Intro, Verse, Chorus…", onclick: (e: Event) => { e.stopPropagation(); this.nameMenu(s, e.currentTarget as HTMLElement); } }, `${r + 1} ${s.name}`),
         h("div", { class: "sh-meta" },
-          s.repeat > 1 ? `×${s.repeat} ` : "", s.tempo ? `${s.tempo} bpm ` : "", s.transpose ? `key ${s.transpose > 0 ? "+" : ""}${s.transpose} ` : "", s.fadeIn ? "◢ " : "", s.fadeOut ? "◣" : "")),
+          s.tempo ? `${s.tempo} bpm ` : "", s.transpose ? `key ${s.transpose > 0 ? "+" : ""}${s.transpose} ` : "", s.fadeIn ? "◢ " : "", s.fadeOut ? "◣" : "")),
       h("div", { class: "sh-progress" }));
   }
 
@@ -147,6 +151,14 @@ export class SongScreen implements Screen {
 
   frame() {
     const pos = this.app.engine.position(), mode = this.app.engine.playMode;
+    // The chip playing now (SONG mode), with how far through its repeats it is.
+    const chips = this.strip.querySelectorAll<HTMLElement>(".chain-chip");
+    chips.forEach((el, k) => {
+      const on = !!pos && mode.kind === "song" && pos.index === k;
+      el.classList.toggle("playing", on);
+      const bar = el.querySelector<HTMLElement>(".chip-progress");
+      if (bar) bar.style.width = on && pos ? `${((pos.repeat + pos.tick / pos.ticks) / pos.repeats) * 100}%` : "0";
+    });
     // A scene queued to play next (scene loop mode): its clips blink until it starts.
     const queued = pos && mode.kind === "scene" && mode.sceneId !== pos.sceneId ? mode.sceneId : -1;
     // A beat pulse on the playing row (restarted each beat; CSS does the decay).
@@ -173,8 +185,18 @@ export class SongScreen implements Screen {
     switch (a.type) {
       case "dir": {
         const maxR = song.scenes.length, maxC = song.tracks.length;
-        // Alt (or LT) + up / down on a scene row: move the scene.
+        // Alt (or LT) + up / down on a scene row: move the scene. On the chain: left / right moves the chip.
         if (mods.fine && (a.dir === "up" || a.dir === "down") && cur.row >= 0 && cur.row < maxR) { this.nudgeScene(cur.row, a.dir === "up" ? -1 : 1); return true; }
+        const chainLen = songChain(song).length;
+        if (cur.row === -2) {
+          if (mods.fine && (a.dir === "left" || a.dir === "right") && cur.col >= 0 && cur.col < chainLen) { this.moveChip(cur.col, cur.col + (a.dir === "left" ? -1 : 1)); return true; }
+          if (a.dir === "left") cur.col = Math.max(-1, cur.col - 1);
+          if (a.dir === "right") cur.col = Math.min(chainLen, cur.col + 1);
+          if (a.dir === "down") { cur.row = -1; cur.col = Math.min(cur.col, maxC); }
+          this.render();
+          return true;
+        }
+        if (a.dir === "up" && cur.row === -1) { cur.row = -2; cur.col = Math.min(Math.max(-1, cur.col), chainLen); this.render(); return true; }
         if (a.dir === "up") cur.row = Math.max(-1, cur.row - 1);
         if (a.dir === "down") cur.row = Math.min(maxR, cur.row + 1);
         if (a.dir === "left") cur.col = Math.max(-1, cur.col - 1);
@@ -216,6 +238,7 @@ export class SongScreen implements Screen {
   private activate() {
     const app = this.app, { row, col } = app.songCur, song = app.song;
     const nT = song.tracks.length, nS = song.scenes.length;
+    if (row === -2) { this.chainMenu(col); return; }
     if (row === -1 && col === -1) { app.songSettings?.(); return; }
     if (row === -1 && col === nT) { this.addTrack(); return; }
     if (row === nS && col === -1) { this.addSceneAtEnd(); return; }
@@ -238,7 +261,7 @@ export class SongScreen implements Screen {
   private playScene(r: number) {
     const app = this.app, s = app.song.scenes[r];
     app.songCur.row = r;
-    if (app.songMode === "song") app.engine.play({ kind: "song", fromIndex: r });
+    if (app.songMode === "song") app.engine.play({ kind: "song", fromIndex: chainIndexOf(app.song, s.id) });
     else if (app.engine.playing) app.engine.queue({ kind: "scene", sceneId: s.id, once: app.song.sceneLoop === false });
     else app.engine.play({ kind: "scene", sceneId: s.id, once: app.song.sceneLoop === false });
     app.refresh();
@@ -262,6 +285,125 @@ export class SongScreen implements Screen {
     app.edit("Move scene", () => moveScene(song, i, to));
     app.songCur.row = to;
     this.render();
+  }
+
+  // ------------------------------------------------------------ the song chain
+
+  private renderStrip() {
+    const app = this.app, song = app.song, cur = app.songCur;
+    const chain = songChain(song), follows = chainFollowsRows(song);
+    const cursorAt = (c: number) => cur.row === -2 && cur.col === c;
+    const label = h("button", { class: "chain-label" + (cursorAt(-1) ? " cursor" : ""), title: "The song chain: what SONG plays, left to right", onclick: () => { cur.row = -2; cur.col = -1; this.chainMenu(-1); } },
+      h("span", null, "SONG"), h("small", null, follows ? "rows in order" : "arranged"));
+    const chips = chain.map((step, k) => {
+      const sc = song.scenes.find((s) => s.id === step.sceneId)!, r = song.scenes.indexOf(sc), color = sceneColor(sc.name);
+      const el = h("button", { class: "chain-chip" + (cursorAt(k) ? " cursor" : "") + (color ? " tinted" : ""), style: color ? `--scene:${color}` : "", role: "listitem", "data-chip": k,
+        title: `${r + 1} ${sc.name}${step.repeat > 1 ? `, ${step.repeat} times` : ""}: click for options, drag to move` },
+        h("span", { class: "chip-num" }, String(r + 1)), h("span", { class: "chip-name" }, sc.name),
+        step.repeat > 1 ? h("span", { class: "chip-rep" }, `×${step.repeat}`) : "",
+        h("span", { class: "chip-progress", "aria-hidden": "true" }));
+      el.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0) return;
+        if (e.pointerType === "mouse") this.chipDrag(k, e, () => { cur.row = -2; cur.col = k; this.chainMenu(k, { x: e.clientX, y: e.clientY + 12 }); });
+      });
+      if (!isPhone()) el.addEventListener("contextmenu", (e) => { e.preventDefault(); cur.row = -2; cur.col = k; this.chainMenu(k, { x: e.clientX, y: e.clientY }); });
+      // Touch: tap for the menu; hold then drag to move the chip.
+      el.addEventListener("pointerdown", (e) => {
+        if (e.pointerType === "mouse") return;
+        const x0 = e.clientX, y0 = e.clientY;
+        let held = false, moved = false;
+        const timer = setTimeout(() => { held = true; this.holding = true; el.classList.add("held"); navigator.vibrate?.(15); }, HOLD_MS);
+        const move = (ev: PointerEvent) => {
+          const far = Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8;
+          if (!held) { if (far) { moved = true; quit(); } return; }
+          if (far) { quit(); this.chipDrag(k, ev); }
+        };
+        const up = () => { const wasHeld = held; quit(); if (!moved && !wasHeld) { cur.row = -2; cur.col = k; this.chainMenu(k); } else if (wasHeld) { cur.row = -2; cur.col = k; this.chainMenu(k); } };
+        const quit = () => { clearTimeout(timer); this.holding = false; el.classList.remove("held"); window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", quit); };
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", up);
+        window.addEventListener("pointercancel", quit);
+      });
+      return el;
+    });
+    const add = h("button", { class: "chain-add" + (cursorAt(chain.length) ? " cursor" : ""), title: "Add a scene to the end of the song", disabled: chain.length >= MAX_CHAIN, onclick: (e: Event) => { cur.row = -2; cur.col = chain.length; const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); this.chainMenu(chain.length, { x: r.left, y: r.bottom + 4 }); } }, "+");
+    this.strip.replaceChildren(label, h("div", { class: "chain-chips" }, ...chips, add));
+    if (cur.row === -2) requestAnimationFrame(() => this.strip.querySelector(".cursor")?.scrollIntoView({ block: "nearest", inline: "nearest" }));
+  }
+
+  /** k = a chip; -1 = the label (chain options); chain length = "+" (add a scene). */
+  private chainMenu(k: number, at?: { x: number; y: number }) {
+    const app = this.app, song = app.song, chain = songChain(song);
+    if (!at) { const r = this.strip.querySelector(".cursor")?.getBoundingClientRect(); at = r ? { x: r.left, y: r.bottom + 4 } : undefined; }
+    const sceneList = (run: (id: number) => void) => song.scenes.map((s, r) => ({ label: `${r + 1} ${s.name}`, color: sceneColor(s.name) ?? undefined, run: () => run(s.id) }));
+    if (k < 0) {
+      app.overlays.menu("Song chain", () => [
+        { label: "Play the song", run: () => { app.setSongMode("song"); app.engine.play({ kind: "song", fromIndex: 0 }); app.refresh(); } },
+        { label: "Add a scene at the end", sub: () => sceneList((id) => app.edit("Add to chain", () => addChainStep(song, id))) },
+        { label: "Back to the rows in order", hint: "each scene once", disabled: chainFollowsRows(song), run: () => app.edit("Reset chain", () => resetChain(song)) },
+      ], at);
+      return;
+    }
+    if (k >= chain.length) {
+      app.overlays.menu("Add to the song", () => sceneList((id) => { app.edit("Add to chain", () => addChainStep(song, id)); app.songCur = { row: -2, col: songChain(song).length - 1 }; }), at);
+      return;
+    }
+    const step = chain[k], sc = song.scenes.find((s) => s.id === step.sceneId)!;
+    app.overlays.menu(`Song step ${k + 1} · ${sc.name}`, () => [
+      { label: "Play the song from here", run: () => { app.setSongMode("song"); app.engine.play({ kind: "song", fromIndex: k }); app.refresh(); } },
+      { label: `Repeat ×${step.repeat}`, sub: () => [1, 2, 3, 4, 6, 8, 16].map((n) => ({ label: `×${n}`, checked: step.repeat === n, run: () => app.edit("Repeat", () => setChainRepeat(song, k, n)) })) },
+      { label: "Play another scene here", sub: () => sceneList((id) => app.edit("Change step", () => { const c = songChain(song).map((x) => ({ ...x })); c[k] = { sceneId: id, repeat: c[k].repeat }; song.chain = c; })) },
+      { label: "Duplicate this step", disabled: chain.length >= MAX_CHAIN, run: () => app.edit("Duplicate step", () => { addChainStep(song, step.sceneId, k + 1); setChainRepeat(song, k + 1, step.repeat); }) },
+      { label: "Move left", hint: "Alt+←", disabled: k === 0, run: () => this.moveChip(k, k - 1) },
+      { label: "Move right", hint: "Alt+→", disabled: k >= chain.length - 1, run: () => this.moveChip(k, k + 1) },
+      { label: "Remove from the song", hint: "the scene stays", disabled: chain.length <= 1, run: () => { app.edit("Remove step", () => removeChainStep(song, k)); app.songCur.col = Math.min(k, songChain(song).length - 1); this.render(); } },
+      { label: "Open the scene", run: () => { app.songCur = { row: song.scenes.indexOf(sc), col: -1 }; this.render(); } },
+    ], at);
+  }
+
+  private moveChip(from: number, to: number) {
+    const app = this.app, song = app.song;
+    if (to < 0 || to >= songChain(song).length) return;
+    app.edit("Move step", () => moveChainStep(song, from, to));
+    app.songCur = { row: -2, col: to };
+    this.render();
+  }
+
+  /** Drag chip `from` along the strip; a line shows where it lands. A plain click (no move) calls `onClick`. */
+  private chipDrag(from: number, e: PointerEvent, onClick?: () => void) {
+    const chips = [...this.strip.querySelectorAll<HTMLElement>(".chain-chip")];
+    const src = chips[from];
+    if (!src) return;
+    const x0 = e.clientX;
+    let to = from, dragging = !onClick;
+    this.holding = true;
+    const mark = (x: number) => {
+      const k = chips.filter((el) => { const b = el.getBoundingClientRect(); return b.left + b.width / 2 < x; }).length;
+      to = k > from ? k - 1 : k;
+      chips.forEach((el, i) => {
+        el.classList.toggle("drop-before", i === k && k !== from && k !== from + 1);
+        el.classList.toggle("drop-after", k === chips.length && i === chips.length - 1 && from !== chips.length - 1);
+      });
+    };
+    const move = (ev: PointerEvent) => {
+      if (!dragging) { if (Math.abs(ev.clientX - x0) < 6) return; dragging = true; }
+      src.classList.add("dragging");
+      mark(ev.clientX);
+    };
+    const end = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      this.holding = false;
+      chips.forEach((el) => el.classList.remove("drop-before", "drop-after", "dragging"));
+      if (!dragging) { onClick?.(); return; }
+      if (ev.type === "pointercancel" || to === from) return;
+      this.moveChip(from, to);
+    };
+    if (dragging) { src.classList.add("dragging"); mark(e.clientX); }
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
   }
 
   // ------------------------------------------------------------ scene drag (grip / long-press)
@@ -448,6 +590,7 @@ export class SongScreen implements Screen {
       const r = this.grid.querySelector(".cursor")?.getBoundingClientRect();
       at = r ? { x: r.left + 20, y: r.bottom - 10 } : undefined;
     }
+    if (row === -2) { this.chainMenu(col, at); return; }
     if (row === -1 && t) app.overlays.menu(`Track ${col + 1} · ${t.name}`, () => this.trackMenu(t, col), at);
     else if (col === -1 && s) app.overlays.menu(`Scene ${row + 1} · ${s.name}`, () => this.sceneMenu(s, row), at);
     else if (t && s) app.overlays.menu(`Clip · ${t.name} / ${s.name}`, () => this.clipMenu(t, s), at);
@@ -482,7 +625,11 @@ export class SongScreen implements Screen {
         ...SCENE_NAMES.map((n) => ({ label: n, color: sceneColor(n) ?? undefined, checked: s.name === n, run: () => app.edit("Rename scene", () => (s.name = n)) })),
         { label: "Custom…", run: () => { const n = prompt("Scene name", s.name); if (n) app.edit("Rename scene", () => (s.name = n.slice(0, 24))); } },
       ] },
-      { label: `Repeat ×${s.repeat}`, sub: () => [1, 2, 3, 4, 6, 8, 16].map((n) => ({ label: `×${n}`, checked: s.repeat === n, run: () => app.edit("Repeat", () => (s.repeat = n)) })) },
+      { label: `Repeat ×${s.repeat}`, hint: "in the song chain", sub: () => [1, 2, 3, 4, 6, 8, 16].map((n) => ({ label: `×${n}`, checked: s.repeat === n, run: () => app.edit("Repeat", () => {
+        s.repeat = n;
+        songChain(song).forEach((x, k) => { if (x.sceneId === s.id) setChainRepeat(song, k, n); });
+      }) })) },
+      { label: "Add to the song chain", hint: `in it ×${songChain(song).filter((x) => x.sceneId === s.id).length}`, disabled: songChain(song).length >= MAX_CHAIN, run: () => app.edit("Add to chain", () => addChainStep(song, s.id)) },
       { label: `Tempo: ${s.tempo ? `${s.tempo} bpm` : "song tempo"}`, sub: () => [
         { label: "Song tempo", checked: s.tempo === null, run: () => setTempo(null) },
         ...[-20, -10, -5, 5, 10, 20].map((d) => ({ label: `${d > 0 ? "+" : ""}${d} → ${cur + d}`, run: () => setTempo(Math.max(40, Math.min(250, cur + d))) })),

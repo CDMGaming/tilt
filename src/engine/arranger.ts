@@ -49,4 +49,6 @@ export function autoArrange(song: Song) {
   }
   for (const t of song.tracks) delete t.clips[src.id];
   song.scenes = scenes;
+  // The arrangement plays its sections in order, each repeated to its length.
+  song.chain = scenes.map((s) => ({ sceneId: s.id, repeat: s.repeat }));
 }

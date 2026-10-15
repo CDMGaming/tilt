@@ -400,3 +400,43 @@ Deno.test("scale degree, out-of-key notes and snap to scale", async () => {
   assertEquals(outOfKeyNotes(clip, 9, "minor").length, 0);
   assertEquals(clip.notes.length, 3); // F# landed on the existing F at the same start
 });
+
+Deno.test("song chain: old songs get the rows; steps repeat, reorder and can play a scene twice", async () => {
+  const { normalizeSong, songChain } = await import("../src/engine/model.ts");
+  const ops = await import("../src/engine/songops.ts");
+  const song = songFromSetup({ key: 0, scale: "minor", tempo: 120, swing: 0, lineup: [{ kind: "drums", preset: 0 }] });
+  ops.addScene(song); ops.addScene(song);
+  song.scenes[1].repeat = 2;
+  const [a, b, c] = song.scenes.map((s) => s.id);
+  // A song from before the chain: normalising gives it the rows in order, with their repeats.
+  delete song.chain;
+  normalizeSong(song);
+  assertEquals(song.chain, [{ sceneId: a, repeat: 1 }, { sceneId: b, repeat: 2 }, { sceneId: c, repeat: 1 }]);
+  // Following the rows: moving a scene moves its step too, a new scene joins the chain.
+  ops.moveScene(song, 2, 0);
+  assertEquals(songChain(song).map((x) => x.sceneId), [c, a, b]);
+  const d = ops.addScene(song)!.id;
+  assertEquals(songChain(song).map((x) => x.sceneId), [c, a, b, d]);
+  // Arranged: A, B, A ×3, C. Now rows moving no longer touches it.
+  ops.resetChain(song);
+  song.chain = [{ sceneId: a, repeat: 1 }, { sceneId: b, repeat: 1 }, { sceneId: a, repeat: 3 }, { sceneId: c, repeat: 1 }];
+  ops.moveScene(song, 0, 3);
+  assertEquals(songChain(song).map((x) => x.sceneId), [a, b, a, c]);
+  ops.moveChainStep(song, 3, 0);
+  assertEquals(songChain(song).map((x) => x.sceneId), [c, a, b, a]);
+  // Playback walks the chain: C, A, B, A A A, then stops (no loop).
+  const mode = { kind: "song" as const, fromIndex: 0 };
+  const seen: number[] = [];
+  let inst = firstInstance(song, mode, 0);
+  while (inst && seen.length < 20) { seen.push(inst.sceneId); inst = nextInstance(song, mode, inst); }
+  assertEquals(seen, [c, a, b, a, a, a]);
+  // Deleting a scene takes its steps with it.
+  ops.deleteScene(song, song.scenes.findIndex((s) => s.id === a));
+  assertEquals(songChain(song).map((x) => x.sceneId), [c, b]);
+  // Auto-arrange writes the chain of its sections.
+  const one = songFromSetup({ key: 0, scale: "minor", tempo: 120, swing: 0, lineup: [{ kind: "drums", preset: 0 }, { kind: "acid", preset: 0 }] });
+  for (const t of one.tracks) ensureClip(one, t, one.scenes[0].id).notes.push({ id: 1, pitch: 36, start: 0, len: 24, vel: 100 });
+  assert(canArrange(one));
+  autoArrange(one);
+  assertEquals(one.chain!.map((x) => x.sceneId), one.scenes.map((s) => s.id));
+});

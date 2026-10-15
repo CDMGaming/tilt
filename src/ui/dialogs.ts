@@ -400,7 +400,8 @@ const CONTROLS: Record<ControlsTab, { label: string; rows: [string, string][] }>
     ["RT / ZR (hold) + move", "Select a range"],
     ["RB / R", "Switch piano roll ↔ instrument panel. Hold: roll only / split / panel only"],
     ["LB / L (hold)", "Jump to any track / scene"],
-    ["Left stick click (L3)", "Play: SCENE (this scene) ↔ SONG (all the scenes in order)"],
+    ["Left stick click (L3)", "Play: SCENE (this scene) ↔ SONG (the song chain)"],
+    ["Right stick click (R3)", "Tutorial: I'm ready (next step)"],
     ["Start / +", "App menu.  Back / −: undo"],
   ] },
   keyboard: { label: "Keyboard", rows: [
@@ -417,9 +418,11 @@ const CONTROLS: Record<ControlsTab, { label: string; rows: [string, string][] }>
     ["Delete", "Delete notes"],
     ["F1 / F2 / F3 / F4", "App menu / song / editor / mixer"],
     ["?", "Help"],
+    ["Ctrl+Enter", "Tutorial: I'm ready (next step)"],
   ] },
   touch: { label: "Mouse & touch", rows: [
-    ["SCENE | SONG (by ▶)", "What Play plays: this scene, or all the scenes in order"],
+    ["SCENE | SONG (by ▶)", "What Play plays: this scene, or the song chain"],
+    ["Song chain (top of the Song screen)", "What SONG plays, left to right. Click a chip: repeat it, swap its scene, play from it, remove it. Drag (or long-press + drag) to reorder; + adds a scene. A scene can be in it more than once"],
     ["⟳ Loop", "On: it repeats. Off (Once): it plays one time and stops. Works for SCENE and SONG"],
     ["A scene's ▶", "SCENE: play that scene.  SONG: play the song from there"],
     ["Scene ⋮⋮ grip / long-press + drag", "Move the scene"],

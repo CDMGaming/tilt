@@ -23,7 +23,8 @@ export type Action =
   | { type: "octave"; d: -1 | 1 } // Z / X
   | { type: "screen"; to: "song" | "edit" | "mix" }
   | { type: "playMode" } // C / L3: SCENE <-> SONG
-  | { type: "help" }; // ?: the controls
+  | { type: "help" } // ?: the controls
+  | { type: "aux" }; // Ctrl+Enter / R3: the tutorial's "I'm ready"
 
 /** Held modifiers, kept by the input layer. */
 export const mods = {

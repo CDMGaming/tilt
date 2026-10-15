@@ -87,6 +87,11 @@ export interface Song {
   metronome: boolean;
   tracks: Track[];
   scenes: Scene[];
+  /**
+   * The song chain: what SONG mode plays, in order. A scene can appear more than once, each
+   * step with its own repeat count. Missing (songs from before the chain): every scene in row order.
+   */
+  chain?: ChainStep[];
   master: Master;
   nextId: number;
   setupCode?: string; // DICE share code this song was started from
@@ -137,6 +142,20 @@ export function newSong(): Song {
 }
 
 /** Length of a scene in ticks: the longest clip in it, at least one bar. */
+export interface ChainStep { sceneId: number; repeat: number }
+
+/** What SONG mode plays: the chain, or (none yet) every scene in row order. Steps whose scene is gone are skipped. */
+export function songChain(song: Song): ChainStep[] {
+  const ids = new Set(song.scenes.map((s) => s.id));
+  const c = (song.chain ?? []).filter((x) => ids.has(x.sceneId));
+  return c.length ? c : song.scenes.map((s) => ({ sceneId: s.id, repeat: Math.max(1, s.repeat) }));
+}
+
+/** The first chain step that plays this scene (0 when it isn't in the chain). */
+export function chainIndexOf(song: Song, sceneId: number): number {
+  return Math.max(0, songChain(song).findIndex((x) => x.sceneId === sceneId));
+}
+
 export function sceneTicks(song: Song, sceneId: number): number {
   let bars = 1;
   for (const t of song.tracks) {
@@ -173,6 +192,8 @@ export function normalizeSong(song: Song): Song {
   assignShades(song);
   song.master = { ...defaultMaster(), ...(song.master ?? {}) };
   song.midiMap ??= [];
+  // Songs from before the chain get one: the scenes in row order, with their repeat counts.
+  song.chain = songChain(song).map((x) => ({ ...x }));
   for (const t of song.tracks) {
     t.send ??= 0.15;
     if (t.kind === "sampler" && !t.samples) t.samples = [...DEFAULT_SAMPLER_REFS];

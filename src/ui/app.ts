@@ -8,7 +8,7 @@ import { INSTRUMENTS, drumCount, fromUnit, isDrumKind, paramDef, toUnit } from "
 import { getParam, paramInfo, setParamValue } from "../engine/params";
 import { AUTO_STEP } from "../engine/timeline";
 import { DRUM_BASE_NOTE } from "../engine/instruments";
-import { PPQ, TICKS_PER_BAR, assignShades, idLanes, normalizeSong, type Song, type Track } from "../engine/model";
+import { PPQ, TICKS_PER_BAR, assignShades, idLanes, normalizeSong, type Song, type Track, songChain, chainIndexOf } from "../engine/model";
 import { scaleById, snapToScale } from "../engine/music";
 import { addNote, addTrack, clearAutoRange, ensureClip, quantizeNotes, setAutoPoint } from "../engine/songops";
 import { NO_HOLDS, defaultSpec, nudgeSetup, type Holds, type LineupSpec, type Setup } from "../engine/dice";
@@ -546,8 +546,8 @@ export class App {
     const s = this.song;
     if (!s.tracks.find((t) => t.id === this.ed.trackId)) this.ed.trackId = s.tracks[0]?.id ?? 0;
     if (!s.scenes.find((x) => x.id === this.ed.sceneId)) this.ed.sceneId = s.scenes[0]?.id ?? 0;
-    this.songCur.row = Math.min(this.songCur.row, s.scenes.length);
-    this.songCur.col = Math.min(this.songCur.col, s.tracks.length);
+    this.songCur.row = Math.max(-2, Math.min(this.songCur.row, s.scenes.length));
+    this.songCur.col = Math.min(this.songCur.col, this.songCur.row === -2 ? songChain(s).length : s.tracks.length);
   }
 
   track(id = this.ed.trackId): Track | undefined {
@@ -651,8 +651,9 @@ export class App {
   songMode: "scene" | "song" = "scene";
   playMode() {
     if (this.songMode === "song") {
-      const row = this.screenName === "song" ? Math.max(0, this.songCur.row) : this.song.scenes.findIndex((s) => s.id === this.ed.sceneId);
-      return { kind: "song" as const, fromIndex: Math.max(0, Math.min(row, this.song.scenes.length - 1)) };
+      // From the chip under the cursor, or the first step that plays the scene you're on.
+      if (this.screenName === "song" && this.songCur.row === -2 && this.songCur.col >= 0) return { kind: "song" as const, fromIndex: Math.min(this.songCur.col, songChain(this.song).length - 1) };
+      return { kind: "song" as const, fromIndex: chainIndexOf(this.song, this.currentSceneId()) };
     }
     return { kind: "scene" as const, sceneId: this.currentSceneId(), once: this.song.sceneLoop === false };
   }
@@ -680,7 +681,7 @@ export class App {
     const pos = this.engine.position();
     if (pos) {
       const i = Math.max(0, this.song.scenes.findIndex((s) => s.id === pos.sceneId));
-      this.engine.queue(m === "scene" ? { kind: "scene", sceneId: pos.sceneId, once: this.song.sceneLoop === false } : { kind: "song", fromIndex: i });
+      this.engine.queue(m === "scene" ? { kind: "scene", sceneId: pos.sceneId, once: this.song.sceneLoop === false } : { kind: "song", fromIndex: chainIndexOf(this.song, this.song.scenes[i]?.id ?? pos.sceneId) });
     }
     this.overlays.toast(m === "scene" ? (this.loopOn() ? "SCENE: loops the scene" : "SCENE: plays the scene once") : this.loopOn() ? "SONG: all the scenes, then again" : "SONG: all the scenes, once", 1400);
     this.refresh();
@@ -688,9 +689,10 @@ export class App {
 
   /** What play does / is doing, for the display: LOOP SCENE 2, SONG 3/6. */
   playState(narrow = false): string {
-    const song = this.song, n = song.scenes.length, pos = this.engine.position();
+    const song = this.song, pos = this.engine.position();
     if (this.songMode === "song") {
-      const i = pos ? song.scenes.findIndex((s) => s.id === pos.sceneId) : (this.playMode() as { fromIndex: number }).fromIndex;
+      const n = songChain(song).length;
+      const i = pos && this.engine.playMode.kind === "song" ? pos.index : (this.playMode() as { fromIndex: number }).fromIndex;
       return `SONG ${Math.max(0, i) + 1}/${n}${song.songLoop ? (narrow ? " LP" : " LOOP") : ""}`;
     }
     const id = pos ? pos.sceneId : this.currentSceneId();
@@ -1006,8 +1008,12 @@ export class App {
 
   // ------------------------------------------------------------ dispatch
 
+  /** The tutorial gets a look at every action first ("I'm ready" on Enter / A, Ctrl+Enter, R3). */
+  actionHook?: (a: Action) => boolean;
+
   dispatch(a: Action) {
     if (this.inLobby) { if (a.type === "confirm") this.lobbyJoin(); return; }
+    if (this.actionHook?.(a)) return;
     if (this.overlays.handle(a)) return;
     if (this.couch && this.screenName === "couch") {
       // F2-F4 would leave the quarters; the system button is the conductor's way into the shared strip.

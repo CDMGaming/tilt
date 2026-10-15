@@ -2,7 +2,7 @@
 // itself against the song, so the app can show progress live.
 
 import { INSTRUMENTS } from "./instruments";
-import { sceneTicks, type Song, type Track } from "./model";
+import { sceneTicks, songChain, type Song, type Track } from "./model";
 import { Rng } from "./rng";
 import { secPerTick } from "./timeline";
 
@@ -14,7 +14,7 @@ const hasNotes = (t: Track, sceneId: number) => {
 };
 const group = (t: Track) => INSTRUMENTS[t.kind].group;
 const songSeconds = (song: Song) =>
-  song.scenes.reduce((a, s) => a + sceneTicks(song, s.id) * s.repeat * secPerTick(s.tempo ?? song.tempo), 0);
+  songChain(song).reduce((a, x) => { const s = song.scenes.find((y) => y.id === x.sceneId)!; return a + sceneTicks(song, s.id) * x.repeat * secPerTick(s.tempo ?? song.tempo); }, 0);
 const isNamed = (name: string, ...words: string[]) => words.some((w) => name.toLowerCase().includes(w));
 
 export const CHALLENGES: Challenge[] = [
@@ -38,7 +38,7 @@ export const CHALLENGES: Challenge[] = [
   { id: "breakdown", text: "A breakdown scene with no drums (not the first one)", check: (s) => s.scenes.slice(1).some((x) => s.tracks.some((t) => hasNotes(t, x.id)) && !s.tracks.some((t) => group(t) === "drums" && hasNotes(t, x.id))) },
   { id: "longclip", text: "Write one 8-bar clip", check: (s) => s.tracks.some((t) => Object.values(t.clips).some((c) => c.bars === 8 && c.notes.length > 0)) },
   { id: "oneBarOnly", text: "Every clip is 1 bar", check: (s) => s.tracks.some((t) => Object.values(t.clips).some((c) => c.notes.length)) && s.tracks.every((t) => Object.values(t.clips).every((c) => c.bars === 1)) },
-  { id: "repeat4", text: "Repeat a scene 4 times or more", check: (s) => s.scenes.some((x) => x.repeat >= 4) },
+  { id: "repeat4", text: "Repeat a scene 4 times or more", check: (s) => songChain(s).some((x) => x.repeat >= 4) },
   { id: "fx", text: "Use 3 different insert effects", check: (s) => new Set(s.tracks.flatMap((t) => t.fx.map((f) => f.type)).filter((f) => f !== "off")).size >= 3 },
 ];
 

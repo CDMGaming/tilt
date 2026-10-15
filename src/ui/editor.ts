@@ -32,6 +32,12 @@ export class EditorScreen implements Screen {
   private panelWrap = h("div", { class: "panel-wrap" });
   private mixWrap = h("div", { class: "mix-wrap" });
   private nav = new SpatialNav(() => (this.app.ed.focus === "mix" ? this.mixWrap : this.panelWrap));
+
+  /** Put the panel's (gamepad / keyboard) focus on a control, e.g. a knob by its parameter. */
+  focusControl(param: string) {
+    const el = this.panelWrap.querySelector<HTMLElement>(`[data-param="${param}"]`);
+    if (el) this.nav.set(el);
+  }
   private heldKey: HTMLElement | null = null;
   private meter = h("div", { class: "meter" }, h("div", { class: "meter-fill" }));
   private peak = 0;
@@ -81,7 +87,7 @@ export class EditorScreen implements Screen {
     const twin = (long: string, short: string, on: boolean, onclick: () => void, title: string) =>
       h("button", { class: "tb-btn" + (on ? " on" : ""), onclick, title }, h("span", { class: "lbl-long" }, long), h("span", { class: "lbl-short" }, short));
     const layBtn = (v: EditorLayout, label: string, title: string) =>
-      h("button", { class: "tb-btn seg" + (lay === v ? " on" : ""), onclick: () => this.setLayout(v), title }, label);
+      h("button", { class: "tb-btn seg" + (lay === v ? " on" : ""), "data-coach": v === "panel" ? "sound" : null, onclick: () => this.setLayout(v), title }, label);
     this.toolbar.replaceChildren(
       h("div", { class: "tb-track", style: `--track:${trackColor(track)}` },
         h("button", { class: "tb-arrow", onclick: () => this.switchTrack(-1), title: "Previous instrument" }, "‹"),
@@ -108,7 +114,7 @@ export class EditorScreen implements Screen {
         this.outKeyButton()),
       h("div", { class: "spacer" }),
       h("div", { class: "tb-group layout-seg", title: "Roll only / split / panel only (\\ key, or hold RB)" },
-        layBtn("roll", "Roll", "Piano roll only"), layBtn("split", "Split", "Piano roll and instrument panel"), layBtn("panel", "Panel", "Instrument panel only")),
+        layBtn("roll", "Roll", "Piano roll only"), layBtn("split", "Split", "Piano roll and instrument panel"), layBtn("panel", "Sound", "The instrument's sound panel only")),
       h("button", { class: "tb-btn menu-btn", onclick: () => this.openMenu(), title: "More: quantize, duplicate, zoom, hide out-of-key... (X / M)" }, "⋯"),
     );
     this.el.classList.toggle("layout-roll", lay === "roll");
@@ -125,7 +131,11 @@ export class EditorScreen implements Screen {
     const app = this.app, ed = app.ed, track = app.track()!, clip = this.clip;
     const btn = (label: string, on: boolean | null, onclick: () => void, title?: string) =>
       h("button", { class: "tb-btn" + (on ? " on" : ""), onclick, title }, label);
-    const tab = (v: "roll" | "panel" | "mix", label: string) => btn(label, ed.focus === v, () => this.setView(v), "Switch view (RB / Tab)");
+    const tab = (v: "roll" | "panel" | "mix", label: string) => {
+      const b = btn(label, ed.focus === v, () => this.setView(v), "Switch view (RB / Tab)");
+      if (v === "panel") b.dataset.coach = "sound";
+      return b;
+    };
     const roll = ed.focus === "roll";
     this.el.classList.add("couch-ed");
     // A phone (not a couch seat) can still move between instruments.

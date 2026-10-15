@@ -1115,3 +1115,29 @@ body.phone .help td:first-child { font-weight: 700; color: var(--accent); margin
 .note.warn { color: var(--roll-warn); }
 .share-wait { animation: pulse 1.2s ease-in-out infinite; }
 .lib-shared { color: var(--dmd); }
+
+/* ---------- The song chain: what SONG plays, as chips above the grid ---------- */
+.chain-strip { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 6px 8px; border-radius: var(--r-m); background: var(--panel); border: 1px solid var(--line); position: sticky; left: 0; top: 0; z-index: 5; }
+.chain-label { display: flex; flex-direction: column; align-items: flex-start; gap: 0; padding: 4px 10px; background: none; border: none; box-shadow: none; flex: none; }
+.chain-label span { font: 700 12px var(--font-display); letter-spacing: .14em; color: var(--dmd); }
+.chain-label small { font-size: 10px; color: var(--dim); text-transform: none; letter-spacing: 0; }
+.chain-chips { display: flex; gap: 6px; overflow-x: auto; flex: 1; padding: 3px 2px; scrollbar-width: thin; }
+.chain-chip { position: relative; display: flex; align-items: center; gap: 6px; flex: none; padding: 6px 10px 8px; border-radius: 8px; overflow: hidden; text-transform: none; letter-spacing: 0; font-size: 13px; cursor: grab; touch-action: pan-x; user-select: none; -webkit-touch-callout: none; }
+.chain-chip.tinted { box-shadow: inset 3px 0 0 var(--scene); }
+.chain-chip.tinted .chip-name { color: color-mix(in srgb, var(--scene) 55%, var(--ink)); }
+.chip-num { font: 700 11px var(--font-mono); color: var(--dim); }
+.chip-rep { font: 700 11px var(--font-mono); color: var(--dmd); }
+.chip-progress { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--mint); }
+.chain-chip.playing { border-color: var(--mint); background: color-mix(in srgb, var(--mint) 12%, var(--raise)); }
+.chain-chip.dragging { opacity: .45; }
+.chain-chip.drop-before { box-shadow: inset 3px 0 0 var(--accent) !important; }
+.chain-chip.drop-after { box-shadow: inset -3px 0 0 var(--accent) !important; }
+.chain-chip.held { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chain-strip .cursor { outline: 2px solid var(--focus); outline-offset: 2px; }
+.chain-add { flex: none; min-width: 34px; font-weight: 800; border-style: dashed; }
+body.phone .chain-strip { padding: 4px 6px; gap: 4px; }
+body.phone .chain-label { padding: 2px 4px; }
+body.phone .chain-chip { padding: 6px 8px 8px; }
+.coach-links { display: flex; gap: 10px; margin: -4px 0 8px; }
+.coach-ready small { opacity: .7; font-weight: 600; margin-left: 4px; }
+.coach-card.explore { border-color: color-mix(in srgb, var(--mint) 55%, var(--line)); }
