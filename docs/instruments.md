@@ -501,7 +501,8 @@ synthesis are textbook techniques, written from scratch.
      (never its level), so it keeps the parent's role and stays within ~7 dB of it (Chordette ~11 dB:
      its Osc 1 isn't flipped; rebalanced in Phase 3). Named "✦ Adjective Noun", stored in the song,
      saveable with ★ Save. Settings → Sounds: off / 20 / 40 (default) / 60%.
-   - Mutate on every panel with a recipe (all but Grab), undoable.
+   - Mutate on every panel with a recipe (all but Grab), undoable: about half the recipe's knobs (4-8),
+     each moved at least ~12% of its travel; picked switches flip 75% of the time.
    - The panel NUDGE and the Song screen's 🎲 items stay in the track's role.
 3. **Redesign existing instruments, one at a time.** Suggested order: Squelch → Thump Lab → Kitbox →
    Chordette → Razor → Wobbler → Haze → Pixel → Glint → Morph → Grab.

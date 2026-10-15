@@ -2,7 +2,7 @@
 // and the share code (format 1 unchanged, format 2 for generated sounds and big indexes).
 
 import { assert, assertEquals, assertNotEquals } from "jsr:@std/assert@1";
-import { INSTRUMENTS, paramDef, presetParams } from "../src/engine/instruments.ts";
+import { INSTRUMENTS, paramDef, presetParams, toUnit } from "../src/engine/instruments.ts";
 import {
   DICE_KINDS, RECIPES, ROLES, GEN_MARK, generatePreset, genBase, mutateParams, pickSound, presetRoles, soundKey, soundRoles, soundsWithRole,
 } from "../src/engine/sounds.ts";
@@ -46,13 +46,18 @@ Deno.test("generated presets: the same seed gives the same sound, in range, with
   }
 });
 
-Deno.test("Mutate: a few knobs move a little, the same seed moves them the same way", () => {
+Deno.test("Mutate: about half the knobs move clearly, the same seed moves them the same way", () => {
   for (const kind of DICE_KINDS) {
     const base = { ...generatePreset(kind, 5).params };
     const m = mutateParams(kind, base, 99);
     assertEquals(mutateParams(kind, base, 99), m);
     const moved = Object.keys(m).filter((k) => m[k] !== base[k]);
-    assert(moved.length <= 5, `${kind}: ${moved.length} moved`);
+    assert(moved.length >= 3 && moved.length <= 8, `${kind}: ${moved.length} moved`);
+    // Every moved knob travels at least ~10% (switches aside), so a press is audible.
+    for (const id of moved) {
+      const p = paramDef(kind, id)!;
+      if (!p.options) assert(Math.abs(toUnit(p, m[id]) - toUnit(p, base[id])) > 0.09, `${kind} ${id} barely moved`);
+    }
     assertEquals(m.level, base.level);
   }
 });
@@ -97,6 +102,19 @@ Deno.test("generated sounds: within 12 dB of their parent, no blow-ups", () => {
       assert(Number.isFinite(a.rms) && a.peak < 3, `${kind} ${g.name}: peak ${a.peak}`);
       const db = 20 * Math.log10((a.rms + 1e-6) / (b.rms + 1e-6));
       assert(Math.abs(db) < 12, `${kind} ${g.name}: ${db.toFixed(1)} dB from its parent`);
+    }
+  }
+});
+
+Deno.test("Mutate ten times in a row: still sounding, no blow-ups", () => {
+  for (const kind of ["acid", "lead", "analog", "wobble", "pad", "chip", "fm", "poly"] as InstrumentKind[]) {
+    for (let start = 0; start < INSTRUMENTS[kind].presets.length; start++) {
+      let params = presetParams(kind, start);
+      for (let i = 0; i < 10; i++) params = mutateParams(kind, params, start * 100 + i);
+      // Level, not timing: a slow pad whose attack got shorter is louder in a 1 s window without being louder.
+      const a = loudness(kind, { ...params, attack: presetParams(kind, start).attack ?? params.attack }), b = loudness(kind, presetParams(kind, start));
+      const db = 20 * Math.log10((a.rms + 1e-6) / (b.rms + 1e-6));
+      assert(a.peak < 3 && db > -24 && db < 15, `${kind} ${INSTRUMENTS[kind].presets[start].name} after 10 mutates: ${db.toFixed(1)} dB, peak ${a.peak.toFixed(2)}`);
     }
   }
 });

@@ -37,7 +37,7 @@ export function buildPanel(app: App, track: Track): HTMLElement {
     h("button", { class: "preset-name", "data-nav": "preset-list", onclick: () => presetMenu(app, track) }, track.preset),
     h("button", { class: "preset-step", "data-nav": "preset-next", onclick: () => stepPreset(app, track, 1) }, "▶"),
     h("button", { class: "preset-nudge", "data-nav": "preset-nudge", title: "NUDGE: another sound in the same role (bass, lead, pad...) for this instrument, sometimes a new generated one ✦. Undo brings the old one back", onclick: () => nudgePreset(app, track) }, "NUDGE"),
-    RECIPES[track.kind] ? h("button", { class: "preset-mutate", "data-nav": "preset-mutate", title: "Mutate: push a few of this sound's knobs a little. Undo brings it back", onclick: () => mutateSound(app, track) }, "Mutate") : null,
+    RECIPES[track.kind] ? h("button", { class: "preset-mutate", "data-nav": "preset-mutate", title: "Mutate: push about half of this sound's knobs clearly in new directions. Press again to keep going; undo steps back", onclick: () => mutateSound(app, track) }, "Mutate") : null,
     h("button", { class: "preset-save", "data-nav": "preset-save", title: "Save this sound as a user preset", onclick: () => savePresetPrompt(app, track) }, "★ Save"),
   );
 

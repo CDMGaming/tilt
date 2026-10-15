@@ -444,7 +444,7 @@ const CONTROLS: Record<ControlsTab, { label: string; rows: [string, string][] }>
     ["Drag a clip (mouse)", "Drop it on another cell: move, copy or swap"],
     ["♪ 1/16 ▾ (editor toolbar)", "Length of new notes, remembered per track. Click a spot: a note that long; drag: size it by hand"],
     ["Alt+click a note", "Split it at the grid line you clicked"],
-    ["NUDGE / Mutate (sound panel)", "NUDGE: another sound in the same role. Mutate: push a few knobs a little. Undo brings either back"],
+    ["NUDGE / Mutate (sound panel)", "NUDGE: another sound in the same role. Mutate: push about half the knobs clearly. Undo brings either back"],
     ["🎲 code (Song screen, top left)", "Share the song's setup code: copy it, a link that opens TILT with it, or a new song from it"],
   ] },
   setup: { label: "Setup screen", rows: [

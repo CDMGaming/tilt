@@ -117,18 +117,27 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
 /** Roughly normal, -1..1 (three uniforms). */
 const wobble = (r: Rng) => (r.next() + r.next() + r.next() - 1.5) / 1.5;
 
-/** Move `params` by a recipe, `amount` scaling how far (1 = a generated preset, ~0.35 = Mutate). */
-function vary(kind: InstrumentKind, params: Record<string, number>, r: Rng, amount: number, only?: Set<string>) {
+/**
+ * Move `params` by a recipe, `amount` scaling how far (1 = a generated preset; Mutate goes
+ * further on fewer knobs). `minMove` (knob travel) makes every moved knob audibly move;
+ * `flipChance` overrides the recipe's switch odds; a switch that flips lands on a different value.
+ */
+function vary(kind: InstrumentKind, params: Record<string, number>, r: Rng, amount: number, only?: Set<string>, minMove = 0, flipChance?: number) {
   for (const m of RECIPES[kind] ?? []) {
     if (only && !only.has(m.id)) continue;
     const p = paramDef(kind, m.id);
     if (!p) continue;
     const v = params[m.id] ?? p.def;
     if ("flip" in m) {
-      if (r.chance(m.flip * amount)) params[m.id] = r.pick(m.values);
+      const others = m.values.filter((x) => x !== v);
+      if (others.length && r.chance(flipChance ?? Math.min(1, m.flip * amount))) params[m.id] = r.pick(others);
     } else {
-      const u = toUnit(p, v) + wobble(r) * m.spread * amount;
-      params[m.id] = fromUnit(p, Math.max(m.lo ?? 0, Math.min(m.hi ?? 1, u)));
+      const lo = m.lo ?? 0, hi = m.hi ?? 1, u0 = toUnit(p, v);
+      let d = wobble(r) * m.spread * amount;
+      if (Math.abs(d) < minMove) d = (d < 0 ? -1 : 1) * minMove;
+      // Against an end of the range: go the other way rather than stand still.
+      if (u0 + d > hi || u0 + d < lo) d = -d;
+      params[m.id] = fromUnit(p, Math.max(lo, Math.min(hi, u0 + d)));
     }
   }
   return params;
@@ -180,14 +189,15 @@ export function genSeedFor(kind: InstrumentKind, role: Role | null, r: Rng): num
   return null;
 }
 
-/** Mutate: a small push on a few of the knobs the recipe names. Returns the new params. */
+/** Mutate: a clear push on about half the knobs the recipe names. Returns the new params. */
 export function mutateParams(kind: InstrumentKind, params: Record<string, number>, seed: number): Record<string, number> {
   const r = new Rng(seed);
   const ids = (RECIPES[kind] ?? []).map((m) => m.id);
-  const n = Math.min(ids.length, r.int(3, 5));
+  // About half the recipe's knobs (4-8), each moved clearly: you should hear every press.
+  const n = Math.min(ids.length, Math.max(4, Math.min(8, Math.round(ids.length * (0.4 + r.next() * 0.25)))));
   const only = new Set<string>();
   while (only.size < n) only.add(r.pick(ids));
-  return vary(kind, { ...params }, r, 0.45, only);
+  return vary(kind, { ...params }, r, 1.4, only, 0.12, 0.75);
 }
 
 // ------------------------------------------------------------ picking by role
