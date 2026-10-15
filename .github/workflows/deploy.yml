@@ -49,18 +49,23 @@ jobs:
       - name: Song sharing storage (KV tilt-shares, R2 tilt-samples), when they exist
         if: env.RAW_TOKEN != ''
         run: |
-          kv=$(npx --yes wrangler@4 kv namespace list 2>/dev/null | jq -r '.[] | select(.title=="tilt-shares") | .id' 2>/dev/null || true)
+          # Names only are printed (no ids, no secrets), so a typo or a missing permission is easy to spot.
+          kvjson=$(npx --yes wrangler@4 kv namespace list 2>kv.err) || { echo "Listing KV failed:"; grep -iE "error|permission|auth" kv.err | head -5; }
+          echo "KV namespaces this token can see: $(echo "$kvjson" | jq -r '[.[].title] | join(", ")' 2>/dev/null)"
+          kv=$(echo "$kvjson" | jq -r '.[] | select(.title=="tilt-shares") | .id' 2>/dev/null || true)
           if [ -n "$kv" ]; then
             { echo; echo '[[kv_namespaces]]'; echo 'binding = "SHARES"'; echo "id = \"$kv\""; } >> wrangler.toml
             echo "KV namespace tilt-shares: bound as SHARES"
           else
-            echo "::warning::No KV namespace named tilt-shares yet: Share song falls back to self-contained #song= links"
+            echo "::warning::No KV namespace named tilt-shares: Share song falls back to self-contained #song= links"
           fi
-          if npx --yes wrangler@4 r2 bucket list 2>/dev/null | grep -qw "tilt-samples"; then
+          r2=$(npx --yes wrangler@4 r2 bucket list 2>r2.err) || { echo "Listing R2 failed:"; grep -iE "error|permission|auth|enable" r2.err | head -5; }
+          echo "R2 buckets this token can see: $(echo "$r2" | sed -n 's/^name:[[:space:]]*//p' | paste -sd, -)"
+          if echo "$r2" | grep -qE '^name:[[:space:]]*tilt-samples[[:space:]]*$'; then
             { echo; echo '[[r2_buckets]]'; echo 'binding = "SAMPLES"'; echo 'bucket_name = "tilt-samples"'; } >> wrangler.toml
             echo "R2 bucket tilt-samples: bound as SAMPLES"
           else
-            echo "::warning::No R2 bucket named tilt-samples yet: shared songs go out without user samples"
+            echo "::warning::No R2 bucket named tilt-samples: shared songs go out without user samples"
           fi
       - name: App
         if: env.RAW_TOKEN != ''
