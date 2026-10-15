@@ -20,7 +20,7 @@ import { trackColor } from "./theme";
 import { control, type ControlHost } from "./knob";
 
 /** Instruments rebuilt in the overhaul (docs/instruments.md): their own panel only, no MORE page. */
-const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums", "poly"]);
+const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums", "poly", "lead"]);
 /** Chordette: the category its sound list shows (null: the current sound's). */
 let chordetteCat: string | null = null;
 /** Kitbox: the channel whose More drawer is open (per session). */
@@ -37,6 +37,10 @@ export function buildPanel(app: App, track: Track): HTMLElement {
   const ctl = (id: string, label?: string, size?: "s" | "m" | "l") => {
     const p = paramDef(track.kind, id);
     return p ? control(p, host, { label, size }) : null;
+  };
+  const fdr = (id: string, label?: string) => {
+    const p = paramDef(track.kind, id);
+    return p ? control(p, host, { label, fader: true }) : null;
   };
   const def = INSTRUMENTS[track.kind];
 
@@ -101,14 +105,15 @@ export function buildPanel(app: App, track: Track): HTMLElement {
         ctl("model", "★ Model", "l"), ctl("accent", "Accent"), ctl("level", "Level")),
     );
   } else if (track.kind === "lead") {
+    // Razor: eight faders with lit caps; Scream, Sweep and Glide are the character controls.
     body = h("div", { class: "panel-body razor" },
-      h("div", { class: "knob-row" },
-        h("div", { class: "section-title small" }, "Osc"), ctl("wave", "Wave"), ctl("sync", "SYNC", "l"), ctl("syncEnv", "Sync env"),
-        h("div", { class: "section-title small" }, "Unison"), ctl("unison", "Voices"), ctl("detune", "Detune"), ctl("spread", "Spread"),
-        h("div", { class: "section-title small" }, "Filter"), ctl("cutoff", "Cutoff", "l"), ctl("reso", "Reso"), ctl("fenv", "Env"), ctl("envDecay", "Env decay")),
-      h("div", { class: "knob-row" },
-        h("div", { class: "section-title small" }, "Amp"), ctl("attack", "Attack", "s"), ctl("release", "Release", "s"),
-        h("div", { class: "section-title small" }, "Play"), ctl("glide", "Glide", "s"), ctl("legato", "Legato"), ctl("vibRate", "Vib rate", "s"), ctl("vibDepth", "Vibrato", "s"), ctl("level", "Level", "s")),
+      h("div", { class: "rz-plate" },
+        h("div", { class: "rz-logo" }, "RAZOR", h("span", null, "SYNC LEAD")),
+        h("div", { class: "rz-faders" },
+          h("div", { class: "rz-group char" }, fdr("scream", "★ Scream"), fdr("sweep", "★ Sweep")),
+          h("div", { class: "rz-group" }, fdr("cutoff", "Tone"), fdr("unison", "Voices"), fdr("spread", "Spread")),
+          h("div", { class: "rz-group" }, fdr("attack", "Attack"), fdr("release", "Release")),
+          h("div", { class: "rz-group char" }, fdr("glide", "★ Glide")))),
       keyboard(app, track),
     );
   } else if (track.kind === "wobble") {

@@ -27,18 +27,20 @@ export class LeadDSP implements InstrumentDSP {
   private fL = new SVF();
   private fR = new SVF();
   private vib = 0;
+  private vibFade = 1;
   private cut = 5000;
   constructor(public params: Record<string, number>, private sr: number) {
     for (let i = 0; i < 7; i++) { this.master[i] = Math.random(); this.slave[i] = Math.random(); }
   }
 
+  /** Glide above zero also means legato: a note played over a held one slides instead of re-striking. */
   noteOn(pitch: number, vel: number) {
-    const legato = this.held.length > 0 && (this.params.legato ?? 1) >= 0.5;
+    const legato = this.held.length > 0 && (this.params.glide ?? 0.2) > 0.02;
     this.held = this.held.filter((p) => p !== pitch);
     this.held.push(pitch);
     this.target = mtof(pitch);
     this.velNow = vel / 127;
-    if (!legato) { this.amp.gate(true); this.env = 1; if (this.amp.value < 0.01) this.freq = this.target; }
+    if (!legato) { this.amp.gate(true); this.env = 1; this.vibFade = 0; if (this.amp.value < 0.01) this.freq = this.target; }
   }
   noteOff(pitch: number) {
     this.held = this.held.filter((p) => p !== pitch);
@@ -50,21 +52,32 @@ export class LeadDSP implements InstrumentDSP {
   render(L: Float32Array, R: Float32Array, i0: number, i1: number) {
     const p = this.params, sr = this.sr;
     if (!this.amp.active) return;
+    // The three character controls:
+    //   Scream: sync ratio up, sync envelope deeper, a little drive.
+    //   Sweep: filter envelope deeper and longer (the zap at each note; the sync envelope follows it).
+    //   Glide: portamento time, legato above zero, and the vibrato fading in after each new note.
+    const scream = p.scream ?? 0.4, sweep = p.sweep ?? 0.4, glide = p.glide ?? 0.2;
     const n = UNISON_COUNTS[Math.round(p.unison ?? 1)] ?? 3;
-    const det = (p.detune ?? 0.3) * 0.012; // up to ~20 cents each side
-    const spread = p.spread ?? 0.6;
+    const spreadK = p.spread ?? 0.6;
+    const det = spreadK * 0.012; // up to ~20 cents each side
+    const spread = Math.min(1, spreadK * 1.3);
     const square = Math.round(p.wave ?? 0) === 1;
-    const glideK = 1 - Math.exp(-1 / ((p.glide ?? 0.04) * sr));
-    const envK = Math.exp(-4.6 / ((p.envDecay ?? 0.3) * sr));
-    const vibInc = (p.vibRate ?? 5.5) / sr, vibAmt = (p.vibDepth ?? 0.15) * 0.02;
-    const level = (p.level ?? 0.6) * 0.4 / Math.sqrt(n);
+    const glideK = 1 - Math.exp(-1 / (0.002 * Math.pow(300, glide) * sr));
+    const envK = Math.exp(-4.6 / ((p.envDecay ?? 0.25) * (0.4 + sweep * 2.6) * sr));
+    const fenv = Math.min(1.2, (p.fenv ?? 0.15) + sweep * 0.7);
+    const syncSemis = (p.sync ?? 0) + scream * 19, syncEnv = ((p.syncEnv ?? 0.1) + scream * 0.5) * 24;
+    const drive = 1 + scream * 2.5, dn = Math.tanh(drive);
+    const fadeInc = 1 / (Math.max(0.05, glide * 1.5) * sr);
+    const vibInc = (p.vibRate ?? 5.5) / sr, vibAmt0 = (p.vibDepth ?? 0.15) * 0.02;
+    const level = (p.level ?? 0.6) * 0.64 / Math.sqrt(n);
     const res = p.reso ?? 0.2;
     for (let i = i0; i < i1; i++) {
       this.freq *= Math.pow(this.target / this.freq, glideK);
       this.env *= envK;
       this.vib = (this.vib + vibInc) % 1;
-      const f0 = this.freq * voiceMod.pitch * (1 + Math.sin(TAU * this.vib) * vibAmt);
-      const ratio = Math.pow(2, ((p.sync ?? 7) + (p.syncEnv ?? 0.35) * 24 * this.env) / 12);
+      if (this.vibFade < 1) this.vibFade = Math.min(1, this.vibFade + fadeInc);
+      const f0 = this.freq * voiceMod.pitch * (1 + Math.sin(TAU * this.vib) * vibAmt0 * this.vibFade);
+      const ratio = Math.pow(2, (syncSemis + syncEnv * this.env) / 12);
       const a = this.amp.next(p.attack ?? 0.005, 0.2, 1, p.release ?? 0.25, sr) * velGain(this.velNow);
       let l = 0, r = 0;
       for (let v = 0; v < n; v++) {
@@ -80,9 +93,10 @@ export class LeadDSP implements InstrumentDSP {
         l += x * panL(pan); r += x * panR(pan);
       }
       this.cut = smooth(this.cut, p.cutoff ?? 5000, 0.002);
-      const fc = Math.min(sr * 0.45, this.cut * Math.pow(2, this.env * (p.fenv ?? 0.35) * 5));
-      L[i] += this.fL.lp(l, fc, res, sr) * a * level * 1.41;
-      R[i] += this.fR.lp(r, fc, res, sr) * a * level * 1.41;
+      const fc = Math.min(sr * 0.45, this.cut * Math.pow(2, this.env * fenv * 5));
+      const g = a * level * 1.41 / dn;
+      L[i] += Math.tanh(this.fL.lp(l, fc, res, sr) * drive) * g;
+      R[i] += Math.tanh(this.fR.lp(r, fc, res, sr) * drive) * g;
     }
   }
 }

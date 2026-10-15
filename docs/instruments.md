@@ -220,6 +220,9 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** E, 8 vertical faders with lit caps.
 - **Theme:** an anodised blue faceplate, LED-lit fader caps, condensed sans labels.
 - **Presets:** 24 (leads, sync bass, sync arps, screaming solos).
+- **Status: built.** A fader control (the knob's gestures, drawn as a fader) is now shared for later
+  instruments. Scream / Sweep / Glide drive the sync, envelopes, drive, portamento + legato and a
+  vibrato fade-in. 24 presets, level-matched (short-term loudness).
 
 ### Wobbler: wobble bass
 - **Idea:** the growling, tempo-locked wobble bass.

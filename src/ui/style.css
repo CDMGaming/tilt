@@ -1240,3 +1240,29 @@ body.phone .chain-chip { padding: 6px 8px 8px; }
 .xy-axis.y { left: 6px; top: 10px; writing-mode: vertical-rl; transform: rotate(180deg); }
 .xy-readout { font-family: var(--font-mono); font-size: 12px; color: var(--dim); }
 body.phone .xy-pad { height: 280px; }
+
+/* Faders (Razor, Wheelhouse...): the same control as a knob, drawn as a vertical fader. */
+.knob.fader { width: 46px; cursor: ns-resize; }
+.fader-svg { width: 30px; height: 120px; }
+.fader-slot { fill: var(--fader-slot, #0006); }
+.fader-fill { fill: var(--fader-fill, var(--track)); opacity: .55; }
+.fader-cap { fill: var(--fader-cap, #ddd); stroke: #0008; stroke-width: 1; }
+.knob.fader.turning .fader-cap { filter: brightness(1.2); }
+
+/* Razor: an anodised blue faceplate, LED-lit fader caps, condensed labels. */
+.panel-body.razor { padding: 0; overflow: hidden; border-top-color: #2b5fa8; }
+.rz-plate { display: flex; gap: 18px; align-items: stretch; padding: 10px 16px; flex-wrap: wrap;
+  background: repeating-linear-gradient(90deg, #ffffff06 0 1px, transparent 1px 3px), linear-gradient(180deg, #24508f, #173a6b); box-shadow: inset 0 1px 0 #ffffff30; }
+.rz-logo { display: flex; flex-direction: column; justify-content: center; font: 900 20px/1 var(--font-display); letter-spacing: .14em; color: #e8f1ff; font-stretch: condensed; }
+.rz-logo span { font-size: 9px; letter-spacing: .3em; opacity: .7; margin-top: 4px; }
+.rz-faders { display: flex; gap: 14px; flex-wrap: wrap; flex: 1; justify-content: space-around; }
+.rz-group { display: flex; gap: 6px; padding: 4px 6px; border-radius: 8px; background: #0000002a; box-shadow: inset 0 1px 3px #0005; }
+.panel-body.razor .knob-label { color: #dce8ff; opacity: 1; font-weight: 700; font-size: 10px; letter-spacing: .06em; font-stretch: condensed; }
+.panel-body.razor .knob-value { color: #a9c3ee; }
+.panel-body.razor .rz-group.char .knob-label { color: #7fe7ff; }
+.panel-body.razor { --fader-slot: #08162b; --fader-fill: #4fc9ff; --fader-cap: #dfe6ef; }
+.panel-body.razor .rz-group.char { --fader-fill: #7fe7ff; }
+.panel-body.razor .fader-cap { filter: drop-shadow(0 0 4px #4fc9ffaa); }
+body.phone .rz-faders { gap: 6px; }
+body.phone .rz-group { gap: 0; padding: 4px 2px; }
+body.phone .panel-body.razor .knob.fader { width: 38px; }

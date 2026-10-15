@@ -33,7 +33,11 @@ const TAGS: Partial<Record<InstrumentKind, Record<string, Role[]>>> = {
     "Lead Saw": ["lead"], "Rave Hoover": ["lead", "fx"], "Acid Chords": ["keys", "pluck"],
     "Music Box": ["pluck", "keys"], "Glass Bells": ["keys", "pluck"], "Chime Pad": ["pad", "keys"],
   },
-  lead: { "Laser Sweep": ["lead", "fx"], "Pluck Lead": ["pluck", "lead"], "Chip-ish": ["lead", "arp"] },
+  lead: {
+    "Laser Sweep": ["lead", "fx"], "Pluck Lead": ["pluck", "lead"], "Chip-ish": ["lead", "arp"],
+    "Sync Bass": ["bass"], "Growl Sync": ["bass"], "Rubber Sync": ["bass", "pluck"],
+    "Sync Arp": ["arp", "pluck"], "Zap Arp": ["arp", "fx"], "Gated Sync": ["arp", "lead"],
+  },
   wobble: { "Robot": ["bass", "fx"], "Laser Wob": ["bass", "fx"] },
   pad: { "Short Keys": ["keys"], "Bit Fog": ["pad", "fx"] },
   chip: {
@@ -100,9 +104,9 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
     knob("attack", 0.06), knob("release", 0.08), knob("width", 0.2),
   ],
   lead: [
-    knob("sync", 0.25), knob("syncEnv", 0.25), pick("unison", 0.2, [0, 1, 2, 3]), knob("detune", 0.2), knob("spread", 0.2),
-    knob("cutoff", 0.18, 0.35, 1), knob("reso", 0.18, 0, 0.75), knob("fenv", 0.22), knob("envDecay", 0.2), knob("vibDepth", 0.12, 0, 0.5),
-    knob("vibRate", 0.15), knob("glide", 0.12, 0, 0.6),
+    knob("scream", 0.22), knob("sweep", 0.22), knob("glide", 0.15, 0, 0.7), knob("spread", 0.2), pick("unison", 0.2, [0, 1, 2, 3]),
+    knob("cutoff", 0.15, 0.35, 1), knob("reso", 0.15, 0, 0.7), knob("sync", 0.15), knob("syncEnv", 0.15), knob("envDecay", 0.15),
+    knob("vibDepth", 0.12, 0, 0.5), knob("vibRate", 0.15),
   ],
   wobble: [
     pick("wave", 0.25, [0, 1, 2]), knob("sub", 0.2), pick("xWave", 0.3, [0, 1, 2]), pick("xTune", 0.3, [-12, 0, 5, 7, 12, 19, 24]),
