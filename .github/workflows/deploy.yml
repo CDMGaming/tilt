@@ -66,8 +66,7 @@ jobs:
             { echo; echo '[[r2_buckets]]'; echo 'binding = "SAMPLES"'; echo 'bucket_name = "tilt-samples"'; grep -qi "jurisdiction.*eu" r2.out && echo 'jurisdiction = "eu"'; } >> wrangler.toml
             echo "R2 bucket tilt-samples: bound as SAMPLES"
           else
-            echo "R2 says: $(grep -iE 'error|not exist|enable|code' r2.err | head -3 | tr '
-' ' ')"
+            echo "R2 says: $(grep -iE 'error|not exist|enable|code' r2.err | head -3 | paste -sd' ' -)"
             echo "R2 buckets this token can see: $(npx --yes wrangler@4 r2 bucket list 2>/dev/null | sed -n 's/^name:[[:space:]]*//p' | paste -sd, -)"
             echo "::warning::No R2 bucket named tilt-samples: shared songs go out without user samples"
           fi
