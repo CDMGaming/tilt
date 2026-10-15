@@ -56,7 +56,7 @@ async function upload(song: Song): Promise<Shared> {
       if (total + s.bytes.length > SAMPLES_MAX_BYTES) { left.push(s.name); continue; }
       const key = await sampleKey(s.bytes);
       const r = await fetch(`/api/sample/${key}`, { method: "PUT", body: s.bytes as Uint8Array<ArrayBuffer>, headers: { "content-type": "application/octet-stream" } });
-      if (r.status === 503) { left.push(s.name); continue; } // no sample storage on this server
+      if (r.status === 503 || r.status === 507) { left.push(s.name); continue; } // no sample storage here, or it's full
       if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { error?: string }).error ?? `sample upload failed (${r.status})`);
       samples[s.id] = key;
       total += s.bytes.length;
@@ -108,7 +108,7 @@ function renderResult(app: App, song: Song, res: Shared, close: () => void): HTM
       h("button", { class: "small-btn primary", "data-nav": "copy-link", onclick: () => copy(app, res.url, "Link") }, "Copy link"),
       res.kind === "server" ? h("button", { class: "small-btn", "data-nav": "copy-code", onclick: () => copy(app, showCode(res.code), "Code") }, "Copy code") : "",
       "share" in navigator ? h("button", { class: "small-btn", "data-nav": "share-sheet", onclick: () => navigator.share({ title: `TILT: ${song.title}`, text: res.kind === "server" ? `My TILT song “${song.title}”: ${showCode(res.code)}` : `My TILT song “${song.title}”`, url: res.url }).catch(() => {}) }, "Share…") : ""),
-    res.left.length ? h("p", { class: "note warn" }, `Shared without ${res.left.length === 1 ? "this sample" : "these samples"} (${res.kind === "link" ? "offline links can't carry samples" : "over the 5 MB limit, or no sample storage"}): ${res.left.join(", ")}. Those pads will be silent for whoever opens it.`) : "",
+    res.left.length ? h("p", { class: "note warn" }, `Shared without ${res.left.length === 1 ? "this sample" : "these samples"} (${res.kind === "link" ? "offline links can't carry samples" : "over the 5 MB limit, or the server's sample storage is off or full"}): ${res.left.join(", ")}. Those pads will be silent for whoever opens it.`) : "",
     h("p", { class: "note" }, "The same song always gets the same code; any change gets a new one. Opening it adds a copy to their Songs: yours stays yours."),
     older.length ? h("div", { class: "share-versions" },
       h("div", { class: "die-label" }, "Shared before"),

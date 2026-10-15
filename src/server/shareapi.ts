@@ -21,6 +21,9 @@ interface DONamespace { idFromName(name: string): unknown; get(id: unknown): { f
 export interface ShareEnv { SHARES?: KVLike; SAMPLES?: R2Like; LIMITER?: DONamespace }
 
 const KEY_RE = /^[0-9a-f]{32}$/;
+/** All shared samples together stay under this (R2's free tier is 10 GB). Counted in KV, so it's approximate. */
+export const SAMPLES_TOTAL_CAP = 2 * 1024 ** 3;
+const TOTAL_KEY = "_stats:sampleBytes";
 const MAX_SAMPLES = 64;
 const FOREVER = "public, max-age=31536000, immutable";
 
@@ -89,7 +92,12 @@ export async function putSampleBlob(req: Request, key: string, env: ShareEnv): P
   if (bytes.length > SAMPLES_MAX_BYTES) return json({ error: "Sample too big (5 MB max)" }, 413);
   if (bytes.length < 6) return json({ error: "Not a sample" }, 400);
   if ((await sampleKey(bytes)) !== key) return json({ error: "The sample doesn't match its key" }, 400);
-  if (!(await env.SAMPLES.head(key))) await env.SAMPLES.put(key, bytes);
+  if (await env.SAMPLES.head(key)) return json({ key }, 200); // stored already: same bytes, same key
+  // The storage cap: past it, songs still share, just without new samples (the app says which).
+  const total = Number((await env.SHARES?.get(TOTAL_KEY)) ?? 0) || 0;
+  if (total + bytes.length > SAMPLES_TOTAL_CAP) return json({ error: "Sample storage is full" }, 507);
+  await env.SAMPLES.put(key, bytes);
+  await env.SHARES?.put(TOTAL_KEY, String(total + bytes.length));
   return json({ key }, 201);
 }
 

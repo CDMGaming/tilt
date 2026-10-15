@@ -176,3 +176,15 @@ Deno.test("QR: a share link reads back out of the symbol (patterns, format, unma
   const text = new TextDecoder().decode(Uint8Array.from({ length: n }, (_, i) => parseInt(s.slice(12 + i * 8, 20 + i * 8), 2)));
   assertEquals(text, url);
 });
+
+Deno.test("samples: the 2 GB total cap refuses new samples (507), already-stored ones still pass", async () => {
+  const { SAMPLES_TOTAL_CAP } = await import("../src/server/shareapi.ts");
+  const kv = memKV(), r2 = memR2(), env: ShareEnv = { SHARES: kv, SAMPLES: r2 };
+  const a = packSample("a", 44100, new Float32Array(100).fill(0.1)), b = packSample("b", 44100, new Float32Array(100).fill(0.2));
+  const put = async (bytes: Uint8Array) => { const k = await sampleKey(bytes); return (await putSampleBlob(new Request(`https://x/api/sample/${k}`, { method: "PUT", body: bytes as Uint8Array<ArrayBuffer> }), k, env)).status; };
+  assertEquals(await put(a), 201);
+  assertEquals(Number(kv.m.get("_stats:sampleBytes")), a.length);
+  kv.m.set("_stats:sampleBytes", String(SAMPLES_TOTAL_CAP - 10)); // nearly full
+  assertEquals(await put(b), 507);
+  assertEquals(await put(a), 200); // the same sample again: nothing new to store
+});
