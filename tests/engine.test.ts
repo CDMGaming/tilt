@@ -292,7 +292,7 @@ Deno.test("NUDGE re-rolls what isn't held: fields, lineup slots, sounds, count",
     assertEquals(new Set(kinds).size, kinds.length, "? slots get distinct instruments");
     // Hold key + tempo, choose slot 2's instrument and slot 1's sound, fix the count at 4.
     const spec = defaultSpec();
-    spec.count = 4; spec.slots[1] = "fm"; spec.presets[0] = 1;
+    spec.count = 4; spec.slots[1] = "fm"; spec.slots[0] = first.lineup[0].kind; spec.presets[0] = 1; // a chosen sound comes with its instrument
     const next = nudgeSetup(first, { ...NO_HOLDS, key: true, tempo: true }, spec, seed + 1000);
     assertEquals(next.key, first.key);
     assertEquals(next.tempo, first.tempo);
@@ -303,7 +303,7 @@ Deno.test("NUDGE re-rolls what isn't held: fields, lineup slots, sounds, count",
     // Everything chosen: NUDGE leaves the lineup and sounds alone.
     const all = defaultSpec();
     all.count = next.lineup.length;
-    next.lineup.forEach((l, i) => { all.slots[i] = l.kind; all.presets[i] = l.preset; });
+    next.lineup.forEach((l, i) => { all.slots[i] = l.kind; all.presets[i] = l.preset; all.gens![i] = l.gen ?? null; });
     assert(lineupHeld(all, next.lineup.length) && soundsHeld(all, next.lineup.length));
     assertEquals(nudgeSetup(next, NO_HOLDS, all, seed + 7).lineup, next.lineup);
   }

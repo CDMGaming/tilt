@@ -1,13 +1,18 @@
 // Song screen: tracks (columns) x scenes (rows); each cell is a clip.
 
 import { canArrange, autoArrange } from "../engine/arranger";
-import { encodeSetup, pickPreset, setupFromSong, usedPresets } from "../engine/dice";
+import { DICE_KINDS, encodeSetup, setupFromSong } from "../engine/dice";
+import { ROLE_LABEL, pickSound, soundRoles } from "../engine/sounds";
+import { Rng, randomSeed } from "../engine/rng";
+import { applySound, noteRoll, pickOptions } from "./sounds";
+import { allPresets } from "./presets";
+import { nudgePreset, trackSound } from "./panels";
 import { ALL_KINDS, INSTRUMENTS, isDrumKind } from "../engine/instruments";
 import { MAX_BARS, MAX_SCENES, TICKS_PER_BAR, chainIndexOf, newId, songChain, type Clip, type Scene, type Track } from "../engine/model";
 import {
   MAX_CHAIN, QUICK_SCENES, SCENE_NAMES, addChainStep, addScene, chainFollowsRows, changeInstrument, deleteScene, deleteTrack, duplicateClip, duplicateScene,
   moveChainStep, removeChainStep, resetChain, setChainRepeat,
-  duplicateTrack, ensureClip, insertBlankScene, loadPreset, moveScene, presetIndex, sceneColor, setClipBars,
+  duplicateTrack, ensureClip, insertBlankScene, moveScene, sceneColor, setClipBars,
 } from "../engine/songops";
 import { mods, type Action } from "./actions";
 import type { App, Screen } from "./app";
@@ -597,15 +602,25 @@ export class SongScreen implements Screen {
     else if (row === -1 && col === -1) app.songSettings?.();
   }
 
+  /** Another instrument with a sound in the same role as this track's (drums stay drums, a bass stays a bass). */
+  private randomInstrument(t: Track) {
+    const app = this.app, role = soundRoles(trackSound(t))[0];
+    const s = pickSound(role, new Rng(randomSeed()), pickOptions(app.settings.genShare), DICE_KINDS.filter((k) => k !== t.kind));
+    if (!s) return;
+    app.edit("Change instrument", () => { changeInstrument(t, s.kind, s.preset); applySound(t, s, allPresets(s.kind)); });
+    noteRoll([s]);
+    app.overlays.toast(`${INSTRUMENTS[s.kind].name}: ${t.preset}`, 1400);
+  }
+
   private trackMenu(t: Track, i: number): MenuItem[] {
     const app = this.app, song = app.song;
     return [
       { label: "Edit sound", run: () => this.openEditor(t, song.scenes[Math.max(0, app.songCur.row)] ?? song.scenes[0], "panel") },
       { label: "Change instrument", sub: () => [
         ...ALL_KINDS.map((k) => ({ label: INSTRUMENTS[k].name, checked: t.kind === k, run: () => app.edit("Change instrument", () => changeInstrument(t, k)) })),
-        { label: "🎲 Random", run: () => app.edit("Change instrument", () => { const k = ALL_KINDS[Math.floor(Math.random() * ALL_KINDS.length)]; changeInstrument(t, k, pickPreset(k, usedPresets(song, k, t.id))); }) },
+        { label: "🎲 Random, same role", hint: ROLE_LABEL[soundRoles(trackSound(t))[0]], run: () => this.randomInstrument(t) },
       ] },
-      { label: "🎲 Random preset", run: () => app.edit("Random preset", () => loadPreset(t, pickPreset(t.kind, [...usedPresets(song, t.kind, t.id), presetIndex(t)]))) },
+      { label: "🎲 Random sound, same role", run: () => nudgePreset(app, t) },
       { label: "Volume", sub: () => [100, 80, 60, 40, 20].map((v) => ({ label: String(v), checked: Math.round(t.volume * 100) === v, run: () => app.edit("Volume", () => (t.volume = v / 100)) })) },
       { label: "Mute", checked: t.mute, keepOpen: true, run: () => app.edit("Mute", () => (t.mute = !t.mute)) },
       { label: "Solo", checked: t.solo, keepOpen: true, run: () => app.edit("Solo", () => (t.solo = !t.solo)) },

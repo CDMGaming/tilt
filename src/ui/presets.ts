@@ -35,6 +35,7 @@ export function allPresets(kind: InstrumentKind): PresetEntry[] {
 export function applyPreset(track: Track, p: PresetEntry) {
   track.params = { ...defaultParams(track.kind), ...p.params };
   track.preset = p.name;
+  delete track.gen;
 }
 
 export function presetPosition(track: Track): number {
@@ -45,7 +46,7 @@ export function presetPosition(track: Track): number {
 export function saveUserPreset(track: Track, name: string): string {
   const s = load();
   const list = (s[track.kind] ??= []);
-  const clean = name.replace(/^★\s*/, "").trim().slice(0, 32);
+  const clean = name.replace(/^[★✦]\s*/, "").trim().slice(0, 32);
   const i = list.findIndex((p) => p.name === clean);
   const entry = { name: clean, params: { ...track.params } };
   if (i >= 0) list[i] = entry; else list.push(entry);

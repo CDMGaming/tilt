@@ -491,8 +491,18 @@ synthesis are textbook techniques, written from scratch.
 
 1. **Note length + grid:** done and live (picker, split / join / legato / set length, grid lines,
    keys and pad equivalents, help).
-2. **Randomness:** role tags, role-first Dice / NUDGE, freshness, share code v2, generated presets
-   from recipes, Mutate.
+2. **Randomness:** done (src/engine/sounds.ts, tests/sounds.test.ts).
+   - Role tags on every preset; a slot can ask for a role ("? Any pad").
+   - Role-first Dice / NUDGE: a role per slot, then a sound from any instrument the band lacks.
+   - Freshness: the last 10 rolls are remembered (in this browser) and avoided.
+   - Share code: format 1 is unchanged; format 2 (a full preset byte, generated seeds) is used only
+     when a setup needs it. Both decode.
+   - Generated presets: each instrument's recipe moves a curated parent's knobs within safe ranges
+     (never its level), so it keeps the parent's role and stays within ~7 dB of it (Chordette ~11 dB:
+     its Osc 1 isn't flipped; rebalanced in Phase 3). Named "✦ Adjective Noun", stored in the song,
+     saveable with ★ Save. Settings → Sounds: off / 20 / 40 (default) / 60%.
+   - Mutate on every panel with a recipe (all but Grab), undoable.
+   - The panel NUDGE and the Song screen's 🎲 items stay in the track's role.
 3. **Redesign existing instruments, one at a time.** Suggested order: Squelch → Thump Lab → Kitbox →
    Chordette → Razor → Wobbler → Haze → Pixel → Glint → Morph → Grab.
 4. **New instruments, one at a time.** Suggested order: Tine → Pluck → Wheelhouse → Anthem → Patchwork →

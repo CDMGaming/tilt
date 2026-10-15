@@ -86,6 +86,7 @@ export function changeInstrument(track: Track, kind: InstrumentKind, preset = 0)
   track.name = def.name;
   track.preset = def.presets[preset % def.presets.length].name;
   track.params = presetParams(kind, preset);
+  delete track.gen;
   if (kind === "sampler" && !track.samples) track.samples = [...DEFAULT_SAMPLER_REFS];
 }
 
@@ -94,6 +95,7 @@ export function loadPreset(track: Track, index: number) {
   const i = ((index % def.presets.length) + def.presets.length) % def.presets.length;
   track.params = presetParams(track.kind, i);
   track.preset = def.presets[i].name;
+  delete track.gen;
 }
 
 export function presetIndex(track: Track): number {

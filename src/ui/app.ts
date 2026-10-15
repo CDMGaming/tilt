@@ -88,6 +88,8 @@ export interface Settings {
   netName: string; // your name in online games
   /** Game mode: challenge cards, editing locks at zero, extra ball, the TILT flash. Off: TILT is a quick-start DAW. */
   gameMode: boolean;
+  /** Share of dice / NUDGE sounds that are generated from recipes, 0..1 (the rest are curated). */
+  genShare: number;
   relayUrl: string; // the online server ("" = this computer, port 8787)
   clockOut: string; // MIDI output id to send clock to ("" = off)
   outputDevice: string;
@@ -159,7 +161,7 @@ export class App {
     stepInput: false, stepTick: 0, sel: new Set(), selAnchor: null, placing: null, grabbing: false, clipboard: [],
     octave: 3, drumPart: 0, topPitch: 72,
   };
-  settings: Settings = { notePreview: true, scaleLock: true, fold: false, countIn: true, gridAtStart: false, recQuantize: true, padLayout: "auto", outputDevice: "", transport: {}, midiSync: "auto", clockOut: "", netName: "", relayUrl: "", gameMode: false };
+  settings: Settings = { notePreview: true, scaleLock: true, fold: false, countIn: true, gridAtStart: false, recQuantize: true, padLayout: "auto", outputDevice: "", transport: {}, midiSync: "auto", clockOut: "", netName: "", relayUrl: "", gameMode: false, genShare: 0.4 };
   /** The setup screen: the current result, what's held, the lineup spec, the timer (remembered between sessions). */
   dice: DiceState = loadDice();
   timer = { total: 0, endsAt: 0, running: false, done: false };

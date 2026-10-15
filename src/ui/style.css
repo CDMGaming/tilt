@@ -943,6 +943,7 @@ body:not(.phone) .thumplab > .knob-row { grid-area: master; flex-direction: colu
 .reels:has(.reel-cards) { grid-template-columns: minmax(84px, .8fr) minmax(110px, 1.1fr) minmax(96px, .9fr) minmax(96px, .9fr) minmax(160px, 1.6fr) minmax(160px, 1.6fr) minmax(150px, 1.5fr); }
 .die-value.small { font-size: 16px; color: var(--dim); }
 .preset-nudge { font: 700 11px var(--font-display); letter-spacing: .1em; color: var(--dmd); border-color: color-mix(in srgb, var(--dmd) 45%, var(--line)); padding: 6px 10px; }
+.preset-mutate { font: 700 11px var(--font-display); letter-spacing: .1em; color: var(--accent, var(--dmd)); padding: 6px 10px; }
 .switch-row { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 10px 14px; font-weight: 700; }
 .switch-row.on { border-color: var(--dmd); color: var(--dmd); }
 .game-list { margin: 0 0 6px 18px; padding: 0; }

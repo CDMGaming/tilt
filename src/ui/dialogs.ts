@@ -23,6 +23,7 @@ import { phraseGridDialog } from "./phrasegrid";
 import { exportMidi } from "../engine/smf";
 import { zip } from "../engine/zip";
 import { stepper } from "./overlay";
+import { GEN_SHARES } from "./sounds";
 import { tiltFlash } from "./tilt";
 
 const KINDS: InstrumentKind[] = ALL_KINDS;
@@ -238,6 +239,14 @@ export function settingsDialog(app: App) {
       toggle("rq", "Quantize while recording", st.recQuantize, () => { st.recQuantize = !st.recQuantize; app.saveSettings(); rerender(); }),
       toggle("ci", "Count-in (1 bar) before recording", st.countIn, () => { st.countIn = !st.countIn; app.saveSettings(); rerender(); }),
       toggle("gas", "Show the phrase grid right after START", st.gridAtStart, () => { st.gridAtStart = !st.gridAtStart; app.saveSettings(); rerender(); }),
+      h("div", { class: "section-title" }, "Sounds"),
+      stepper("genshare", "Generated sounds", st.genShare ? `${Math.round(st.genShare * 100)}% of rolls` : "Off: curated only", (d) => {
+        const i = GEN_SHARES.indexOf(st.genShare);
+        st.genShare = GEN_SHARES[Math.max(0, Math.min(GEN_SHARES.length - 1, (i < 0 ? 2 : i) + d))];
+        app.saveSettings();
+        rerender();
+      }),
+      h("p", { class: "note" }, "The dice and NUDGE pick a sound by role (drums, bass, lead, pad, keys, pluck, arp, fx). Some are new ones grown from an instrument's recipe, marked ✦; they're saved in the song, and ★ Save keeps one for every song."),
       h("button", { class: "row-btn primary", "data-nav": "done", onclick: close }, "Done"),
     );
   }, { wide: true });
@@ -435,12 +444,15 @@ const CONTROLS: Record<ControlsTab, { label: string; rows: [string, string][] }>
     ["Drag a clip (mouse)", "Drop it on another cell: move, copy or swap"],
     ["♪ 1/16 ▾ (editor toolbar)", "Length of new notes, remembered per track. Click a spot: a note that long; drag: size it by hand"],
     ["Alt+click a note", "Split it at the grid line you clicked"],
+    ["NUDGE / Mutate (sound panel)", "NUDGE: another sound in the same role. Mutate: push a few knobs a little. Undo brings either back"],
     ["🎲 code (Song screen, top left)", "Share the song's setup code: copy it, a link that opens TILT with it, or a new song from it"],
   ] },
   setup: { label: "Setup screen", rows: [
     ["A / Enter / click on a value", "Pick it from a list (or − / + for tempo and swing). Editing a field HOLDs it"],
     ["HOLD", "Held fields stay put. Lineup / Sounds: each slot can be chosen on its own or left as ?"],
-    ["NUDGE (Y, Space)", "Re-roll everything that isn't held.  Release all: let go of every hold"],
+    ["NUDGE (Y, Space)", "Re-roll everything that isn't held: each ? slot gets a role (drums, bass, lead, pad...), then a sound for it from any instrument, avoiding ones from your last 10 rolls.  Release all: let go of every hold"],
+    ["Slot ▾ → ? A role, any instrument", "Ask a slot for a role (say, any pad): NUDGE picks the instrument"],
+    ["✦ sounds", "Generated from an instrument's recipe (Settings → Sounds sets how often). Saved in the song; ★ Save keeps one for every song"],
     ["Setups ▾ / Save setup…", "Save the held fields under a name; loading one brings them back held"],
     ["Timer", "Off, 5, 10, 15 or 20 minutes. At zero playback stops and the display says TIME"],
     ["Game mode…", "Challenge cards, lock at zero, extra ball, the TILT flash (off by default)"],

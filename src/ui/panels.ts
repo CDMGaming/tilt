@@ -10,6 +10,9 @@ import { decodeFile, listSamples, putSample, sampleLabel } from "./samples";
 import { SFX, WT_FRAMES, WT_SIZE } from "../engine/instruments3";
 import { allPresets, applyPreset, deleteUserPreset, presetPosition, saveUserPreset, userPresets, USER_MARK } from "./presets";
 import { getParam } from "../engine/params";
+import { RECIPES, genBase, mutateParams, pickSound, soundKey, soundRoles, type SoundRef } from "../engine/sounds";
+import { Rng, randomSeed } from "../engine/rng";
+import { applySound, noteRoll, pickOptions } from "./sounds";
 import { expandPitch } from "../engine/timeline";
 import type { App } from "./app";
 import { h } from "./dom";
@@ -33,7 +36,8 @@ export function buildPanel(app: App, track: Track): HTMLElement {
     h("button", { class: "preset-step", "data-nav": "preset-prev", onclick: () => stepPreset(app, track, -1) }, "◀"),
     h("button", { class: "preset-name", "data-nav": "preset-list", onclick: () => presetMenu(app, track) }, track.preset),
     h("button", { class: "preset-step", "data-nav": "preset-next", onclick: () => stepPreset(app, track, 1) }, "▶"),
-    h("button", { class: "preset-nudge", "data-nav": "preset-nudge", title: "NUDGE: a random sound for this instrument (undo brings the old one back)", onclick: () => nudgePreset(app, track) }, "NUDGE"),
+    h("button", { class: "preset-nudge", "data-nav": "preset-nudge", title: "NUDGE: another sound in the same role (bass, lead, pad...) for this instrument, sometimes a new generated one ✦. Undo brings the old one back", onclick: () => nudgePreset(app, track) }, "NUDGE"),
+    RECIPES[track.kind] ? h("button", { class: "preset-mutate", "data-nav": "preset-mutate", title: "Mutate: push a few of this sound's knobs a little. Undo brings it back", onclick: () => mutateSound(app, track) }, "Mutate") : null,
     h("button", { class: "preset-save", "data-nav": "preset-save", title: "Save this sound as a user preset", onclick: () => savePresetPrompt(app, track) }, "★ Save"),
   );
 
@@ -264,16 +268,29 @@ function previewSound(app: App, track: Track) {
 
 /** Previous / next through factory then user presets. */
 /** A random sound for this track (not the one it has, nor one another track of the same instrument uses). */
-function nudgePreset(app: App, track: Track) {
-  const list = allPresets(track.kind), cur = presetPosition(track);
-  const others = new Set(app.song.tracks.filter((t) => t !== track && t.kind === track.kind).map((t) => t.preset));
-  const fresh = list.map((_, i) => i).filter((i) => i !== cur && !others.has(list[i].name));
-  const pool = fresh.length ? fresh : list.map((_, i) => i).filter((i) => i !== cur);
-  if (!pool.length) return;
-  const i = pool[Math.floor(Math.random() * pool.length)];
-  app.edit("Nudge sound", () => applyPreset(track, list[i]));
+/** The sound a track has now, as a dice sound (a user preset counts as the first built-in one). */
+export function trackSound(t: Track): SoundRef {
+  if (t.gen !== undefined) return { kind: t.kind, preset: genBase(t.kind, t.gen), gen: t.gen };
+  return { kind: t.kind, preset: Math.max(0, INSTRUMENTS[t.kind].presets.findIndex((p) => p.name === t.preset)) };
+}
+
+/** NUDGE: another sound in the same role on this instrument, fresh ones first; sometimes a generated one. */
+export function nudgePreset(app: App, track: Track) {
+  const list = allPresets(track.kind), now = trackSound(track);
+  const taken = new Set(app.song.tracks.filter((t) => t.kind === track.kind).map((t) => soundKey(trackSound(t))));
+  const s = pickSound(soundRoles(now)[0], new Rng(randomSeed()), { ...pickOptions(app.settings.genShare), taken }, [track.kind]);
+  if (!s || soundKey(s) === soundKey(now)) return;
+  app.edit("Nudge sound", () => applySound(track, s, list));
+  noteRoll([s]);
   previewSound(app, track);
   app.overlays.toast(`Sound: ${track.preset}`, 1200);
+}
+
+/** Mutate: a few of the knobs this instrument's recipe names move a little. */
+function mutateSound(app: App, track: Track) {
+  app.edit("Mutate sound", () => { track.params = mutateParams(track.kind, track.params, randomSeed()); });
+  previewSound(app, track);
+  app.overlays.toast("Mutated: a few knobs moved (undo brings it back)", 1400);
 }
 
 function stepPreset(app: App, track: Track, d: number) {
@@ -284,7 +301,7 @@ function stepPreset(app: App, track: Track, d: number) {
 }
 
 function savePresetPrompt(app: App, track: Track) {
-  const suggestion = track.preset.replace(/^★\s*/, "");
+  const suggestion = track.preset.replace(/^[★✦]\s*/, "");
   const name = prompt(`Save this ${INSTRUMENTS[track.kind].name} sound as`, suggestion);
   if (!name?.trim()) return;
   const stored = saveUserPreset(track, name);
@@ -297,6 +314,7 @@ function presetMenu(app: App, track: Track) {
   app.overlays.menu(`${def.name} presets`, () => {
     const user = userPresets(track.kind);
     return [
+      ...(track.gen !== undefined ? [{ label: `${track.preset} (generated: ★ Save keeps it)`, checked: true, disabled: true }] : []),
       ...allPresets(track.kind).map((p) => ({
         label: p.name,
         checked: p.name === track.preset,

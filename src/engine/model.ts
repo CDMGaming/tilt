@@ -51,6 +51,8 @@ export interface Track {
   name: string;
   kind: InstrumentKind;
   preset: string; // name of the preset last loaded (display only)
+  /** A generated sound: its recipe seed (see sounds.ts), so a setup code can bring it back. */
+  gen?: number;
   params: Record<string, number>; // full instrument state
   volume: number; // 0..1
   pan: number; // -1..1

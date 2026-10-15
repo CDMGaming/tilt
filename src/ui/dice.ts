@@ -4,7 +4,7 @@
 // Game features (challenge cards, locking at zero) live behind Game mode.
 
 import {
-  ALL_KINDS_FOR_SETUP, NO_HOLDS, conformSetup, decodeSetup, defaultSpec, encodeSetup, lineupHeld, nudgeSetup, songFromSetup, soundsHeld,
+  ALL_KINDS_FOR_SETUP, MAX_SLOTS, NO_HOLDS, conformSetup, decodeSetup, defaultSpec, encodeSetup, lineupHeld, nudgeSetup, songFromSetup, soundsHeld,
   type HoldKey, type LineupSpec,
 } from "../engine/dice";
 import { INSTRUMENTS } from "../engine/instruments";
@@ -22,6 +22,13 @@ import { phraseGridDialog } from "./phrasegrid";
 import { dmdText } from "./dmd";
 import { gameModeDialog } from "./dialogs";
 import type { MenuItem } from "./overlay";
+import { ROLES, ROLE_LABEL, generatePreset, type Role, type SoundRef } from "../engine/sounds";
+import { noteRoll, pickOptions } from "./sounds";
+
+/** A sound's name on the setup screen (a generated one's name comes from its seed). */
+const soundName = (l: SoundRef) => l.gen !== undefined ? generatePreset(l.kind, l.gen).name : INSTRUMENTS[l.kind].presets[l.preset]?.name ?? "";
+const gensOf = (spec: LineupSpec) => (spec.gens ??= Array(MAX_SLOTS).fill(null));
+const rolesOf = (spec: LineupSpec) => (spec.roles ??= Array(MAX_SLOTS).fill(null));
 
 const RANGES: [number, number][] = [[1, 3], [2, 4], [3, 5], [4, 6], [5, 8]];
 const SETUPS_KEY = STORE_PREFIX + "setups.v1";
@@ -46,6 +53,7 @@ export class DiceScreen implements Screen {
 
   private get d() { return this.app.dice; }
   private get cardsOn() { return this.app.settings.gameMode; }
+  private get opts() { return pickOptions(this.app.settings.genShare); }
 
   /** Something changed: remember it, redraw. */
   private changed() { this.app.saveDice(); this.shown = this.d.setup; this.render(); }
@@ -90,9 +98,10 @@ export class DiceScreen implements Screen {
           h("div", { class: "reel-window" },
             h("button", { class: "count-btn", "data-nav": "count", title: "How many instruments: a fixed number, or a random one in a range", onclick: (e: Event) => app.overlays.menu("Instruments", () => this.countMenu(), anchor(e)) }, countLabel),
             h("div", { class: "slots" }, s.lineup.map((l, i) => {
-              const chosen = !!spec.slots[i];
-              return h("button", { class: `chip slot kind-${l.kind}` + (chosen ? " chosen" : " surprise"), "data-nav": `slot${i}`, title: chosen ? "Chosen: NUDGE leaves it" : "?: NUDGE picks one", onclick: (e: Event) => app.overlays.menu(`Slot ${i + 1}`, () => this.slotMenu(i), anchor(e)) },
-                chosen ? "" : h("span", { class: "q" }, "?"), INSTRUMENTS[l.kind].name);
+              const chosen = !!spec.slots[i], role = spec.roles?.[i];
+              const title = chosen ? "Chosen: NUDGE leaves it" : role ? `? ${ROLE_LABEL[role]}: NUDGE picks a ${ROLE_LABEL[role].toLowerCase()} sound from any instrument` : "?: NUDGE picks a role, then a sound for it";
+              return h("button", { class: `chip slot kind-${l.kind}` + (chosen ? " chosen" : " surprise"), "data-nav": `slot${i}`, title, onclick: (e: Event) => app.overlays.menu(`Slot ${i + 1}`, () => this.slotMenu(i), anchor(e)) },
+                chosen ? "" : h("span", { class: "q" }, role ? `? ${ROLE_LABEL[role]} ` : "?"), INSTRUMENTS[l.kind].name);
             }))),
           holdBtn("lineup", lineupHeld(spec, n), chosenSlots > 0, () => this.toggleLineup(), "Hold every slot (and the count) / release them all")),
         h("div", { class: "die reel reel-presets" + (soundsHeld(spec, n) ? " locked" : "") },
@@ -101,7 +110,7 @@ export class DiceScreen implements Screen {
             h("div", { class: "slots" }, s.lineup.map((l, i) => {
               const chosen = spec.presets[i] !== null;
               return h("button", { class: "chip slot" + (chosen ? " chosen" : " surprise"), "data-nav": `sound${i}`, title: chosen ? "Chosen: NUDGE leaves it" : "?: NUDGE picks one", onclick: (e: Event) => app.overlays.menu(`${INSTRUMENTS[l.kind].name} sound`, () => this.soundMenu(i), anchor(e)) },
-                chosen ? "" : h("span", { class: "q" }, "?"), INSTRUMENTS[l.kind].presets[l.preset]?.name ?? "");
+                chosen ? "" : h("span", { class: "q" }, "?"), soundName(l));
             }))),
           holdBtn("presets", soundsHeld(spec, n), chosenSounds > 0, () => this.toggleSounds(), "Hold every sound / release them all")),
         this.cardsOn ? h("div", { class: "die reel reel-cards" },
@@ -141,7 +150,7 @@ export class DiceScreen implements Screen {
   private heldSpec(): LineupSpec {
     const s = this.d.setup, sp = defaultSpec();
     sp.count = s.lineup.length;
-    s.lineup.forEach((l, i) => { sp.slots[i] = l.kind; sp.presets[i] = l.preset; });
+    s.lineup.forEach((l, i) => { sp.slots[i] = l.kind; sp.presets[i] = l.preset; gensOf(sp)[i] = l.gen ?? null; });
     return sp;
   }
 
@@ -149,7 +158,7 @@ export class DiceScreen implements Screen {
 
   private countMenu(): MenuItem[] {
     const d = this.d, spec = d.spec;
-    const apply = (fn: () => void) => { fn(); d.setup = conformSetup(d.setup, spec); this.changed(); };
+    const apply = (fn: () => void) => { fn(); d.setup = conformSetup(d.setup, spec, randomSeed(), this.opts); this.changed(); };
     return [
       ...RANGES.map(([a, b]) => ({ label: `Random ${a}–${b}`, checked: spec.count === null && spec.min === a && spec.max === b, run: () => apply(() => { spec.count = null; spec.min = a; spec.max = b; }) })),
       ...Array.from({ length: 8 }, (_, i) => ({ label: `${i + 1} instrument${i ? "s" : ""}`, checked: spec.count === i + 1, run: () => apply(() => { spec.count = i + 1; }) })),
@@ -158,25 +167,37 @@ export class DiceScreen implements Screen {
 
   private slotMenu(i: number): MenuItem[] {
     const d = this.d, spec = d.spec;
-    const apply = (k: InstrumentKind | null) => {
-      if (spec.slots[i] !== k) spec.presets[i] = null; // a new instrument: its old sound choice doesn't apply
+    const apply = (k: InstrumentKind | null, role: Role | null = null) => {
+      if (spec.slots[i] !== k || role) { spec.presets[i] = null; gensOf(spec)[i] = null; } // a new instrument: its old sound choice doesn't apply
       spec.slots[i] = k;
+      rolesOf(spec)[i] = role;
       if (spec.count === null && i >= spec.min) spec.min = Math.min(spec.max, i + 1);
-      d.setup = conformSetup(d.setup, spec);
+      // A role re-rolls this slot now; otherwise it keeps what it has.
+      d.setup = conformSetup(d.setup, spec, randomSeed(), this.opts, role ? i : undefined);
       this.changed();
     };
+    const role = spec.roles?.[i] ?? null;
     return [
-      { label: "? Let NUDGE pick", checked: !spec.slots[i], run: () => apply(null) },
+      { label: "? Let NUDGE pick", checked: !spec.slots[i] && !role, run: () => apply(null) },
+      { label: "? A role, any instrument", hint: role ? ROLE_LABEL[role] : "", sub: () => ROLES.map((r) => ({ label: `? Any ${ROLE_LABEL[r].toLowerCase()}`, checked: !spec.slots[i] && role === r, run: () => apply(null, r) })) },
       ...ALL_KINDS_FOR_SETUP.map((k) => ({ label: INSTRUMENTS[k].name, hint: INSTRUMENTS[k].group, checked: spec.slots[i] === k, run: () => apply(k) })),
     ];
   }
 
   private soundMenu(i: number): MenuItem[] {
-    const d = this.d, spec = d.spec, kind = d.setup.lineup[i].kind;
-    const apply = (p: number | null) => { spec.presets[i] = p; d.setup = conformSetup(d.setup, spec); this.changed(); };
+    const d = this.d, spec = d.spec, now = d.setup.lineup[i], kind = now.kind;
+    // Choosing a sound chooses its instrument too (a sound belongs to one).
+    const apply = (p: number | null, gen: number | null = null) => {
+      spec.presets[i] = p;
+      gensOf(spec)[i] = gen;
+      if (p !== null) spec.slots[i] = kind;
+      d.setup = conformSetup(d.setup, spec, randomSeed(), this.opts);
+      this.changed();
+    };
     return [
       { label: "? Let NUDGE pick", checked: spec.presets[i] === null, run: () => apply(null) },
-      ...INSTRUMENTS[kind].presets.map((p, pi) => ({ label: p.name, checked: spec.presets[i] === pi, run: () => apply(pi) })),
+      ...(now.gen !== undefined ? [{ label: `${soundName(now)} (generated)`, checked: spec.gens?.[i] === now.gen, run: () => apply(now.preset, now.gen!) }] : []),
+      ...INSTRUMENTS[kind].presets.map((p, pi) => ({ label: p.name, checked: spec.presets[i] === pi && (spec.gens?.[i] ?? null) === null, run: () => apply(pi) })),
     ];
   }
 
@@ -190,8 +211,9 @@ export class DiceScreen implements Screen {
 
   private toggleSounds() {
     const d = this.d, spec = d.spec, n = d.setup.lineup.length;
-    if (soundsHeld(spec, n)) spec.presets = spec.presets.map(() => null);
-    else d.setup.lineup.forEach((l, i) => (spec.presets[i] = l.preset));
+    // Holding a sound holds its instrument too; releasing the sounds leaves the instruments chosen.
+    if (soundsHeld(spec, n)) { spec.presets = spec.presets.map(() => null); spec.gens = gensOf(spec).map(() => null); }
+    else d.setup.lineup.forEach((l, i) => { spec.presets[i] = l.preset; gensOf(spec)[i] = l.gen ?? null; spec.slots[i] = l.kind; });
     this.changed();
   }
 
@@ -232,7 +254,7 @@ export class DiceScreen implements Screen {
     const d = this.d;
     d.holds = { ...NO_HOLDS, ...x.holds };
     d.spec = { ...defaultSpec(), ...JSON.parse(JSON.stringify(x.spec)) };
-    d.setup = nudgeSetup({ ...d.setup, ...x.values }, d.holds, d.spec, randomSeed(), this.cardsOn ? d.cards : 0);
+    d.setup = nudgeSetup({ ...d.setup, ...x.values }, d.holds, d.spec, randomSeed(), this.cardsOn ? d.cards : 0, this.opts);
     this.changed();
     this.app.overlays.toast(`Setup “${x.name}”`, 1200);
   }
@@ -256,13 +278,15 @@ export class DiceScreen implements Screen {
     const d = this.d;
     if (this.rolling) return;
     const cards = this.cardsOn ? d.cards : 0;
-    const target = nudgeSetup(d.setup, d.holds, d.spec, randomSeed(), cards);
+    const opts = this.opts;
+    const target = nudgeSetup(d.setup, d.holds, d.spec, randomSeed(), cards, opts);
     d.setup = target;
+    noteRoll(target.lineup);
     this.app.saveDice();
     this.rolling = 8;
     const tick = () => {
       if (--this.rolling <= 0) { this.rolling = 0; this.shown = target; this.render(); return; }
-      this.shown = nudgeSetup(target, d.holds, d.spec, randomSeed(), cards);
+      this.shown = nudgeSetup(target, d.holds, d.spec, randomSeed(), cards, opts);
       this.render();
       setTimeout(tick, 45 + (8 - this.rolling) * 12);
     };
