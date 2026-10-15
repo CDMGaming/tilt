@@ -89,46 +89,37 @@ export function songLength(song: Song): string {
 
 /**
  * Share song: upload, then the code, link, QR code, the phone's share sheet, and earlier versions.
- * `playAs`: how it opens for them, ready to play the whole song (SONG) or scene 1 (SCENE);
- * it's part of what's shared, so each choice has its own code.
+ * It always opens ready to play the whole song (the chain, in order, with its repeats).
  */
-export function shareSongDialog(app: App, song: Song = app.song, playAs: "song" | "scene" = app.songMode) {
+export function shareSongDialog(app: App, song: Song = app.song) {
   const wait = app.overlays.dialog("Share song", () => h("div", { class: "form share" }, h("p", { class: "note big share-wait" }, "Uploading…")));
   void (async () => {
     let res: Shared | null = null, err = "";
-    try { res = await upload({ ...song, playAs }); } catch (e) { err = e instanceof Error ? e.message : String(e); }
+    try { res = await upload({ ...song, playAs: "song" }); } catch (e) { err = e instanceof Error ? e.message : String(e); }
     if (res?.kind === "server") remember(app, song, res.code);
     app.overlays.remove(wait);
-    app.overlays.dialog("Share song", (close) => res ? renderResult(app, song, res, close, playAs)
+    app.overlays.dialog("Share song", (close) => res ? renderResult(app, song, res, close)
       : h("div", { class: "form share" }, h("p", { class: "note big" }, err || "Something went wrong"), h("button", { class: "row-btn", "data-nav": "ok", onclick: close }, "Close")));
   })();
 }
 
-/** "Opens as": the whole song or scene 1; picking the other one shares again (a different code). */
-function opensAs(app: App, song: Song, playAs: "song" | "scene", close: () => void): HTMLElement {
+/** What whoever opens it will hear when they press Play. */
+function whatTheyHear(song: Song): HTMLElement {
   const steps = songChain(song).length;
-  const pick = (m: "song" | "scene", label: string, sub: string) => h("button", {
-    class: "opens-btn" + (playAs === m ? " on" : ""), "data-nav": `opens-${m}`, "aria-pressed": String(playAs === m),
-    onclick: () => { if (m !== playAs) { close(); shareSongDialog(app, song, m); } },
-  }, h("span", null, label), h("small", null, sub));
-  return h("div", { class: "opens-as" },
-    h("div", { class: "die-label" }, "When they open it, Play plays"),
-    h("div", { class: "opens-row" },
-      pick("song", "The whole song", `${steps} step${steps > 1 ? "s" : ""} · ${songLength(song)}${song.songLoop ? " · then again" : ""}`),
-      pick("scene", "Scene 1", song.sceneLoop === false ? "once" : "on a loop")));
+  return h("p", { class: "note" }, `They get a Play button for the whole song: ${steps} step${steps > 1 ? "s" : ""} in your song chain, ${songLength(song)}${song.songLoop ? ", then it starts again" : ""}.`);
 }
 
-function renderResult(app: App, song: Song, res: Shared, close: () => void, playAs: "song" | "scene" = "song"): HTMLElement {
+function renderResult(app: App, song: Song, res: Shared, close: () => void): HTMLElement {
   const qr = res.url.length < 200 ? makeQr(res.url) : null;
   const qrBox = h("div", { class: "share-qr", "aria-label": "QR code of the link" });
   if (qr) qrBox.innerHTML = qrSvg(qr, 5);
   const older = (song.shares ?? []).filter((x) => x.code !== res.code);
   return h("div", { class: "form share song-share" },
-    opensAs(app, song, playAs, close),
     res.kind === "server"
       ? h("div", { class: "share-block main" }, h("div", { class: "die-label" }, "Song code"), h("code", { class: "share-code big" }, showCode(res.code)))
       : h("div", { class: "share-block main" }, h("div", { class: "die-label" }, "Offline link"), h("p", { class: "note" }, `Couldn't upload (${res.why}), so here's a link with the whole song inside it. It works without the server; it's just long.`)),
     qr ? qrBox : h("p", { class: "note" }, "The link is too long for a QR code: copy it instead."),
+    whatTheyHear(song),
     h("code", { class: "share-link" }, res.url.length > 90 ? `${res.url.slice(0, 70)}…` : res.url),
     h("div", { class: "share-btns" },
       h("button", { class: "small-btn primary", "data-nav": "copy-link", onclick: () => copy(app, res.url, "Link") }, "Copy link"),
