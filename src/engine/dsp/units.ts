@@ -13,7 +13,13 @@ export function blep(t: number, dt: number): number {
   return 0;
 }
 
-/** Band-limited oscillator. wave: 0 saw, 1 square, 2 triangle, 3 sine. */
+/**
+ * Set by the voice toolkit around each synth's render: a pitch multiplier (its LFO, pitch
+ * envelope, glide) and the pulse width square waves use. 1 and 0.5 when nothing is on.
+ */
+export const voiceMod = { pitch: 1, pw: 0.5 };
+
+/** Band-limited oscillator. wave: 0 saw, 1 square (pulse width from voiceMod.pw), 2 triangle, 3 sine. */
 export class Osc {
   phase = Math.random();
   private tri = 0;
@@ -23,12 +29,16 @@ export class Osc {
     let y: number;
     switch (wave) {
       case 0: y = 2 * t - 1 - blep(t, dt); break;
-      case 1:
+      case 1: {
+        const pw = voiceMod.pw;
+        y = (t < pw ? 1 : -1) + blep(t, dt) - blep((t + 1 - pw) % 1, dt);
+        if (pw !== 0.5) y -= 2 * pw - 1; // keep a narrow pulse centred (no DC)
+        break;
+      }
       case 2: {
         let sq = t < 0.5 ? 1 : -1;
         sq += blep(t, dt);
         sq -= blep((t + 0.5) % 1, dt);
-        if (wave === 1) { y = sq; break; }
         // Leaky-integrated square = band-limited triangle.
         this.tri = dt * 4 * sq + (1 - dt * 0.05) * this.tri;
         y = this.tri;

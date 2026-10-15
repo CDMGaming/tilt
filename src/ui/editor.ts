@@ -227,6 +227,9 @@ export class EditorScreen implements Screen {
     el?.redraw?.();
     // Drum sound names and chord labels live outside the knob.
     if (/^p\dsmp$|^chord$|^spread$/.test(id)) this.render();
+    // Toolkit switches change which controls are dimmed (and the built-in FX's knob names).
+    if (/^tk:(fType|l\dDest|l\dSync|mode|uni|pAmt|repeat)$|^ifx:type$/.test(id)) this.render();
+    this.panelWrap.querySelector<HTMLElement & { redraw?: () => void }>(".xy-pad")?.redraw?.();
     if (id === "pos" || id === "table") this.panelWrap.querySelector<HTMLElement & { redraw?: () => void }>(".wt-view")?.redraw?.();
   }
 
@@ -475,6 +478,13 @@ export class EditorScreen implements Screen {
         if (app.learning && this.nav.focused?.dataset.param) app.noteLearnTarget(track.id, this.nav.focused.dataset.param);
         return true;
       case "knob": {
+        if (f?.dataset.xy) {
+          const [x, y] = f.dataset.xy.split(" ");
+          if (a.dx) app.nudgeParam(track, x, a.dx);
+          if (a.dy) app.nudgeParam(track, y, a.dy);
+          (f as HTMLElement & { redraw?: () => void }).redraw?.();
+          return true;
+        }
         const id = f?.dataset.param;
         if (id) app.nudgeParam(track, id, a.dx + a.dy);
         return true;

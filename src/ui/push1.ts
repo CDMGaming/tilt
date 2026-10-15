@@ -9,7 +9,8 @@
 // 17 lime, 21 green, 29 turquoise, 37 sky, 45 blue, 49 orchid, 53 magenta,
 // 57 pink (+1/+2 dimmer), 1 dark, 2 grey, 3 white.
 
-import { DRUM_BASE_NOTE, INSTRUMENTS, drumCount, drumPartName, formatParam, fromUnit, isDrumKind, presetParams, toUnit } from "../engine/instruments";
+import { DRUM_BASE_NOTE, INSTRUMENTS, drumCount, drumPartName, formatParam, fromUnit, isDrumKind, paramDef, presetParams, toUnit } from "../engine/instruments";
+import { XY_PARAMS } from "../engine/toolkit";
 import { MAX_BARS, MAX_SCENES, TICKS_PER_BAR, type Scene, type Track } from "../engine/model";
 import { NOTE_NAMES, inScale, scaleById } from "../engine/music";
 import { getParam, paramInfo } from "../engine/params";
@@ -158,6 +159,12 @@ export class Push1Surface {
       // Encoder touch (notes 0..7): hold Delete and touch a knob to put it back to the preset's value.
       if (note < 8) { if (on && this.del) this.resetSlot(note); return; }
       if (note >= 36 && note <= 99) { if (on) this.padDown(note, d[2], time); else this.padUp(note, time); }
+      return;
+    }
+    if (st === 0xe0) {
+      // Touch strip (pitch bend): the selected synth's XY pad, X axis.
+      const t = this.app.track(), xy = t && XY_PARAMS[t.kind], def = t && xy && paramDef(t.kind, xy[0]);
+      if (t && xy && def) this.app.setParam(t, xy[0], fromUnit(def, ((d[2] << 7) | d[1]) / 16383));
       return;
     }
     if (st !== 0xb0) return;

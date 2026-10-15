@@ -1,7 +1,7 @@
 // DSP for the Phase 2 instruments: Razor (lead), Thump Lab (analog drums),
 // Wobbler (wobble bass), Haze (lo-fi pad). Runs in the AudioWorklet.
 
-import { ADSR, Ladder, OnePole, Osc, SVF, TAU, mtof, smooth } from "./units";
+import { ADSR, Ladder, OnePole, Osc, SVF, TAU, mtof, smooth, voiceMod } from "./units";
 import { velGain, type Clock, type InstrumentDSP } from "./instruments-dsp";
 import { Reverb } from "./fx-dsp";
 import { DRUM_BASE_NOTE } from "../instruments";
@@ -63,7 +63,7 @@ export class LeadDSP implements InstrumentDSP {
       this.freq *= Math.pow(this.target / this.freq, glideK);
       this.env *= envK;
       this.vib = (this.vib + vibInc) % 1;
-      const f0 = this.freq * (1 + Math.sin(TAU * this.vib) * vibAmt);
+      const f0 = this.freq * voiceMod.pitch * (1 + Math.sin(TAU * this.vib) * vibAmt);
       const ratio = Math.pow(2, ((p.sync ?? 7) + (p.syncEnv ?? 0.35) * 24 * this.env) / 12);
       const a = this.amp.next(p.attack ?? 0.005, 0.2, 1, p.release ?? 0.25, sr) * velGain(this.velNow);
       let l = 0, r = 0;
@@ -75,7 +75,7 @@ export class LeadDSP implements InstrumentDSP {
         if (this.master[v] >= 1) { this.master[v] -= 1; this.slave[v] = this.master[v] * ratio; } // hard sync
         this.slave[v] -= Math.floor(this.slave[v]);
         const ph = this.slave[v];
-        const x = square ? (ph < 0.5 ? 1 : -1) : 2 * ph - 1;
+        const x = square ? (ph < voiceMod.pw ? 1 : -1) : 2 * ph - 1;
         const pan = off * spread;
         l += x * panL(pan); r += x * panR(pan);
       }
@@ -236,8 +236,9 @@ export class WobbleDSP implements InstrumentDSP {
       const pos = (((t0 + i / sr - this.clock.zero) * this.clock.bpm) / 60 / beats) % 1;
       const ph = pos < 0 ? pos + 1 : pos;
       const lfo = shape === 0 ? 0.5 - 0.5 * Math.cos(TAU * ph) : shape === 1 ? 1 - ph : shape === 2 ? (ph < 0.5 ? 1 : 0) : ph;
-      const m = this.mod.next(this.freq * xRatio, sr, xWave);
-      const x0 = this.car.next(Math.max(1, this.freq * (1 + m * xmod * 2)), sr, oscWave) + this.subOsc.next(this.freq * 0.5, sr, 3) * (p.sub ?? 0.5);
+      const fq = this.freq * voiceMod.pitch;
+      const m = this.mod.next(fq * xRatio, sr, xWave);
+      const x0 = this.car.next(Math.max(1, fq * (1 + m * xmod * 2)), sr, oscWave) + this.subOsc.next(fq * 0.5, sr, 3) * (p.sub ?? 0.5);
       // Crush: sample-and-hold plus bit reduction before the filter.
       if (this.holdCnt++ % step === 0) this.hold = Math.round(x0 * levels) / levels;
       const x = crush > 0.01 ? this.hold : x0;
@@ -316,7 +317,7 @@ export class PadDSP implements InstrumentDSP {
       let l = 0, rr = 0;
       for (const v of this.voices) {
         if (!v.amp.active) continue;
-        const f = mtof(v.pitch) * drift;
+        const f = mtof(v.pitch) * drift * voiceMod.pitch;
         let x = 0;
         for (let k = 0; k < 3; k++) {
           if (lv[k] < 0.01) continue;

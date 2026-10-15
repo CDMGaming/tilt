@@ -61,6 +61,7 @@ export interface EditorState {
   drumPart: number;
   topPitch: number; // highest visible row
   layout?: EditorLayout; // desktop editor layout (default split)
+  panelPage?: "main" | "more" | "xy"; // a synth panel's page: its own knobs, the voice toolkit, the XY pad
 }
 
 /** Per-player input state that isn't editor state: notes being recorded, held step chords, held keys. */

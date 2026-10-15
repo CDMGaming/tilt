@@ -6,6 +6,14 @@ import { makeFx, type Fx } from "./fx-dsp";
 import { FX_SLOTS, type InstrumentKind } from "../model";
 import { AnalogDrumsDSP, LeadDSP, PadDSP, WobbleDSP } from "./instruments2-dsp";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "./instruments3-dsp";
+import { Toolkit } from "./toolkit-dsp";
+import { hasToolkit } from "../toolkit";
+
+/** Make `target` hold exactly `src`'s keys and values (the same object, so the DSP keeps its reference). */
+function replaceInto(target: Record<string, number>, src: Record<string, number>) {
+  for (const k in target) if (!(k in src)) delete target[k];
+  Object.assign(target, src);
+}
 
 declare const sampleRate: number;
 declare const currentTime: number;
@@ -40,6 +48,12 @@ export type InstrumentMessage =
 
 class RbInstrument extends AudioWorkletProcessor {
   private dsp: InstrumentDSP;
+  /** Synths: the voice toolkit around the DSP (notes and rendering go through it). */
+  private tk: Toolkit | null = null;
+  /** The track's own param values (the toolkit hands the DSP a modulated copy). */
+  private base: Record<string, number>;
+  private ifx: Fx | null = null;
+  private ifxType = 0;
   private queue: TimedEvent[] = [];
   private clock: Clock;
   private fx: (Fx | null)[] = [];
@@ -66,6 +80,8 @@ class RbInstrument extends AudioWorkletProcessor {
     else if (o.kind === "wave") { const w = new WavetableDSP(o.params, sampleRate); if (o.mips) w.setMips(o.mips); this.dsp = w; }
     else if (o.kind === "sampler") { const s = new SamplerDSP(o.params, sampleRate); if (o.samples) s.setSamples(o.samples, o.rates ?? []); this.dsp = s; }
     else this.dsp = new PolyDSP(o.params, sampleRate);
+    this.base = o.params;
+    if (hasToolkit(o.kind)) this.tk = new Toolkit(o.kind, o.params, sampleRate, this.clock, this.dsp);
     if (o.events) this.enqueue(o.events);
     this.port.onmessage = (e: MessageEvent<InstrumentMessage>) => this.onMessage(e.data);
   }
@@ -80,10 +96,10 @@ class RbInstrument extends AudioWorkletProcessor {
     switch (m.t) {
       case "events": this.enqueue(m.events); break;
       case "live":
-        if (m.type === "on") this.dsp.noteOn(m.pitch, m.vel, currentTime);
-        else this.dsp.noteOff(m.pitch, currentTime);
+        if (m.type === "on") this.voices.noteOn(m.pitch, m.vel, currentTime);
+        else this.voices.noteOff(m.pitch, currentTime);
         break;
-      case "params": Object.assign(this.dsp.params, m.params); break;
+      case "params": replaceInto(this.base, m.params); break;
       case "clock": Object.assign(this.clock, m.clock); break;
       case "samples":
         if (this.dsp instanceof DrumsDSP) { this.dsp.setSamples(m.samples); this.dsp.samplesRate = m.samplesRate ?? sampleRate; }
@@ -94,7 +110,7 @@ class RbInstrument extends AudioWorkletProcessor {
         break;
       case "stop":
         this.queue.length = 0;
-        this.dsp.allOff();
+        this.voices.allOff();
         break;
     }
   }
@@ -108,9 +124,15 @@ class RbInstrument extends AudioWorkletProcessor {
     return true;
   }
 
-  /** Insert FX chain, then volume / pan (smoothed, automatable) and the reverb send output. */
+  /** Where notes go: the toolkit (synths) or straight to the DSP. */
+  private get voices() { return this.tk ?? this.dsp; }
+
+  /** The instrument's built-in FX (saved with its preset), the insert FX chain, then volume / pan (smoothed, automatable) and the reverb send output. */
   private post(L: Float32Array, R: Float32Array, n: number, sendOut: Float32Array[] | undefined) {
-    const p = this.dsp.params;
+    const p = this.base;
+    const it = Math.round(p["ifx:type"] ?? 0);
+    if (it !== this.ifxType) { this.ifxType = it; this.ifx = makeFx(it, sampleRate); }
+    this.ifx?.process(L, R, n, p["ifx:a"] ?? 0.5, p["ifx:b"] ?? 0.5, currentTime, this.clock);
     for (let s = 0; s < FX_SLOTS; s++) {
       const type = Math.round(p[`fx${s}:type`] ?? 0);
       if (type !== this.fxType[s]) { this.fxType[s] = type; this.fx[s] = makeFx(type, sampleRate); }
@@ -142,14 +164,14 @@ class RbInstrument extends AudioWorkletProcessor {
         const f = Math.max(i0, Math.round((head.time - currentTime) * sampleRate));
         if (f < n) i1 = f;
       }
-      if (i1 > i0) this.dsp.render(L, R, i0, i1, currentTime);
+      if (i1 > i0) (this.tk ?? this.dsp).render(L, R, i0, i1, currentTime);
       i0 = i1;
       while (this.queue.length && Math.round((this.queue[0].time - currentTime) * sampleRate) <= i0) {
         const ev = this.queue.shift()!;
         const t = currentTime + i0 / sampleRate;
-        if (ev.type === "on") this.dsp.noteOn(ev.pitch, ev.vel, t);
-        else if (ev.type === "off") this.dsp.noteOff(ev.pitch, t);
-        else if (ev.key) this.dsp.params[ev.key] = ev.value!;
+        if (ev.type === "on") this.voices.noteOn(ev.pitch, ev.vel, t);
+        else if (ev.type === "off") this.voices.noteOff(ev.pitch, t);
+        else if (ev.key) this.base[ev.key] = ev.value!;
       }
       if (i0 >= n) break;
     }

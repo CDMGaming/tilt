@@ -1,7 +1,9 @@
 // Instrument panels: each instrument has its own layout and look, plus a
 // keyboard (synths, scale-locked by default) or pads (drums).
 
-import { DRUM_BASE_NOTE, INSTRUMENTS, drumPartName, isDrumKind, paramDef } from "../engine/instruments";
+import { DRUM_BASE_NOTE, INSTRUMENTS, drumPartName, formatParam, fromUnit, isDrumKind, paramDef, toUnit } from "../engine/instruments";
+import { LEAD_KINDS, POLY_KINDS, XY_PARAMS, hasToolkit } from "../engine/toolkit";
+import { FX_TYPES } from "../engine/params";
 import type { Track } from "../engine/model";
 import { chordName, noteName, scaleById, scaleDegree } from "../engine/music";
 import { decodeFile, listSamples, putSample, sampleLabel } from "./samples";
@@ -168,7 +170,89 @@ export function buildPanel(app: App, track: Track): HTMLElement {
       keyboard(app, track),
     );
   }
-  return h("div", { class: `panel kind-${track.kind}`, style: `--track:${trackColor(track)}` }, presetBar, body);
+  // Synths: SOUND (their own knobs, unchanged) | MORE (the voice toolkit) | XY.
+  if (!hasToolkit(track.kind)) return h("div", { class: `panel kind-${track.kind}`, style: `--track:${trackColor(track)}` }, presetBar, body);
+  const page = app.ed.panelPage ?? "main";
+  const tab = (id: "main" | "more" | "xy", label: string, title: string) => h("button", {
+    class: "page-tab" + (page === id ? " on" : ""), "data-nav": `page-${id}`, "aria-pressed": String(page === id), title,
+    onclick: () => { app.ed.panelPage = id; app.screens.edit.render(); },
+  }, label);
+  const pages = h("div", { class: "panel-pages", role: "tablist" },
+    tab("main", "SOUND", "This instrument's own controls"), tab("more", "MORE", "Filter 2, LFOs, voice, pitch envelope, built-in FX"), tab("xy", "XY", "Two parameters on one pad"));
+  const shown = page === "more" ? morePage(app, track, ctl) : page === "xy" ? xyPage(app, track, host) : body;
+  return h("div", { class: `panel kind-${track.kind} page-${page}`, style: `--track:${trackColor(track)}` }, presetBar, pages, shown);
+}
+
+type Ctl = (id: string, label?: string, size?: "s" | "m" | "l") => HTMLElement | null;
+
+/** MORE: the shared voice toolkit (filter 2, 2 LFOs, voice, pitch env, pulse width, velocity, built-in FX, performance FX). */
+function morePage(app: App, track: Track, ctl: Ctl): HTMLElement {
+  const v = (id: string) => getParam(track, id);
+  const sec = (title: string, ...kids: (HTMLElement | null)[]) => h("div", { class: "tk-sec" }, h("div", { class: "section-title small" }, title), ...kids);
+  // Controls that do nothing in the current setting are dimmed (still reachable).
+  const dim = (el: HTMLElement | null, off: boolean) => { if (el && off) el.classList.add("dimmed"); return el; };
+  const filterOff = v("tk:fType") === 0;
+  const lfo = (n: 1 | 2) => {
+    const off = v(`tk:l${n}Dest`) === 0, synced = v(`tk:l${n}Sync`) > 0;
+    return sec(`LFO ${n}`, ctl(`tk:l${n}Dest`, "To"), dim(ctl(`tk:l${n}Amt`, "Amount", "l"), off), dim(ctl(`tk:l${n}Shape`, "Shape"), off),
+      dim(ctl(`tk:l${n}Rate`, "Rate"), off || synced), dim(ctl(`tk:l${n}Sync`, "Sync"), off), dim(ctl(`tk:l${n}Key`, "Key"), off), dim(ctl(`tk:l${n}Delay`, "Fade in"), off));
+  };
+  const fxType = FX_TYPES[Math.round(v("ifx:type"))] ?? FX_TYPES[0];
+  const fxOff = fxType.id === "off";
+  return h("div", { class: "panel-body more-page" },
+    h("div", { class: "knob-row" },
+      sec("Filter 2", ctl("tk:fType", "Type"), dim(ctl("tk:fCut", "Cutoff", "l"), filterOff), dim(ctl("tk:fRes", "Reso"), filterOff), dim(ctl("tk:fTrack", "Key track"), filterOff),
+        dim(ctl("tk:fEnv", "Env"), filterOff), dim(ctl("tk:fA", "A", "s"), filterOff), dim(ctl("tk:fD", "D", "s"), filterOff), dim(ctl("tk:fS", "S", "s"), filterOff), dim(ctl("tk:fR", "R", "s"), filterOff))),
+    h("div", { class: "knob-row" }, lfo(1), lfo(2)),
+    h("div", { class: "knob-row" },
+      POLY_KINDS.includes(track.kind) ? sec("Voice", ctl("tk:mode", "Mode"), ctl("tk:uni", "Unison"), dim(ctl("tk:uniDet", "Detune"), v("tk:uni") <= 1), dim(ctl("tk:glide", "Glide"), v("tk:mode") === 0)) : null,
+      sec("Pitch env", ctl("tk:pAmt", "Amount"), dim(ctl("tk:pDec", "Decay"), v("tk:pAmt") === 0)),
+      sec("Pulse", ctl("tk:pw", "Width")),
+      sec("Velocity", ctl("tk:velAmp", "→ Amp"), ctl("tk:velFilt", "→ Filter"))),
+    h("div", { class: "knob-row" },
+      sec("Built-in FX", ctl("ifx:type", "Type"), dim(ctl("ifx:a", fxType.a || "Edit 1"), fxOff), dim(ctl("ifx:b", fxType.b || "Edit 2"), fxOff),
+        h("span", { class: "note tk-note" }, "Saved with the preset")),
+      LEAD_KINDS.includes(track.kind) ? sec("Perform", ctl("tk:pump", "Pump", "l"), ctl("tk:repeat", "Repeat", "l"), dim(ctl("tk:repDiv", "Rate"), v("tk:repeat") === 0)) : null),
+  );
+}
+
+/** XY: the synth's two most expressive parameters on one pad (mouse, touch, a pad's right stick; moves record as automation). */
+function xyPage(app: App, track: Track, host: ControlHost): HTMLElement {
+  const [xId, yId] = XY_PARAMS[track.kind]!;
+  const xp = paramDef(track.kind, xId)!, yp = paramDef(track.kind, yId)!;
+  const dot = h("div", { class: "xy-dot" });
+  const readout = h("div", { class: "xy-readout" });
+  const pad = h("div", { class: "xy-pad", "data-nav": "xy", "data-xy": `${xId} ${yId}`, tabindex: 0, title: "Drag (or right stick / , . - =) to play both at once" },
+    h("span", { class: "xy-axis x" }, `${xp.label} →`), h("span", { class: "xy-axis y" }, `${yp.label} →`), dot) as HTMLElement & { redraw?: () => void };
+  const draw = () => {
+    const ux = toUnit(xp, getParam(track, xId)), uy = toUnit(yp, getParam(track, yId));
+    dot.style.left = `${ux * 100}%`;
+    dot.style.top = `${(1 - uy) * 100}%`;
+    readout.textContent = `${xp.label} ${formatParam(xp, getParam(track, xId))}  ·  ${yp.label} ${formatParam(yp, getParam(track, yId))}`;
+  };
+  pad.redraw = draw;
+  const setFrom = (e: PointerEvent) => {
+    const r = pad.getBoundingClientRect();
+    const ux = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), uy = Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height));
+    host.set(xId, fromUnit(xp, ux));
+    host.set(yId, fromUnit(yp, uy));
+    draw();
+  };
+  pad.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    try { pad.setPointerCapture(e.pointerId); } catch { /* synthetic */ }
+    host.begin(xId); host.begin(yId);
+    pad.classList.add("active");
+    setFrom(e);
+    const move = (ev: PointerEvent) => setFrom(ev);
+    const up = () => { pad.classList.remove("active"); pad.removeEventListener("pointermove", move); pad.removeEventListener("pointerup", up); pad.removeEventListener("pointercancel", up); };
+    pad.addEventListener("pointermove", move);
+    pad.addEventListener("pointerup", up);
+    pad.addEventListener("pointercancel", up);
+  });
+  requestAnimationFrame(draw);
+  return h("div", { class: "panel-body xy-page" }, pad, readout,
+    h("p", { class: "note" }, "While recording, moves are written into the clip as automation for both parameters."));
 }
 
 function previewSound(app: App, track: Track) {

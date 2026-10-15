@@ -4,6 +4,7 @@
 import type { InstrumentKind } from "./model";
 import { ANALOG, LEAD, PAD, WOBBLE } from "./instruments2";
 import { CHIP, FM, SAMPLER, WAVE } from "./instruments3";
+import { isToolkitKey, toolkitParams } from "./toolkit";
 
 export interface ParamDef {
   id: string;
@@ -196,6 +197,7 @@ export function presetParams(kind: InstrumentKind, index: number): Record<string
 }
 
 export function paramDef(kind: InstrumentKind, id: string): ParamDef | undefined {
+  if (isToolkitKey(id)) return toolkitParams(kind).find((p) => p.id === id);
   return INSTRUMENTS[kind].params.find((p) => p.id === id);
 }
 

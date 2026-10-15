@@ -1,7 +1,7 @@
 // DSP for Pixel (chip), Glint (FM), Morph (wavetable) and Grab (sampler).
 // Runs in the AudioWorklet.
 
-import { ADSR, SVF, TAU, blep, mtof, smooth } from "./units";
+import { ADSR, SVF, TAU, blep, mtof, smooth, voiceMod } from "./units";
 import { velGain, type InstrumentDSP } from "./instruments-dsp";
 import { DRUM_BASE_NOTE } from "../instruments";
 import { JUMP_STEPS, M_RATIOS, C_RATIOS, SAMPLER_PADS, WT_FRAMES, WT_LEVELS, WT_SIZE } from "../instruments3";
@@ -54,7 +54,8 @@ export class ChipDSP implements InstrumentDSP {
     const a = p.attack ?? 0.002, d = p.decay ?? 0.3, s = p.sustain ?? 0.6, r = p.release ?? 0.12;
     const crush = p.crush ?? 0.3, levels = Math.pow(2, 8 - crush * 5);
     const level = (p.level ?? 0.55) * 0.3;
-    const duty = wave === 1 ? 0.25 : wave === 2 ? 0.125 : 0.5;
+    // Pulse width from the toolkit scales the chosen duty (0.5 = as chosen).
+    const duty = Math.max(0.03, Math.min(0.97, (wave === 1 ? 0.25 : wave === 2 ? 0.125 : 0.5) * (voiceMod.pw / 0.5)));
     for (let i = i0; i < i1; i++) {
       let l = 0, rr = 0;
       for (const v of this.voices) {
@@ -63,7 +64,7 @@ export class ChipDSP implements InstrumentDSP {
         const jumpSemis = steps[Math.floor(v.t * jumpRate) % steps.length];
         const sweepSemis = sweep * Math.exp(-v.t / sweepT);
         const vib = vibD * Math.sin(TAU * vibR * Math.max(0, v.t - 0.15));
-        const f = mtof(v.pitch + jumpSemis + sweepSemis + vib);
+        const f = mtof(v.pitch + jumpSemis + sweepSemis + vib) * voiceMod.pitch;
         const dt = Math.min(0.5, f / sr);
         let x: number;
         if (wave <= 2) {
@@ -127,7 +128,7 @@ export class FmDSP implements InstrumentDSP {
       let l = 0, rr = 0;
       for (const v of this.voices) {
         if (!v.amp.active) continue;
-        const f = mtof(v.pitch);
+        const f = mtof(v.pitch) * voiceMod.pitch;
         const idx = index * (idxSus + (1 - idxSus) * Math.exp(-v.t / idxDecay)) * (1 - velIdx + velIdx * v.vel);
         v.pm += (f * rm) / sr;
         if (v.pm >= 1) v.pm -= 1;
@@ -204,7 +205,7 @@ export class WavetableDSP implements InstrumentDSP {
       for (const v of this.voices) {
         if (!v.amp.active) continue;
         const pos = Math.max(0, Math.min(1, pos0 + envAmt * Math.exp(-v.t / envDecay) + lfo)) * (WT_FRAMES - 1);
-        const f = mtof(v.pitch);
+        const f = mtof(v.pitch) * voiceMod.pitch;
         const env = v.amp.next(a, d, s, r, sr) * velGain(v.vel);
         let vl = 0, vr = 0;
         for (let u = 0; u < n; u++) {
