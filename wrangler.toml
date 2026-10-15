@@ -7,7 +7,7 @@
 # listed here: the deploy workflow looks them up by name (tilt-shares, tilt-samples) and
 # adds them when they exist, so a deploy before they're created still works (sharing
 # then falls back to self-contained #song= links).
-# Local: npx wrangler pages dev dist --kv SHARES --r2 SAMPLES  (in-memory stand-ins)
+# Local: deno run -A tools/pages-dev.ts  (wrangler pages dev with in-memory KV and R2, http://127.0.0.1:8788)
 name = "tilt-jam"
 pages_build_output_dir = "dist"
 compatibility_date = "2025-06-01"
