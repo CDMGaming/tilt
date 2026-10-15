@@ -25,10 +25,9 @@ export const TONE_PARAM: Partial<Record<InstrumentKind, { id: string; label: str
   fm: { id: "index", label: "FM amount" }, wave: { id: "pos", label: "Position" },
 };
 
-/** The XY pad: each synth's two most expressive parameters (X, Y). */
+/** The XY pad (X, Y): only where the pad is the instrument's idea (Morph's Warp pad; Vox later). */
 export const XY_PARAMS: Partial<Record<InstrumentKind, [string, string]>> = {
-  acid: ["cutoff", "reso"], poly: ["cutoff", "fenv"], lead: ["cutoff", "sync"], wobble: ["cutoff", "wobble"],
-  pad: ["cutoff", "lofi"], chip: ["crush", "vibDepth"], fm: ["index", "feedback"], wave: ["pos", "cutoff"],
+  wave: ["pos", "cutoff"],
 };
 
 export const FILTER_TYPES = ["Off", "LP12", "LP24", "HP", "BP", "Notch"];

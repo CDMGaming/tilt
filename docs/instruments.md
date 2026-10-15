@@ -2,8 +2,10 @@
 
 The spec for the instruments overhaul (v2). Nothing here is built yet: this is for review.
 Concepts and control ideas were checked against the KORG Gadget Switch manual (docs/reference);
-every name, panel and sound below is TILT's own. Where your brief borrowed a Korg control name or
-a gadget's look, the doc says so and proposes an original one (marked **⚑ name check**).
+every instrument name, panel and sound below is TILT's own.
+**Naming rule (agreed):** short descriptive control labels (Bite, Gnaw, Twist, Jump...) aren't
+protected and say what they do, so they're used as briefed. Trademarks (808, 909, 606, CR-78,
+Simmons) are not: Thump Lab's models get their own names. Panels and colours are our own designs.
 
 ## 1. Principles
 
@@ -33,6 +35,7 @@ They're a generic synth page, which this design rules out. The plan:
   hidden voicing that presets set. Songs already using them keep sounding the same.
 - **The pages go**, instrument by instrument, as each is rebuilt in Phase 3.
 - **An XY pad survives only where it's the instrument's idea:** Morph's Warp pad and Vox's vowel pad.
+  (Done: the XY tab now shows on Morph only.)
 - **The built-in FX** becomes one or two named controls where an instrument has an effect as
   part of its idea (Haze's Space, Anthem's Shine...). Otherwise it's hidden voicing.
 
@@ -110,45 +113,48 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 ### Thump Lab: analog drum machine
 - **Idea:** synthesised drums in colourful modules, every part tweakable, nothing sampled.
 - **Roles:** drums.
-- **Parts (8):** kick, snare, clap, closed hat, open hat, low tom, high tom, rim / cowbell.
-- **Front (master, 4):** Model switch · ★ Boom · ★ Snap · ★ Sizzle.
-- **Per module (8 × 4):** Tune · Decay · Tone · Level. Module **More**: Drive, Pan, Accent, Pitch env
-  (kick / toms), Punch (snare), Mod speed (rim / cowbell).
-- **Model switch ⚑ name check:** the brief's 808 / 909 / 606 / CR-78 / Simmons labels are Roland and
-  Simmons trademarks. Proposed labels and what they mean:
+- **Organisation (after Tokyo and Amsterdam):** each part is a compact module with only the controls
+  that matter for that drum (3-5 each) and a small mixer foot. No generic per-part page.
+
+| Module | Controls | Notes |
+|---|---|---|
+| Kick | Tune · Decay · Bend · Boost · Click | Bend = pitch-envelope depth; Boost = drive + low shelf; Click = attack transient |
+| Snare | Tune · Decay · Snappy · Punch · Tone | Snappy = noise level; Punch = transient |
+| Clap | Decay · Spread · Tone · Room | Spread = spacing of the 3-4 hand hits |
+| Closed hat | Decay · Tone · Metal | Metal = the 6-square-oscillator mix against noise (the classic metallic hat) |
+| Open hat | Decay · Tone · Metal | chokes with the closed hat |
+| Low tom | Tune · Decay · Bend · Noise | |
+| High tom | Tune · Decay · Bend · Noise | |
+| Rim / Cowbell | Type (rim · cowbell · clave) · Tune · Decay · Depth · Speed | Depth / Speed = pitch modulation |
+
+- **Every module's foot:** Level · Pan.
+- **Master (3):** ★ Model · Accent · Level.
+- **Model** (moves every part's hidden voicing at once):
   - **Deep:** long sine kick, metallic hats.
   - **Club:** punchy click kick, noisy snare.
   - **Tiny:** small, tight and bright.
-  - **Parlour:** soft, vintage rhythm box.
-  - **Hex:** electronic tom and snare sweeps.
+  - **Parlour:** a soft, vintage rhythm box.
+  - **Hex:** electronic toms and snare sweeps.
 
-| ★ Control | Moves |
-|---|---|
-| Boom | Kick decay + kick pitch-env depth + low tom decay + sub level |
-| Snap | Snare snappy (noise level) + noise tone + clap spread + transient |
-| Sizzle | Both hats: decay + band-pass centre + the 6-oscillator metallic mix |
-
-- **Hidden voicing:** each Model's oscillator shapes, noise colours, accent curve and hat choke.
-  Hats use 6 detuned square oscillators into a band-pass (the classic metallic hat).
-- **Macros:** Boom · Snap · Sizzle · Kick tune · Snare tune · Hat decay · Tom tune · Level.
-- **Layout:** B, 8 modules in two rows of four, the Model switch and ★ knobs on a strip above.
-- **Theme:** powder-coated modules in 8 bright colours, white knob caps, rubber feet.
+  808 / 909 / 606 / CR-78 / Simmons are trademarks: inspiration only, never labels.
+- **Hidden voicing:** oscillator shapes, noise colours, accent curve, hat choke, and per-part drive and filter, all set per Model.
+- **Macros:** Kick decay · Kick bend · Snare snappy · Snare tune · Hat decay · Tom tune · Accent · Level.
+- **Layout:** B, 8 modules side by side (two rows of four on narrow screens), one colour each.
+- **Theme:** powder-coated modules in 8 bright colours, white knob caps, small engraved module numbers.
 - **Presets:** 24 (Model × style: club, hip-hop, electro, minimal, lo-fi...).
 
 ### Squelch: acid bass
 - **Idea:** the squelchy, resonant mono bass line that slides and screams.
 - **Roles:** bass, lead (acid leads), arp.
-- **Front (9):** Wave · Cutoff · Reso · Env (depth) · Decay · ★ Snarl · ★ Chew · Accent · Slide.
-- **⚑ name check:** the brief's "Bite" and "Gnaw" are the Chicago gadget's control names. The proposal
-  is **Snarl** and **Chew**. Today's `bite` param keeps its id; only the label changes.
+- **Front (9):** Wave · Cutoff · Reso · Env (depth) · Decay · ★ Bite · ★ Gnaw · Accent · Slide.
 
 | ★ Control | Moves |
 |---|---|
-| Snarl | Filter input drive + post-filter saturation + resonance compensation (gets louder and dirtier, not thinner) |
-| Chew | Audio-rate filter FM from the oscillator + a resonance tilt + a touch of high-pass |
+| Bite | Filter input drive + post-filter saturation + resonance compensation (gets louder and dirtier, not thinner) |
+| Gnaw | Audio-rate filter FM from the oscillator + a resonance tilt + a touch of high-pass |
 
 - **Hidden voicing:** sub level, arp (on, mode, rate, range), accent curve, glide shape, built-in FX.
-- **Macros:** Cutoff · Reso · Env · Decay · Snarl · Chew · Accent · Slide.
+- **Macros:** Cutoff · Reso · Env · Decay · Bite · Gnaw · Accent · Slide.
 - **Layout:** C, one row of big knobs, the arp tucked under a flip-down lid.
 - **Theme:** brushed silver, black engraved labels, red pointer knobs, an LED for accent.
 - **Presets:** 28 (classic 303-style lines, dirty, rubbery, acid leads, arps).
@@ -194,18 +200,16 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Idea:** the growling, tempo-locked wobble bass.
 - **Roles:** bass, fx.
 - **Front (8):** ★ Wobble (huge, centre) · Rate tiles (1/1 · 1/2 · 1/4 · 1/8 · 1/16 · triplet) · ★ Growl ·
-  ★ Grit · Cutoff · Sub · Glide · Level.
-- **⚑ name check:** "Crush" is the Miami gadget's filter name, so Grit is proposed instead. (Wobble is a
-  generic genre word, kept.)
+  ★ Crush · Cutoff · Sub · Glide · Level.
 
 | ★ Control | Moves |
 |---|---|
 | Wobble | LFO depth to cutoff + resonance + a little LFO to amp |
 | Growl | X-mod depth + X-mod tune + formant-ish band-pass mix |
-| Grit | Sample-rate reduction + bit depth + post drive |
+| Crush | Sample-rate reduction + bit depth + post drive |
 
 - **Hidden voicing:** carrier wave, X-mod wave, LFO shape, stereo width.
-- **Macros:** Wobble · Rate · Growl · Grit · Cutoff · Sub · Glide · Level.
+- **Macros:** Wobble · Rate · Growl · Crush · Cutoff · Sub · Glide · Level.
 - **Layout:** F, a giant Wobble knob ringed by LEDs, rate tiles under it.
 - **Theme:** carbon-fibre weave, neon green edge light.
 - **Presets:** 24 (wobbles, growls, reese, talking bass, risers).
@@ -230,19 +234,17 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 ### Pixel: chiptune
 - **Idea:** 8-bit game sounds: pulses, arpeggio jumps, sweeps and glitches.
 - **Roles:** lead, arp, bass, fx.
-- **Front (8):** Wave (pulse 12/25/50 · triangle · noise) · ★ Hop! · Hop speed · ★ Dash! · ★ Glitch ·
+- **Front (8):** Wave (pulse 12/25/50 · triangle · noise) · ★ Jump! · Jump speed · ★ Run! · ★ Glitch ·
   Attack · Decay · Level.
-- **⚑ name check:** "Jump" and "Run" are the Kingston gadget's. The proposal is **Hop!** (the arpeggio jump)
-  and **Dash!** (the pitch-run sweep).
 
 | ★ Control | Moves |
 |---|---|
-| Hop! | Arpeggio pattern (octave / fifth / chord) + note count |
-| Dash! | Pitch sweep amount + sweep time + vibrato |
+| Jump! | Arpeggio pattern (octave / fifth / chord) + note count |
+| Run! | Pitch sweep amount + sweep time + vibrato |
 | Glitch | Bit-crush + random pitch steps + duty cycling |
 
 - **Hidden voicing:** sustain, release, vibrato rate.
-- **Macros:** Hop! · Hop speed · Dash! · Glitch · Wave · Decay · Attack · Level.
+- **Macros:** Jump! · Jump speed · Run! · Glitch · Wave · Decay · Attack · Level.
 - **Layout:** H, a handheld console with a pixel screen showing the wave and buttons.
 - **Theme:** off-white plastic, a green-grey pixel screen, purple and pink buttons.
 - **Presets:** 28 (leads, arps, bass, jingles, coin / jump / laser FX).
@@ -269,8 +271,7 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Roles:** pad, lead, bass, arp.
 - **Front (8):** Warp XY pad (X = position, Y = ★ Warp) · Table · Motion (position LFO) · Motion speed ·
   Cutoff · Attack · Release · Level.
-- **⚑ look check:** "industrial yellow + a Warp touchpad" is the Kiev gadget's identity. The proposal is
-  **oxidised copper with verdigris**, keeping the XY pad (the pad is the idea, the colour is ours).
+- **Look:** our own design, oxidised copper with a verdigris pad. The XY pad stays because it's the idea.
 
 | ★ Control | Moves |
 |---|---|
@@ -370,18 +371,15 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 ### Anthem: supersaw lead
 - **Idea:** the huge festival lead.
 - **Roles:** lead, pad.
-- **Front (7):** ★ Size (big centre knob) · Edge · Wide · Duck · Stutter · Sub · Shine.
-- **⚑ name check:** the brief's Twist / Diffuse / Pump / Repeat / Bottom are the Brussels gadget's whole front
-  panel. The proposal is **Size, Edge, Wide, Duck, Stutter, Sub, Shine**. The concepts stay (supersaw thickness,
-  spread, sidechain pump, repeat, sub, reverb), the names are ours.
+- **Front (7):** ★ Twist (big centre knob) · Diffuse · Pump · Repeat · Bottom · Shine (reverb) · Level.
 
 | ★ Control | Moves |
 |---|---|
-| Size | Supersaw voices + detune + stereo spread + level compensation |
+| Twist | Supersaw voices + detune + stereo spread + level compensation |
 
-- **Engine:** reuses the Pump and Stutter performer from the shared library.
-- **Macros:** Size · Edge · Wide · Duck · Stutter · Sub · Shine · Level.
-- **Layout:** F, knobs ringed around the Size knob.
+- **Engine:** reuses the Pump and Repeat performer from the shared library.
+- **Macros:** Twist · Diffuse · Pump · Repeat · Bottom · Shine · Glide (hidden) · Level.
+- **Layout:** F, knobs ringed around the Twist knob.
 - **Theme:** gloss white with a magenta glow ring.
 - **Presets:** 24.
 
@@ -503,12 +501,10 @@ synthesis are textbook techniques, written from scratch.
 
 Each step ends with a report and audio previews of every preset, plus a list of near-duplicates removed.
 
-## 9. Open questions for you
+## 9. Decisions
 
-1. **The ⚑ renames:** Snarl / Chew (Squelch), Size / Edge / Wide / Duck / Stutter / Sub / Shine (Anthem),
-   Hop! / Dash! (Pixel), Grit (Wobbler), copper Morph, the Model names (Deep, Club, Tiny, Parlour, Hex).
-   Keep, change, or suggest your own?
-2. **Front-control counts:** Kitbox and Thump Lab have more than 12 controls if you count every channel or
-   module. I've treated "front" as the master row plus per-part strips. OK?
-3. **The MORE / XY pages:** remove them as each instrument is rebuilt (proposed), or straight away?
-4. **Order of Phase 3 and 4:** as suggested in §8?
+- **Names:** descriptive control labels as briefed (Bite, Gnaw, Jump!, Run!, Crush, Twist, Diffuse, Pump,
+  Repeat, Bottom). Trademarks aren't used: Thump Lab's models have their own names.
+- **XY pads:** only Morph (Warp) and Vox (vowels).
+- **Thump Lab:** compact per-part modules, after Tokyo and Amsterdam (above).
+- **Order:** left to me (§8).

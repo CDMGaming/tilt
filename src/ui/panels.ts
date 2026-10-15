@@ -172,13 +172,15 @@ export function buildPanel(app: App, track: Track): HTMLElement {
   }
   // Synths: SOUND (their own knobs, unchanged) | MORE (the voice toolkit) | XY.
   if (!hasToolkit(track.kind)) return h("div", { class: `panel kind-${track.kind}`, style: `--track:${trackColor(track)}` }, presetBar, body);
-  const page = app.ed.panelPage ?? "main";
+  const hasXy = !!XY_PARAMS[track.kind];
+  const page = !hasXy && app.ed.panelPage === "xy" ? "main" : app.ed.panelPage ?? "main";
   const tab = (id: "main" | "more" | "xy", label: string, title: string) => h("button", {
     class: "page-tab" + (page === id ? " on" : ""), "data-nav": `page-${id}`, "aria-pressed": String(page === id), title,
     onclick: () => { app.ed.panelPage = id; app.screens.edit.render(); },
   }, label);
   const pages = h("div", { class: "panel-pages", role: "tablist" },
-    tab("main", "SOUND", "This instrument's own controls"), tab("more", "MORE", "Filter 2, LFOs, voice, pitch envelope, built-in FX"), tab("xy", "XY", "Two parameters on one pad"));
+    tab("main", "SOUND", "This instrument's own controls"), tab("more", "MORE", "Filter 2, LFOs, voice, pitch envelope, built-in FX"),
+    hasXy ? tab("xy", "XY", "Two parameters on one pad") : null);
   const shown = page === "more" ? morePage(app, track, ctl) : page === "xy" ? xyPage(app, track, host) : body;
   return h("div", { class: `panel kind-${track.kind} page-${page}`, style: `--track:${trackColor(track)}` }, presetBar, pages, shown);
 }
