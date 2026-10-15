@@ -95,6 +95,8 @@ export interface Song {
   master: Master;
   nextId: number;
   setupCode?: string; // DICE share code this song was started from
+  /** How a shared song opens: ready to play the whole song (SONG) or the first scene (SCENE). */
+  playAs?: "song" | "scene";
   /** Opened from someone's share: its song code (shown as "Shared · TILT-XXXXXXXX"). */
   sharedFrom?: string;
   /** Codes this song was shared under, newest first (each edit shares as a new code). */

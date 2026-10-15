@@ -199,3 +199,18 @@ Deno.test("an opened shared song, shared again untouched, keeps its code", async
   assertEquals(await songCode(opened), code);
   assertEquals((await (await postShare(post({ song: opened }), env)).json()).code, code);
 });
+
+Deno.test("shared songs carry how they open (whole song or scene 1), the chain and its repeats", async () => {
+  const env: ShareEnv = { SHARES: memKV(), SAMPLES: memR2() };
+  const song = demo();
+  song.scenes.push({ id: 77, name: "Chorus", repeat: 1, tempo: null, fadeIn: false, fadeOut: false });
+  song.chain = [{ sceneId: song.scenes[0].id, repeat: 2 }, { sceneId: 77, repeat: 4 }, { sceneId: song.scenes[0].id, repeat: 1 }];
+  song.songLoop = true;
+  const asSong = { ...song, playAs: "song" as const }, asScene = { ...song, playAs: "scene" as const };
+  assertNotEquals(await songCode(asSong), await songCode(asScene)); // each choice has its own code
+  const { code } = await (await postShare(post({ song: asSong }), env)).json();
+  const back = (await (await getShare(code, env)).json()).song;
+  assertEquals([back.playAs, back.songLoop, back.chain], ["song", true, song.chain]);
+  assertEquals((await songFromFragment(await songToFragment(asScene))).playAs, "scene");
+  assertEquals(validateSong({ ...asSong, playAs: "forever" }), "bad play setting");
+});

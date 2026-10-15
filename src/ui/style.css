@@ -1143,3 +1143,14 @@ body.phone .chain-chip { padding: 6px 8px 8px; }
 .coach-card.explore { border-color: color-mix(in srgb, var(--mint) 55%, var(--line)); }
 .tp-btn.share-btn { font-size: 13px; font-weight: 700; padding-inline: 10px; }
 @media (max-width: 1100px) { .tp-btn.share-btn .share-label { display: none; } }
+
+/* Share song: how it opens for them; a shared song's Play card */
+.opens-as { display: flex; flex-direction: column; gap: 6px; }
+.opens-row { display: flex; gap: 6px; }
+.opens-btn { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 12px; text-transform: none; letter-spacing: 0; text-align: left; }
+.opens-btn span { font-weight: 700; }
+.opens-btn small { color: var(--dim); font-size: 11px; }
+.opens-btn.on, button.opens-btn.on:hover:not(:disabled) { border-color: var(--dmd); background: color-mix(in srgb, var(--dmd) 14%, var(--raise)); }
+.opens-btn.on span { color: var(--dmd); }
+.shared-title { font: 800 22px var(--font-display); }
+.play-big { font-size: 20px; padding: 14px; }

@@ -2,7 +2,8 @@
 // /s/XXXXXXXX), or, with no server, a self-contained link (#song=…). Opening either
 // imports the song as a new song in your library, never over one you have.
 
-import { normalizeSong, type Song } from "../engine/model";
+import { normalizeSong, songChain, type Song } from "../engine/model";
+import { wholeSong } from "../engine/timeline";
 import { decodeSetup } from "../engine/dice";
 import {
   SAMPLES_MAX_BYTES, SONG_MAX_BYTES, packSample, parseSongCode, sampleKey, shareable, showCode, songCode,
@@ -80,25 +81,50 @@ function remember(app: App, song: Song, code: string) {
   app.renderHeader();
 }
 
-/** Share song: upload, then the code, link, QR code, the phone's share sheet, and earlier versions. */
-export function shareSongDialog(app: App, song: Song = app.song) {
+/** m:ss of the whole song played once (the chain, repeats and scene tempos included). */
+export function songLength(song: Song): string {
+  const s = Math.round(wholeSong(song).duration);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/**
+ * Share song: upload, then the code, link, QR code, the phone's share sheet, and earlier versions.
+ * `playAs`: how it opens for them, ready to play the whole song (SONG) or scene 1 (SCENE);
+ * it's part of what's shared, so each choice has its own code.
+ */
+export function shareSongDialog(app: App, song: Song = app.song, playAs: "song" | "scene" = app.songMode) {
   const wait = app.overlays.dialog("Share song", () => h("div", { class: "form share" }, h("p", { class: "note big share-wait" }, "Uploading…")));
   void (async () => {
     let res: Shared | null = null, err = "";
-    try { res = await upload(song); } catch (e) { err = e instanceof Error ? e.message : String(e); }
+    try { res = await upload({ ...song, playAs }); } catch (e) { err = e instanceof Error ? e.message : String(e); }
     if (res?.kind === "server") remember(app, song, res.code);
     app.overlays.remove(wait);
-    app.overlays.dialog("Share song", (close) => res ? renderResult(app, song, res, close)
+    app.overlays.dialog("Share song", (close) => res ? renderResult(app, song, res, close, playAs)
       : h("div", { class: "form share" }, h("p", { class: "note big" }, err || "Something went wrong"), h("button", { class: "row-btn", "data-nav": "ok", onclick: close }, "Close")));
   })();
 }
 
-function renderResult(app: App, song: Song, res: Shared, close: () => void): HTMLElement {
+/** "Opens as": the whole song or scene 1; picking the other one shares again (a different code). */
+function opensAs(app: App, song: Song, playAs: "song" | "scene", close: () => void): HTMLElement {
+  const steps = songChain(song).length;
+  const pick = (m: "song" | "scene", label: string, sub: string) => h("button", {
+    class: "opens-btn" + (playAs === m ? " on" : ""), "data-nav": `opens-${m}`, "aria-pressed": String(playAs === m),
+    onclick: () => { if (m !== playAs) { close(); shareSongDialog(app, song, m); } },
+  }, h("span", null, label), h("small", null, sub));
+  return h("div", { class: "opens-as" },
+    h("div", { class: "die-label" }, "When they open it, Play plays"),
+    h("div", { class: "opens-row" },
+      pick("song", "The whole song", `${steps} step${steps > 1 ? "s" : ""} · ${songLength(song)}${song.songLoop ? " · then again" : ""}`),
+      pick("scene", "Scene 1", song.sceneLoop === false ? "once" : "on a loop")));
+}
+
+function renderResult(app: App, song: Song, res: Shared, close: () => void, playAs: "song" | "scene" = "song"): HTMLElement {
   const qr = res.url.length < 200 ? makeQr(res.url) : null;
   const qrBox = h("div", { class: "share-qr", "aria-label": "QR code of the link" });
   if (qr) qrBox.innerHTML = qrSvg(qr, 5);
   const older = (song.shares ?? []).filter((x) => x.code !== res.code);
   return h("div", { class: "form share song-share" },
+    opensAs(app, song, playAs, close),
     res.kind === "server"
       ? h("div", { class: "share-block main" }, h("div", { class: "die-label" }, "Song code"), h("code", { class: "share-code big" }, showCode(res.code)))
       : h("div", { class: "share-block main" }, h("div", { class: "die-label" }, "Offline link"), h("p", { class: "note" }, `Couldn't upload (${res.why}), so here's a link with the whole song inside it. It works without the server; it's just long.`)),
@@ -130,8 +156,30 @@ async function importShared(app: App, song: Song, code: string) {
   app.engine.stop();
   app.replaceSong(s);
   app.songCur = { row: 0, col: -1 };
+  // Set up the way it was shared: the whole song (in chain order, with its repeats) or scene 1.
+  app.songMode = s.playAs ?? (songChain(s).length > 1 ? "song" : "scene");
   app.show("song");
-  app.overlays.toast(`Shared · ${showCode(code)}: added to your Songs`, 3500);
+  sharedPlayCard(app, s, code);
+}
+
+/** A shared song just opened: what it is, and one big Play (browsers want a press before any sound). */
+function sharedPlayCard(app: App, s: Song, code: string) {
+  const whole = app.songMode === "song", steps = songChain(s).length;
+  const what = whole
+    ? `The whole song: ${steps} step${steps > 1 ? "s" : ""}, ${songLength(s)}${s.songLoop ? ", then it starts again" : ""}.`
+    : `Scene 1${s.sceneLoop === false ? ", once" : ", on a loop"}.`;
+  app.overlays.dialog("Shared song", (close) => h("div", { class: "form share shared-open" },
+    h("div", { class: "shared-title" }, s.title),
+    h("div", { class: "die-label" }, `Shared · ${showCode(code)} · added to your Songs`),
+    h("p", { class: "note big" }, what),
+    h("button", { class: "row-btn primary play-big", "data-nav": "play", onclick: () => {
+      close();
+      app.songCur = { row: 0, col: -1 };
+      if (whole) app.engine.play({ kind: "song", fromIndex: 0 });
+      else app.engine.play({ kind: "scene", sceneId: s.scenes[0].id, once: s.sceneLoop === false });
+      app.refresh();
+    } }, "▶  Play"),
+    h("button", { class: "row-btn", "data-nav": "look", onclick: close }, "Just look around")));
 }
 
 /** Fetch a song code from the server; a brand-new code can take a moment to arrive (KV), so retry for a minute. */
