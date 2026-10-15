@@ -1141,3 +1141,5 @@ body.phone .chain-chip { padding: 6px 8px 8px; }
 .coach-links { display: flex; gap: 10px; margin: -4px 0 8px; }
 .coach-ready small { opacity: .7; font-weight: 600; margin-left: 4px; }
 .coach-card.explore { border-color: color-mix(in srgb, var(--mint) 55%, var(--line)); }
+.tp-btn.share-btn { font-size: 13px; font-weight: 700; padding-inline: 10px; }
+@media (max-width: 1100px) { .tp-btn.share-btn .share-label { display: none; } }

@@ -11,6 +11,7 @@ import { libraryDialog } from "./library";
 import { fmtTime, h } from "./dom";
 import { isPhone } from "./phone";
 import { dmdText } from "./dmd";
+import { shareSongDialog } from "./sharesong";
 
 export function bindTopbar(app: App, el: HTMLElement) {
   const timerEl = h("div", { class: "timer" });
@@ -34,6 +35,7 @@ export function bindTopbar(app: App, el: HTMLElement) {
         h("button", { class: "tp-btn rec" + (app.recording ? " on" : ""), onclick: () => app.toggleRecord(), title: "Record (hold Y, Shift+Space)" }, "●"),
         modeSwitch(),
         h("button", { class: "tp-btn" + (s.metronome ? " on" : ""), onclick: () => app.edit("Metronome", () => (s.metronome = !s.metronome)), title: "Metronome" }, "♩"),
+        h("button", { class: "tp-btn share-btn", onclick: () => shareSongDialog(app), disabled: none, title: "Share song: a code, a link and a QR code", "aria-label": "Share song" }, "⇪", h("span", { class: "share-label" }, " Share")),
         h("button", { class: "tp-btn help-btn", onclick: () => app.openHelp?.(), title: "Controls (?)", "aria-label": "Controls" }, "?")),
       s.challenges?.length && app.settings.gameMode ? (() => {
         const st = challengeStatus(s);
