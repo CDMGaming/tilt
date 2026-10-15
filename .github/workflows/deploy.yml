@@ -50,7 +50,9 @@ jobs:
         if: env.RAW_TOKEN != ''
         run: |
           # Names only are printed (no ids, no secrets), so a typo or a missing permission is easy to spot.
-          kvjson=$(npx --yes wrangler@4 kv namespace list 2>kv.err) || { echo "Listing KV failed:"; grep -iE "error|permission|auth" kv.err | head -5; }
+          # wrangler may print its banner first: keep from the JSON's opening bracket on.
+          kvjson=$(npx --yes wrangler@4 kv namespace list 2>kv.err | sed -n '/^\[/,$p') || true
+          [ -n "$kvjson" ] || { echo "Listing KV gave nothing:"; grep -iE "error|permission|auth" kv.err | head -5; }
           echo "KV namespaces this token can see: $(echo "$kvjson" | jq -r '[.[].title] | join(", ")' 2>/dev/null)"
           kv=$(echo "$kvjson" | jq -r '.[] | select(.title=="tilt-shares") | .id' 2>/dev/null || true)
           if [ -n "$kv" ]; then
