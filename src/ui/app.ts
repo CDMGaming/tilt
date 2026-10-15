@@ -1145,7 +1145,7 @@ export const STEP_GRIDS = [
 
 /**
  * Where the online server is when the player hasn't set one: next to the app
- * (wss://<site>/relay, as on Tower behind Cloudflare), or, on the dev server,
+ * (wss://<site>/relay, as on Cloudflare Pages), or, on the dev server,
  * the separate relay on port 8787.
  */
 export function defaultRelayUrl(): string {
