@@ -3,3 +3,5 @@ dist/
 *.log
 # Third-party manuals (Korg copyright): kept locally, not versioned
 docs/reference/
+# wrangler pages dev (tools/pages-dev.ts): local KV / R2 stand-ins
+.wrangler/

@@ -61,6 +61,10 @@ jobs:
           else
             echo "::warning::No KV namespace named tilt-shares: Share song falls back to self-contained #song= links"
           fi
+          # Missing in an account where R2 is on: make it (it's the bucket the app is built for).
+          if ! npx --yes wrangler@4 r2 bucket info tilt-samples >/dev/null 2>&1 && ! npx --yes wrangler@4 r2 bucket info tilt-samples --jurisdiction eu >/dev/null 2>&1; then
+            npx --yes wrangler@4 r2 bucket create tilt-samples 2>&1 | grep -iE "created|error|exists" | head -3 || true
+          fi
           # Ask for the bucket by name (also finds it in another jurisdiction such as EU).
           if npx --yes wrangler@4 r2 bucket info tilt-samples >r2.out 2>r2.err || npx --yes wrangler@4 r2 bucket info tilt-samples --jurisdiction eu >r2.out 2>r2.err; then
             { echo; echo '[[r2_buckets]]'; echo 'binding = "SAMPLES"'; echo 'bucket_name = "tilt-samples"'; grep -qi "jurisdiction.*eu" r2.out && echo 'jurisdiction = "eu"'; } >> wrangler.toml
