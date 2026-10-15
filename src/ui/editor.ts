@@ -1,8 +1,8 @@
 // Edit screen: piano roll on top, the track's instrument panel below.
 
 import { DRUM_BASE_NOTE, INSTRUMENTS } from "../engine/instruments";
-import { MAX_BARS, TICKS_PER_BAR, type Clip } from "../engine/model";
-import { inScale, NOTE_NAMES, scaleById, snapToScale, stepInScale } from "../engine/music";
+import { MAX_BARS, TICKS_PER_BAR, type Clip, type Note } from "../engine/model";
+import { inScale, NOTE_NAMES, noteName, scaleById, snapToScale, stepInScale } from "../engine/music";
 import { getParam, paramInfo } from "../engine/params";
 import { fxDef } from "../engine/params";
 import { drumCount, isDrumKind, toUnit } from "../engine/instruments";
@@ -46,7 +46,7 @@ export class EditorScreen implements Screen {
   private peak = 0;
 
   constructor(private app: App, private couch?: CouchEditorOpts) {
-    this.roll = new PianoRoll(app, (x, y) => this.openMenu({ x, y }));
+    this.roll = new PianoRoll(app, (x, y) => this.openMenu({ x, y }), (n, tick, x, y) => this.noteMenu(n, tick, { x, y }));
     this.rollWrap.appendChild(this.roll.canvas);
     this.el.append(this.toolbar, this.rollWrap, this.panelWrap);
     this.el.append(this.mixWrap); // the mix view (couch quarters, phones)
@@ -108,6 +108,7 @@ export class EditorScreen implements Screen {
       h("div", { class: "tb-group" },
         btn("1/8", ed.grid === 48, () => this.setGrid(48)),
         btn("1/16", ed.grid === 24, () => this.setGrid(24)),
+        btn("1/32", ed.grid === 12, () => this.setGrid(12)),
         btn("3", ed.triplet, () => { ed.triplet = !ed.triplet; this.snapCursor(); this.render(); }, "Triplets")),
       this.lengthButton(),
       h("div", { class: "tb-group" },
@@ -168,6 +169,7 @@ export class EditorScreen implements Screen {
         h("div", { class: "tb-group" },
           btn("1/8", ed.grid === 48, () => this.setGrid(48)),
           btn("1/16", ed.grid === 24, () => this.setGrid(24)),
+          btn("1/32", ed.grid === 12, () => this.setGrid(12)),
           btn("Step", ed.stepInput, () => this.toggleStep(), "Step input: play notes while stopped, the cursor advances"))) : "",
     );
     this.el.classList.toggle("view-roll", ed.focus === "roll");
@@ -381,6 +383,23 @@ export class EditorScreen implements Screen {
       { label: "Same as the grid", checked: track?.noteLen === undefined, keepOpen: true, run: () => set(undefined) },
       { label: `Set the selected notes to ${lengthLabel(cur)}`, disabled: !this.roll.selectedNotes().length, run: () => this.noteOp("setLen"), hint: "Ctrl+K" },
     ];
+  }
+
+  /** Right-click on a note: what to do with it (or with the selection, when it's part of one). */
+  private noteMenu(n: Note, tick: number, at: { x: number; y: number }) {
+    const app = this.app, ed = app.ed, clip = this.clip;
+    if (!clip || app.locked) return;
+    const group = ed.sel.has(n.id) ? this.roll.selectedNotes() : [n];
+    const many = group.length > 1, what = many ? `${group.length} notes` : "Note";
+    const inside = tick > n.start && tick < n.start + n.len;
+    app.overlays.menu(many ? `${group.length} selected notes` : `Note ${noteName(n.pitch)}`, () => [
+      { label: "Split here", disabled: !inside, hint: inside ? "at the grid line you clicked" : "click inside the note", run: () => app.edit("Split note", () => splitNote(app.song, clip, n, tick)) },
+      { label: "Length", sub: () => NOTE_LENGTHS.flatMap((l) => [l.ticks, l.ticks * 1.5]).map((t) => ({ label: lengthLabel(t), checked: group.every((x) => x.len === t), run: () => app.edit(`${what}: length`, () => setNoteLength(group, t)) })) },
+      { label: "Velocity", sub: () => [127, 110, 100, 80, 60, 40].map((v) => ({ label: String(v), checked: group.every((x) => x.vel === v), run: () => app.edit(`${what}: velocity`, () => group.forEach((x) => (x.vel = v))) })) },
+      { label: "Legato: to the next note", hint: "Ctrl+G", run: () => app.edit("Legato", () => legatoNotes(clip, group)) },
+      { label: "Join with the notes it touches", hint: "same pitch", run: () => app.edit("Join notes", () => joinNotes(clip, clip.notes.filter((x) => x.pitch === n.pitch))) },
+      { label: many ? "Delete these notes" : "Delete note", hint: "Delete", run: () => app.edit("Delete note", () => { const gone = new Set(group); clip.notes = clip.notes.filter((x) => !gone.has(x)); group.forEach((x) => ed.sel.delete(x.id)); }) },
+    ], at);
   }
 
   /** Split (at the cursor), join, legato, set length: on the selection, or the note under the cursor. */
@@ -683,6 +702,7 @@ export class EditorScreen implements Screen {
         { label: "Grid", sub: () => [
           { label: "1/8", checked: ed.grid === 48, run: () => this.setGrid(48) },
           { label: "1/16", checked: ed.grid === 24, run: () => this.setGrid(24) },
+          { label: "1/32", checked: ed.grid === 12, run: () => this.setGrid(12) },
           { label: "Triplets", checked: ed.triplet, run: () => { ed.triplet = !ed.triplet; this.snapCursor(); this.render(); } },
         ] },
         { label: "Velocity view", checked: ed.velView && !ed.autoKey, keepOpen: true, run: () => { ed.velView = !(ed.velView && !ed.autoKey); ed.autoKey = null; this.render(); } },

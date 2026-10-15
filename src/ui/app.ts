@@ -10,7 +10,7 @@ import { AUTO_STEP } from "../engine/timeline";
 import { DRUM_BASE_NOTE } from "../engine/instruments";
 import { PPQ, TICKS_PER_BAR, assignShades, idLanes, normalizeSong, type Song, type Track, songChain, chainIndexOf } from "../engine/model";
 import { scaleById, snapToScale } from "../engine/music";
-import { addNote, addTrack, clearAutoRange, ensureClip, quantizeNotes, setAutoPoint, stepLength, lengthLabel } from "../engine/songops";
+import { addNote, addTrack, clearAutoRange, ensureClip, quantizeNotes, setAutoPoint, stepLength, lengthLabel, splitLength, makeLength } from "../engine/songops";
 import { NO_HOLDS, defaultSpec, nudgeSetup, type Holds, type LineupSpec, type Setup } from "../engine/dice";
 import { mods, type Action } from "./actions";
 import { h } from "./dom";
@@ -796,6 +796,18 @@ export class App {
   setNoteLength(ticks: number | undefined, track = this.track()) {
     if (!track) return;
     if (ticks === undefined) delete track.noteLen; else track.noteLen = ticks;
+    // Shorter than the grid, or a triplet on a straight grid: the grid follows, so the notes fit side by side.
+    const parts = ticks === undefined ? null : splitLength(ticks);
+    if (parts && parts.mod !== "dot") {
+      const step = Math.max(PPQ / 8, Math.min(PPQ / 2, parts.base));
+      const tri = parts.mod === "tri";
+      if (makeLength(parts.base, parts.mod) < this.grid() || (tri && !this.ed.triplet)) {
+        this.ed.grid = step;
+        this.ed.triplet = tri;
+        this.ed.tick = Math.floor(this.ed.tick / this.grid()) * this.grid();
+        this.overlays.toast(`Grid ${lengthLabel(this.grid())} to match`, 1000);
+      }
+    }
     this.changed();
   }
 

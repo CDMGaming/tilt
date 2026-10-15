@@ -33,7 +33,7 @@ export class PianoRoll {
   private dirty = true;
   private lastPlayTick = -1;
 
-  constructor(private app: App, private onMenu: (x: number, y: number) => void) {
+  constructor(private app: App, private onMenu: (x: number, y: number) => void, private onNoteMenu?: (note: Note, tick: number, x: number, y: number) => void) {
     this.canvas = document.createElement("canvas");
     this.canvas.className = "roll-canvas";
     this.ctx = this.canvas.getContext("2d")!;
@@ -548,7 +548,7 @@ export class PianoRoll {
     ed.pitch = pitch;
 
     if (e.button === 2) {
-      if (hit) app.edit("Delete note", () => { clip!.notes = clip!.notes.filter((n) => n !== hit); ed.sel.delete(hit.id); });
+      if (hit) this.onNoteMenu?.(hit, Math.round(rawTick / grid) * grid, e.clientX, e.clientY);
       else this.onMenu(e.clientX, e.clientY);
       return;
     }
