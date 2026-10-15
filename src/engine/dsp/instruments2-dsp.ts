@@ -197,17 +197,30 @@ export class WobbleDSP implements InstrumentDSP {
 
 interface PadVoice { pitch: number; vel: number; osc: Osc[]; amp: ADSR; held: boolean; age: number; pan: number }
 
+/**
+ * Haze: three layers (an octave down, unison, an octave up) of a detuned pair each, a filter, tape
+ * wear and a reverb. Its character controls: Drift (tape wow, layers slowly detuning against each
+ * other, a slow filter sway), Dust (hiss, bit / sample-rate wear, a high cut) and Space (reverb time,
+ * level, pre-delay and stereo width).
+ */
 export class PadDSP implements InstrumentDSP {
   private voices: PadVoice[] = [];
   private fL = new SVF();
   private fR = new SVF();
+  private hcL = new OnePole();
+  private hcR = new OnePole();
   private wowPh = 0;
   private flutPh = 0;
+  private slowPh = 0;
   private hold = [0, 0];
   private cnt = 0;
   private rev: Reverb;
   private revBufL = new Float32Array(128);
   private revBufR = new Float32Array(128);
+  private dryL = new Float32Array(128);
+  private dryR = new Float32Array(128);
+  private pre = [new Float32Array(4096), new Float32Array(4096)];
+  private pw = 0;
   private counter = 0;
   private cut = 2200;
   constructor(public params: Record<string, number>, private sr: number) {
@@ -234,49 +247,67 @@ export class PadDSP implements InstrumentDSP {
 
   render(L: Float32Array, R: Float32Array, i0: number, i1: number) {
     const p = this.params, sr = this.sr;
+    const drift = p.drift ?? 0.35, dust = p.dust ?? 0.3, space = p.space ?? 0.5;
     const wave = [0, 2, 3, 1][Math.round(p.wave ?? 0)] ?? 0;
     const lv = [p.low ?? 0.5, p.hi ?? 0.8, p.higher ?? 0.25];
     const mult = [0.5, 1, 2];
     const det = (p.detune ?? 0.4) * 0.008;
     const a = p.attack ?? 0.8, d = p.decay ?? 1, s = p.sustain ?? 0.8, r = p.release ?? 2.2;
-    const lofi = p.lofi ?? 0.35, wow = p.wow ?? 0.35, width = p.width ?? 0.8;
-    const nz = (p.noise ?? 0.1) * 0.15;
+    const width = Math.min(1, 0.4 + space * 0.6);
+    const nz = (p.noise ?? 0.05) * 0.45 + dust * 0.05;
     const level = (p.level ?? 0.55) * 0.75;
-    const step = 1 + Math.floor(lofi * 6), levels = Math.pow(2, 14 - lofi * 9);
+    const lofi = dust * 0.9, step = 1 + Math.floor(lofi * 6), levels = Math.pow(2, 14 - lofi * 9);
+    const highCut = 14000 * Math.pow(2, -dust * 2.6);
     const res = p.reso ?? 0.15;
     const n = i1 - i0;
-    if (this.revBufL.length < n) { this.revBufL = new Float32Array(n); this.revBufR = new Float32Array(n); }
-    const bl = this.revBufL, br = this.revBufR;
+    if (this.revBufL.length < n) {
+      this.revBufL = new Float32Array(n); this.revBufR = new Float32Array(n); this.dryL = new Float32Array(n); this.dryR = new Float32Array(n);
+    }
+    const bl = this.revBufL, br = this.revBufR, dl = this.dryL, dr = this.dryR;
+    const preLen = Math.floor(space * 0.06 * sr), plen = this.pre[0].length;
     for (let i = i0; i < i1; i++) {
-      // Tape wow (slow) + flutter (fast): one pitch drift shared by every voice.
+      // Tape wow (slow) + flutter (fast): one pitch drift shared by every voice; a slower sway for the layers and the filter.
       this.wowPh = (this.wowPh + 0.45 / sr) % 1;
       this.flutPh = (this.flutPh + 6.3 / sr) % 1;
-      const drift = 1 + wow * (0.006 * Math.sin(TAU * this.wowPh) + 0.0015 * Math.sin(TAU * this.flutPh));
+      this.slowPh = (this.slowPh + 0.13 / sr) % 1;
+      const tape = 1 + drift * (0.007 * Math.sin(TAU * this.wowPh) + 0.0018 * Math.sin(TAU * this.flutPh));
       let l = 0, rr = 0;
       for (const v of this.voices) {
         if (!v.amp.active) continue;
-        const f = mtof(v.pitch) * drift * voiceMod.pitch;
+        const f = mtof(v.pitch) * tape * voiceMod.pitch;
         let x = 0;
         for (let k = 0; k < 3; k++) {
           if (lv[k] < 0.01) continue;
-          x += (v.osc[k * 2].next(f * mult[k] * (1 + det), sr, wave) + v.osc[k * 2 + 1].next(f * mult[k] * (1 - det), sr, wave)) * lv[k];
+          const sway = 1 + drift * 0.004 * Math.sin(TAU * (this.slowPh + k / 3));
+          x += (v.osc[k * 2].next(f * mult[k] * sway * (1 + det), sr, wave) + v.osc[k * 2 + 1].next(f * mult[k] * sway * (1 - det), sr, wave)) * lv[k];
         }
         x += noise() * nz;
         x *= v.amp.next(a, d, s, r, sr) * velGain(v.vel);
         const pan = v.pan * width;
         l += x * panL(pan); rr += x * panR(pan);
       }
-      this.cut = smooth(this.cut, p.cutoff ?? 2200, 0.002);
-      l = this.fL.lp(l, this.cut, res, sr);
-      rr = this.fR.lp(rr, this.cut, res, sr);
-      // Lo-fi: sample-rate and bit reduction blended in, plus a little hiss.
+      this.cut = smooth(this.cut, (p.cutoff ?? 2200) * Math.pow(2, drift * 0.6 * Math.sin(TAU * this.slowPh * 1.7)), 0.002);
+      l = this.hcL.lp(this.fL.lp(l, this.cut, res, sr), highCut, sr);
+      rr = this.hcR.lp(this.fR.lp(rr, this.cut, res, sr), highCut, sr);
+      // Dust: sample-rate and bit reduction blended in, plus a little hiss.
       if (this.cnt++ % step === 0) { this.hold[0] = Math.round(l * levels) / levels; this.hold[1] = Math.round(rr * levels) / levels; }
-      const hiss = noise() * 0.004 * lofi;
-      bl[i - i0] = (l * (1 - lofi) + this.hold[0] * lofi + hiss) * level;
-      br[i - i0] = (rr * (1 - lofi) + this.hold[1] * lofi + hiss) * level;
+      const hiss = noise() * 0.006 * dust;
+      const ol = (l * (1 - lofi) + this.hold[0] * lofi + hiss) * level, or = (rr * (1 - lofi) + this.hold[1] * lofi + hiss) * level;
+      dl[i - i0] = ol; dr[i - i0] = or;
+      // Space: a pre-delay into the reverb.
+      this.pre[0][this.pw] = ol; this.pre[1][this.pw] = or;
+      const rd = (this.pw - preLen + plen) % plen;
+      bl[i - i0] = this.pre[0][rd]; br[i - i0] = this.pre[1][rd];
+      this.pw = (this.pw + 1) % plen;
     }
-    this.rev.process(bl, br, n, p.revTime ?? 0.7, p.revLevel ?? 0.45);
-    for (let i = 0; i < n; i++) { L[i0 + i] += bl[i]; R[i0 + i] += br[i]; }
+    // The reverb keeps 65% of its input in: subtract it so only the room is added, at Space's level.
+    const inL = bl.slice(0, n), inR = br.slice(0, n);
+    this.rev.process(bl, br, n, Math.min(1, 0.3 + space * 0.7), 1);
+    const wet = space * 1.1;
+    for (let i = 0; i < n; i++) {
+      L[i0 + i] += dl[i] + (bl[i] - inL[i] * 0.65) * wet;
+      R[i0 + i] += dr[i] + (br[i] - inR[i] * 0.65) * wet;
+    }
     this.voices = this.voices.filter((v) => v.amp.active || v.held);
   }
 }

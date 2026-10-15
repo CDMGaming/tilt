@@ -21,7 +21,7 @@ import { trackColor } from "./theme";
 import { control, type ControlHost } from "./knob";
 
 /** Instruments rebuilt in the overhaul (docs/instruments.md): their own panel only, no MORE page. */
-const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums", "poly", "lead", "wobble"]);
+const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums", "poly", "lead", "wobble", "pad"]);
 /** Chordette: the category its sound list shows (null: the current sound's). */
 let chordetteCat: string | null = null;
 /** Kitbox: the channel whose More drawer is open (per session). */
@@ -135,15 +135,14 @@ export function buildPanel(app: App, track: Track): HTMLElement {
       keyboard(app, track),
     );
   } else if (track.kind === "pad") {
+    // Haze: frosted glass with glowing level bars: the three layers, then Drift, Dust, Space, Level.
     body = h("div", { class: "panel-body haze" },
-      h("div", { class: "knob-row" },
-        h("div", { class: "section-title small" }, "Layers"), ctl("wave", "Wave"), ctl("low", "Low", "s"), ctl("hi", "Hi", "s"), ctl("higher", "Higher", "s"), ctl("noise", "Noise", "s"), ctl("detune", "Detune", "s"),
-        h("div", { class: "section-title small" }, "Filter"), ctl("cutoff", "Cutoff", "l"), ctl("reso", "Reso")),
-      h("div", { class: "knob-row" },
-        h("div", { class: "section-title small" }, "Env"), ctl("attack", "A", "s"), ctl("decay", "D", "s"), ctl("sustain", "S", "s"), ctl("release", "R", "s"),
-        h("div", { class: "section-title small" }, "Lo-fi"), ctl("lofi", "LO-FI", "l"), ctl("wow", "Wow"),
-        h("div", { class: "section-title small" }, "Reverb"), ctl("revTime", "Time"), ctl("revLevel", "Level"),
-        ctl("width", "Width", "s"), ctl("level", "Out", "s")),
+      h("div", { class: "hz-glass" },
+        h("div", { class: "hz-title" }, "haze"),
+        h("div", { class: "hz-bars" },
+          h("div", { class: "hz-group" }, fdr("low", "Low"), fdr("hi", "Hi"), fdr("higher", "Higher")),
+          h("div", { class: "hz-group char" }, fdr("drift", "★ Drift"), fdr("dust", "★ Dust"), fdr("space", "★ Space")),
+          h("div", { class: "hz-group" }, fdr("level", "Level")))),
       keyboard(app, track),
     );
   } else if (track.kind === "chip") {

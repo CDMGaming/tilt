@@ -39,7 +39,10 @@ const TAGS: Partial<Record<InstrumentKind, Record<string, Role[]>>> = {
     "Sync Arp": ["arp", "pluck"], "Zap Arp": ["arp", "fx"], "Gated Sync": ["arp", "lead"],
   },
   wobble: { "Robot": ["bass", "fx"], "Laser Wob": ["bass", "fx"], "Riser Wub": ["fx", "bass"], "Siren": ["fx"], "Bit Storm": ["fx", "bass"], "Zapper": ["fx", "bass"] },
-  pad: { "Short Keys": ["keys"], "Bit Fog": ["pad", "fx"] },
+  pad: {
+    "Short Keys": ["keys"], "Lo-fi Piano": ["keys"], "Tape Rhodes": ["keys"], "Cassette Organ": ["keys"], "Bedroom Keys": ["keys"],
+    "Music Box Dust": ["keys", "pluck"], "Bit Fog": ["pad", "fx"], "Wind": ["fx", "pad"], "Vinyl Room": ["fx", "pad"], "Rain Glass": ["fx", "pad"],
+  },
   chip: {
     "Major Jump": ["arp"], "Minor Jump": ["arp"], "Octave Bounce": ["arp"], "Power Up": ["fx"], "Laser Blip": ["fx"],
     "Tri Bass": ["bass"], "Noise Snare": ["fx"],
@@ -114,9 +117,9 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
     pick("xTune", 0.3, [-12, 0, 5, 7, 12]), knob("reso", 0.15, 0, 0.7), pick("wobShape", 0.3, [0, 1, 2, 3]),
   ],
   pad: [
-    pick("wave", 0.25, [0, 1, 2, 3]), knob("low", 0.22), knob("hi", 0.2), knob("higher", 0.22), knob("noise", 0.15, 0, 0.5),
-    knob("detune", 0.22), knob("cutoff", 0.18, 0.2, 0.9), knob("reso", 0.12, 0, 0.6), knob("lofi", 0.25), knob("wow", 0.25),
-    knob("revTime", 0.18), knob("revLevel", 0.18, 0.1, 0.8), knob("attack", 0.06), knob("release", 0.06),
+    knob("drift", 0.22), knob("dust", 0.22), knob("space", 0.2), knob("low", 0.22), knob("hi", 0.2), knob("higher", 0.22),
+    pick("wave", 0.25, [0, 1, 2, 3]), knob("detune", 0.22), knob("noise", 0.12, 0, 0.5), knob("cutoff", 0.18, 0.2, 0.9),
+    knob("reso", 0.12, 0, 0.6), knob("attack", 0.06), knob("release", 0.06),
   ],
   chip: [
     pick("wave", 0.2, [0, 1, 2, 3]), knob("jumpRate", 0.18), knob("vibDepth", 0.15, 0, 0.5), knob("vibRate", 0.18),

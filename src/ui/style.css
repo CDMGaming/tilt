@@ -1288,3 +1288,17 @@ body.phone .panel-body.razor .knob.fader { width: 38px; }
 .panel-body.wobbler .wb-side .knob:nth-child(-n+2) .knob-label { color: #39ff7a; }
 .panel-body.wobbler .knob-val { stroke: #39ff7a; }
 .panel.kind-wobble { --cap-fill: #222427; --cap-edge: #39ff7a66; --knob-dot: #39ff7a; }
+
+/* Haze: frosted glass over a dusk gradient, soft white type, level bars that glow. */
+.panel-body.haze { padding: 0; overflow: hidden; border-top-color: #f3b6d6;
+  background: radial-gradient(circle at 20% 110%, #ff9e7a 0, transparent 45%), radial-gradient(circle at 85% -10%, #6c5ce7 0, transparent 50%), linear-gradient(160deg, #3b2a5c, #c06c84 70%, #f8b195); }
+.hz-glass { margin: 10px; padding: 8px 14px 10px; border-radius: 14px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  background: #ffffff1f; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid #ffffff3a; box-shadow: inset 0 1px 0 #ffffff40, 0 6px 20px #0003; }
+.hz-title { font: 300 28px var(--font-display); letter-spacing: .3em; color: #fff; opacity: .9; text-shadow: 0 0 12px #fff8; }
+.hz-bars { display: flex; gap: 16px; flex-wrap: wrap; flex: 1; justify-content: space-around; }
+.hz-group { display: flex; gap: 4px; }
+.panel-body.haze { --fader-slot: #ffffff22; --fader-fill: #fff; --fader-cap: #ffffffe6; }
+.panel-body.haze .fader-fill { opacity: .85; filter: drop-shadow(0 0 5px #fff); }
+.panel-body.haze .hz-group.char { --fader-fill: #ffd9ec; }
+.panel-body.haze .knob-label { color: #fff; opacity: .95; font-weight: 600; text-shadow: 0 1px 4px #0005; }
+.panel-body.haze .knob-value { color: #ffffffcc; }

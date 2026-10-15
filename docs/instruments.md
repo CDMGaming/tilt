@@ -261,6 +261,9 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** G, frosted glass with level bars that glow.
 - **Theme:** frosted glass over a dusk gradient, soft white type.
 - **Presets:** 24 (pads, keys, textures).
+- **Status: built.** Seven glowing level bars (the shared fader). Drift: tape wow, the layers swaying
+  against each other, a slow filter sway; Dust: hiss, bit / rate wear, a high cut; Space: reverb time and
+  level, pre-delay up to 60 ms, width. 24 presets (12 pads, 6 keys, 6 textures), level-matched.
 
 ### Pixel: chiptune
 - **Idea:** 8-bit game sounds: pulses, arpeggio jumps, sweeps and glitches.
