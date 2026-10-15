@@ -20,7 +20,7 @@ import { trackColor } from "./theme";
 import { control, type ControlHost } from "./knob";
 
 /** Instruments rebuilt in the overhaul (docs/instruments.md): their own panel only, no MORE page. */
-const REDESIGNED = new Set<Track["kind"]>(["acid"]);
+const REDESIGNED = new Set<Track["kind"]>(["acid", "analog"]);
 /** Squelch's arp lid, open or shut (per session). */
 let squelchLid = false;
 
@@ -62,18 +62,25 @@ export function buildPanel(app: App, track: Track): HTMLElement {
       ),
     );
   } else if (track.kind === "analog") {
-    const mod = (i: number, title: string, ids: string[], extra?: string) => h("div", { class: `module m${i}` },
-      h("div", { class: "module-title" }, title),
-      ids.map((id) => ctl(id, undefined, "s")),
-      extra ? ctl(extra, "Shape") : null);
+    // Thump Lab: eight compact modules, each with only the controls that matter for that drum,
+    // its pad on top and a Level / Pan foot; the master strip holds the ★ Model switch.
+    const mod = (i: number, ids: string[], foot: [string, string]) => h("div", { class: `tl-mod m${i}` + (app.ed.drumPart === i ? " sel" : "") },
+      pad(app, track, i),
+      h("div", { class: "tl-knobs" }, ids.map((id) => ctl(id, undefined, "s"))),
+      h("div", { class: "tl-foot" }, ctl(foot[0], "Level", "s"), ctl(foot[1], "Pan", "s")));
     body = h("div", { class: "panel-body thumplab" },
-      h("div", { class: "pads four" }, Array.from({ length: 4 }, (_, i) => pad(app, track, i))),
-      h("div", { class: "modules" },
-        mod(0, "Kick", ["kTune", "kDecay", "kBend", "kDrive", "kLevel"]),
-        mod(1, "Snare", ["sTune", "sDecay", "sSnappy", "sTone", "sLevel"]),
-        mod(2, "Tom", ["tTune", "tDecay", "tBend", "tNoise", "tLevel"]),
-        mod(3, "Perc", ["pTune", "pDecay", "pDepth", "pLevel"], "pShape")),
-      h("div", { class: "knob-row" }, ctl("level", "Master")),
+      h("div", { class: "tl-rack" },
+        mod(0, ["kTune", "kDecay", "kBend", "kBoost", "kClick"], ["kLevel", "kPan"]),
+        mod(1, ["sTune", "sDecay", "sSnappy", "sPunch", "sTone"], ["sLevel", "sPan"]),
+        mod(2, ["cDecay", "cSpread", "cTone", "cRoom"], ["cLevel", "cPan"]),
+        mod(3, ["hDecay", "hTone", "hMetal"], ["hLevel", "hPan"]),
+        mod(4, ["oDecay", "oTone", "oMetal"], ["oLevel", "oPan"]),
+        mod(5, ["ltTune", "ltDecay", "ltBend", "ltNoise"], ["ltLevel", "ltPan"]),
+        mod(6, ["htTune", "htDecay", "htBend", "htNoise"], ["htLevel", "htPan"]),
+        mod(7, ["pType", "pTune", "pDecay", "pDepth", "pSpeed"], ["pLevel", "pPan"])),
+      h("div", { class: "tl-master" },
+        h("div", { class: "tl-logo" }, "THUMP", h("br"), "LAB"),
+        ctl("model", "★ Model", "l"), ctl("accent", "Accent"), ctl("level", "Level")),
     );
   } else if (track.kind === "lead") {
     body = h("div", { class: "panel-body razor" },

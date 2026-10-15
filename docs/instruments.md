@@ -141,6 +141,12 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Macros:** Kick decay · Kick bend · Snare snappy · Snare tune · Hat decay · Tom tune · Accent · Level.
 - **Layout:** B, 8 modules side by side (two rows of four on narrow screens), one colour each.
 - **Theme:** powder-coated modules in 8 bright colours, white knob caps, small engraved module numbers.
+- **Status: built** (new engine, src/engine/dsp/thumplab-dsp.ts). Parts are in Kitbox's note order
+  (kick, snare, clap, closed hat, open hat, low tom, high tom, perc), so phrases fit both; the
+  closed hat chokes the open one; Accent lifts notes at velocity 100+. Perc's Type is rim /
+  cowbell / clave. Each Model has its own part balance, and presets are level-matched halfway
+  (a long boom stays a bit bigger than a tight kit). Old Thump Lab songs aren't kept compatible
+  (agreed). 24 presets, none carried over.
 - **Presets:** 24 (Model × style: club, hip-hop, electro, minimal, lo-fi...).
 
 ### Squelch: acid bass

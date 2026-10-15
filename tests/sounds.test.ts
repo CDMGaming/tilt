@@ -9,7 +9,8 @@ import {
 import { NO_HOLDS, decodeSetup, defaultSpec, encodeSetup, nudgeSetup, setupFromSong, songFromSetup, type Setup } from "../src/engine/dice.ts";
 import { Rng } from "../src/engine/rng.ts";
 import { PolyDSP, AcidDSP, type InstrumentDSP } from "../src/engine/dsp/instruments-dsp.ts";
-import { LeadDSP, AnalogDrumsDSP, WobbleDSP, PadDSP } from "../src/engine/dsp/instruments2-dsp.ts";
+import { LeadDSP, WobbleDSP, PadDSP } from "../src/engine/dsp/instruments2-dsp.ts";
+import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
 import { ChipDSP, FmDSP } from "../src/engine/dsp/instruments3-dsp.ts";
 import type { InstrumentKind } from "../src/engine/model.ts";
 
@@ -69,7 +70,7 @@ function dspFor(kind: InstrumentKind, params: Record<string, number>): Instrumen
   switch (kind) {
     case "acid": return new AcidDSP(params, SR, clock);
     case "lead": return new LeadDSP(params, SR);
-    case "analog": return new AnalogDrumsDSP(params, SR);
+    case "analog": return new ThumpLabDSP(params, SR);
     case "wobble": return new WobbleDSP(params, SR, clock);
     case "pad": return new PadDSP(params, SR);
     case "chip": return new ChipDSP(params, SR);

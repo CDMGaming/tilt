@@ -45,51 +45,115 @@ export const LEAD: InstrumentDef = {
   ],
 };
 
-// ---------- analog drum modules: "Thump Lab" (all synthesis, no samples) ----------
+// ---------- analog drum machine: "Thump Lab" (all synthesis, no samples) ----------
 
-export const ANALOG_PARTS = ["Kick", "Snare", "Tom", "Perc"];
-export const PERC_SHAPES = ["Metal", "Click", "FM", "Noise"];
+/** Parts in note order (from the drum base note): the same order as Kitbox's, so phrases fit both. */
+export const ANALOG_PARTS = ["Kick", "Snare", "Clap", "Closed Hat", "Open Hat", "Low Tom", "High Tom", "Perc"];
+export const PERC_TYPES = ["Rim", "Cowbell", "Clave"];
+export const THUMP_MODELS = ["Deep", "Club", "Tiny", "Parlour", "Hex"];
+
+const tl = (model: number, extra: Record<string, number> = {}) => ({ model, ...extra });
 
 export const ANALOG: InstrumentDef = {
   kind: "analog",
   name: "Thump Lab",
-  role: "Analog drum modules: kick, snare, tom, perc",
+  role: "Analog drum machine: eight synthesized parts, five models",
   group: "drums",
-  drumParts: 4,
+  drumParts: 8,
   partNames: ANALOG_PARTS,
   params: [
-    { id: "kTune", label: "Tune", min: 30, max: 120, def: 52, curve: "exp", unit: "Hz" },
+    { id: "model", label: "Model", min: 0, max: 4, def: 1, options: THUMP_MODELS },
+    { id: "accent", label: "Accent", min: 0, max: 1, def: 0.3 },
+    { id: "level", label: "Level", min: 0, max: 1, def: 0.85 },
+    // Kick
+    { id: "kTune", label: "Tune", min: 30, max: 120, def: 50, curve: "exp", unit: "Hz" },
     { id: "kDecay", label: "Decay", min: 0.05, max: 2, def: 0.5, curve: "exp", unit: "s" },
     { id: "kBend", label: "Bend", min: 0, max: 1, def: 0.5 },
-    { id: "kDrive", label: "Boost", min: 0, max: 1, def: 0.2 },
+    { id: "kBoost", label: "Boost", min: 0, max: 1, def: 0.3 },
+    { id: "kClick", label: "Click", min: 0, max: 1, def: 0.4 },
     { id: "kLevel", label: "Level", min: 0, max: 1, def: 0.9 },
+    { id: "kPan", label: "Pan", min: -1, max: 1, def: 0 },
+    // Snare
     { id: "sTune", label: "Tune", min: 100, max: 400, def: 190, curve: "exp", unit: "Hz" },
     { id: "sDecay", label: "Decay", min: 0.05, max: 1, def: 0.22, curve: "exp", unit: "s" },
     { id: "sSnappy", label: "Snappy", min: 0, max: 1, def: 0.6 },
-    { id: "sTone", label: "Tone", min: 0, max: 1, def: 0.55 },
+    { id: "sPunch", label: "Punch", min: 0, max: 1, def: 0.3 },
+    { id: "sTone", label: "Tone", min: 0, max: 1, def: 0.5 },
     { id: "sLevel", label: "Level", min: 0, max: 1, def: 0.75 },
-    { id: "tTune", label: "Tune", min: 60, max: 400, def: 120, curve: "exp", unit: "Hz" },
-    { id: "tDecay", label: "Decay", min: 0.05, max: 1.5, def: 0.4, curve: "exp", unit: "s" },
-    { id: "tBend", label: "Bend", min: 0, max: 1, def: 0.4 },
-    { id: "tNoise", label: "Noise", min: 0, max: 1, def: 0.15 },
-    { id: "tLevel", label: "Level", min: 0, max: 1, def: 0.7 },
+    { id: "sPan", label: "Pan", min: -1, max: 1, def: 0 },
+    // Clap
+    { id: "cDecay", label: "Decay", min: 0.05, max: 1, def: 0.3, curve: "exp", unit: "s" },
+    { id: "cSpread", label: "Spread", min: 0, max: 1, def: 0.5 },
+    { id: "cTone", label: "Tone", min: 0, max: 1, def: 0.5 },
+    { id: "cRoom", label: "Room", min: 0, max: 1, def: 0.3 },
+    { id: "cLevel", label: "Level", min: 0, max: 1, def: 0.7 },
+    { id: "cPan", label: "Pan", min: -1, max: 1, def: 0.1 },
+    // Closed hat
+    { id: "hDecay", label: "Decay", min: 0.01, max: 0.5, def: 0.06, curve: "exp", unit: "s" },
+    { id: "hTone", label: "Tone", min: 0, max: 1, def: 0.5 },
+    { id: "hMetal", label: "Metal", min: 0, max: 1, def: 0.6 },
+    { id: "hLevel", label: "Level", min: 0, max: 1, def: 0.55 },
+    { id: "hPan", label: "Pan", min: -1, max: 1, def: -0.2 },
+    // Open hat
+    { id: "oDecay", label: "Decay", min: 0.05, max: 2, def: 0.35, curve: "exp", unit: "s" },
+    { id: "oTone", label: "Tone", min: 0, max: 1, def: 0.5 },
+    { id: "oMetal", label: "Metal", min: 0, max: 1, def: 0.6 },
+    { id: "oLevel", label: "Level", min: 0, max: 1, def: 0.5 },
+    { id: "oPan", label: "Pan", min: -1, max: 1, def: -0.2 },
+    // Low tom
+    { id: "ltTune", label: "Tune", min: 50, max: 300, def: 100, curve: "exp", unit: "Hz" },
+    { id: "ltDecay", label: "Decay", min: 0.05, max: 1.5, def: 0.45, curve: "exp", unit: "s" },
+    { id: "ltBend", label: "Bend", min: 0, max: 1, def: 0.4 },
+    { id: "ltNoise", label: "Noise", min: 0, max: 1, def: 0.15 },
+    { id: "ltLevel", label: "Level", min: 0, max: 1, def: 0.7 },
+    { id: "ltPan", label: "Pan", min: -1, max: 1, def: -0.3 },
+    // High tom
+    { id: "htTune", label: "Tune", min: 80, max: 500, def: 170, curve: "exp", unit: "Hz" },
+    { id: "htDecay", label: "Decay", min: 0.05, max: 1.5, def: 0.35, curve: "exp", unit: "s" },
+    { id: "htBend", label: "Bend", min: 0, max: 1, def: 0.4 },
+    { id: "htNoise", label: "Noise", min: 0, max: 1, def: 0.15 },
+    { id: "htLevel", label: "Level", min: 0, max: 1, def: 0.7 },
+    { id: "htPan", label: "Pan", min: -1, max: 1, def: 0.3 },
+    // Perc
+    { id: "pType", label: "Type", min: 0, max: 2, def: 0, options: PERC_TYPES },
     { id: "pTune", label: "Tune", min: 200, max: 3000, def: 800, curve: "exp", unit: "Hz" },
     { id: "pDecay", label: "Decay", min: 0.02, max: 1, def: 0.12, curve: "exp", unit: "s" },
-    { id: "pShape", label: "Shape", min: 0, max: 3, def: 0, options: PERC_SHAPES },
-    { id: "pDepth", label: "Depth", min: 0, max: 1, def: 0.5 },
+    { id: "pDepth", label: "Depth", min: 0, max: 1, def: 0 },
+    { id: "pSpeed", label: "Speed", min: 0, max: 1, def: 0 },
     { id: "pLevel", label: "Level", min: 0, max: 1, def: 0.6 },
-    { id: "level", label: "Level", min: 0, max: 1, def: 0.85 },
+    { id: "pPan", label: "Pan", min: -1, max: 1, def: 0.25 },
   ],
-  macros: ["kTune", "kDecay", "kBend", "sTune", "sSnappy", "tTune", "pTune", "pDepth"],
+  macros: ["kDecay", "kBend", "sSnappy", "sTune", "hDecay", "ltTune", "accent", "level"],
   presets: [
-    { name: "Classic Boom", params: {} },
-    { name: "Tight Techno", params: { kTune: 55, kDecay: 0.3, kBend: 0.35, kDrive: 0.5, sDecay: 0.15, pShape: 0, pDecay: 0.05 } },
-    { name: "Deep 808-ish", params: { kTune: 42, kDecay: 1.6, kBend: 0.25, kDrive: 0.3, sTune: 170, tTune: 90 } },
-    { name: "Punch Box", params: { kDrive: 0.8, kBend: 0.7, sSnappy: 0.8, sTone: 0.8, tDecay: 0.25 } },
-    { name: "Electro Toms", params: { tTune: 180, tBend: 0.8, tDecay: 0.6, pShape: 2, pTune: 600, pDepth: 0.8 } },
-    { name: "Clicky", params: { kDecay: 0.18, kBend: 0.9, pShape: 1, pTune: 2200, pDecay: 0.03, sDecay: 0.1 } },
-    { name: "Noise Lab", params: { sSnappy: 1, sTone: 0.9, pShape: 3, pTune: 2500, tNoise: 0.6 } },
-    { name: "Soft Lo", params: { kTune: 48, kDecay: 0.8, kDrive: 0, sTone: 0.3, sSnappy: 0.4, pShape: 2, pDepth: 0.3 } },
+    // Deep: big, boomy, metallic
+    { name: "Deep Classic", params: tl(0, { level: 0.82 }) },
+    { name: "Long Boom", params: tl(0, { level: 0.64, kDecay: 1.6, kTune: 42, kBend: 0.25, kBoost: 0.4 }) },
+    { name: "Cowbell Disco", params: tl(0, { level: 0.82, pType: 1, pTune: 760, cRoom: 0.5, oDecay: 0.5 }) },
+    { name: "Slow Jam", params: tl(0, { level: 0.72, kDecay: 0.9, sSnappy: 0.4, sTone: 0.3, cSpread: 0.7 }) },
+    { name: "Trap Room", params: tl(0, { level: 0.65, kDecay: 1.9, kTune: 40, hDecay: 0.03, htTune: 230, cRoom: 0.7 }) },
+    // Club: punchy, clicky, noisy
+    { name: "Club Standard", params: tl(1, { level: 0.82 }) },
+    { name: "Warehouse", params: tl(1, { level: 0.74, kBoost: 0.7, kClick: 0.7, kDecay: 0.45, sPunch: 0.6, oDecay: 0.5, hMetal: 0.3 }) },
+    { name: "Tight Techno", params: tl(1, { level: 0.86, kDecay: 0.3, kBend: 0.35, kBoost: 0.5, sDecay: 0.15, hDecay: 0.03 }) },
+    { name: "House Shuffle", params: tl(1, { level: 0.82, cRoom: 0.5, oDecay: 0.25, pType: 2, pTune: 900 }) },
+    { name: "Hard Floor", params: tl(1, { level: 0.60, kBoost: 1, kClick: 1, sSnappy: 0.9, sPunch: 0.8, accent: 0.7 }) },
+    // Tiny: small, tight, bright
+    { name: "Tiny Box", params: tl(2, { level: 0.99 }) },
+    { name: "Bleep Kit", params: tl(2, { level: 0.99, pType: 2, pTune: 1400, hMetal: 0.9 }) },
+    { name: "Pocket Electro", params: tl(2, { level: 0.89, kDecay: 0.8, kBend: 0.8, sSnappy: 0.4 }) },
+    { name: "Toy Room", params: tl(2, { level: 0.98, cRoom: 0.6, kTune: 60 }) },
+    { name: "Tick Tock", params: tl(2, { level: 0.99, hDecay: 0.02, pType: 0, pDecay: 0.05 }) },
+    // Parlour: a soft, vintage rhythm box
+    { name: "Parlour Waltz", params: tl(3, { level: 1.00 }) },
+    { name: "Bossa Box", params: tl(3, { level: 1.00, pType: 2, pTune: 900, kDecay: 0.4 }) },
+    { name: "Organ Top", params: tl(3, { level: 1.00, hMetal: 0.2, hTone: 0.3, sTone: 0.2 }) },
+    { name: "Soft Shuffle", params: tl(3, { level: 1.00, cSpread: 0.8, cRoom: 0.5, sSnappy: 0.5 }) },
+    { name: "Lounge", params: tl(3, { level: 1.00, ltTune: 120, htTune: 200, ltBend: 0.1, htBend: 0.1 }) },
+    // Hex: electronic toms and sweeps
+    { name: "Hex Toms", params: tl(4, { level: 0.84 }) },
+    { name: "Pew Pew", params: tl(4, { level: 0.85, ltBend: 1, htBend: 1, ltDecay: 0.8, htDecay: 0.6, sDecay: 0.4 }) },
+    { name: "Synth Pop", params: tl(4, { level: 0.85, kBend: 0.7, sTone: 0.7, cRoom: 0.5 }) },
+    { name: "Glitch Rack", params: tl(4, { level: 0.84, pSpeed: 0.6, pDepth: 0.8, hMetal: 1 }) },
   ],
 };
 

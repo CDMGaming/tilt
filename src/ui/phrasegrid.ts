@@ -53,7 +53,7 @@ function apply(song: Song, sceneId: number, chosen: (Phrase | null)[]) {
     if (chordMode) for (const n of ph.notes) lowest.set(n.start, Math.min(lowest.get(n.start) ?? 999, n.pitch));
     for (const n of ph.notes) {
       if (chordMode && lowest.get(n.start) !== n.pitch) continue;
-      const pitch = drums ? DRUM_BASE_NOTE + mapDrumPart(n.pitch, drumCount(t.kind)) : n.pitch;
+      const pitch = drums ? DRUM_BASE_NOTE + mapDrumPart(n.pitch, drumCount(t.kind), t.kind) : n.pitch;
       addNote(song, clip, { pitch, start: n.start, len: Math.max(1, Math.round(n.len)), vel: n.vel });
     }
   });

@@ -214,10 +214,10 @@ function dedupe(notes: PNote[]): PNote[] {
 }
 
 /** Map Kitbox part indices to another drum instrument's pads. */
-export function mapDrumPart(part: number, pads: number): number {
-  if (pads >= 8) return part;
-  // Thump Lab: kick, snare, tom, perc.
-  return [0, 1, 1, 3, 3, 2, 1, 3][part] ?? 0;
+export function mapDrumPart(part: number, pads: number, kind?: string): number {
+  // Thump Lab has Kitbox's order, with one tom pad more: rim and perc both go to its Perc.
+  if (kind === "analog") return [0, 1, 2, 3, 4, 5, 7, 7][part] ?? 0;
+  return part < pads ? part : 0;
 }
 
 /** Stable seed from a share code (so friends get the same grid). */

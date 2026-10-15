@@ -439,7 +439,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .panel .key small { color: var(--key-chord); }
 
 /* drum machines lay out side by side: pads, then the editor */
-.panel.kind-drums .panel-body, .panel.kind-analog .panel-body { flex-direction: row; flex-wrap: wrap; gap: 16px; }
+.panel.kind-drums .panel-body { flex-direction: row; flex-wrap: wrap; gap: 16px; }
 .pads { display: grid; grid-template-columns: repeat(4, 84px); grid-template-rows: repeat(2, 72px); gap: 8px; }
 .pads.four { grid-template-columns: repeat(2, 84px); grid-template-rows: repeat(2, 72px); }
 .pad { background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-m); display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between;
@@ -453,10 +453,6 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .part-edit { display: flex; flex-direction: column; gap: 6px; }
 
 /* Thump Lab: one stripe colour per module */
-.modules { display: flex; gap: 8px; flex-wrap: wrap; }
-.module { display: flex; gap: 2px; align-items: flex-end; flex-wrap: wrap; max-width: 300px; padding: 6px 8px 4px; border-radius: var(--r-m); background: var(--well); border-top: 3px solid var(--mod); }
-.module.m0 { --mod: var(--coral); } .module.m1 { --mod: var(--purple); } .module.m2 { --mod: var(--inst-poly); } .module.m3 { --mod: var(--inst-acid); }
-.module-title { width: 100%; font-weight: 900; letter-spacing: .1em; font-size: 12px; text-transform: uppercase; color: var(--mod); }
 
 /* small identity cues */
 .panel.kind-lead .inst-name { font-style: italic; }
@@ -466,7 +462,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 /* ---------------------------------------------------------------- typography
    Display face for identity and headings; fixed-width digits for anything that changes. */
 .brand, .logo, .inst-name, .die-value, .th-name, .sh-name, .strip-name, .pick-name, .song-title,
-.go-btn, .roll-btn, .module-title, .pg-role, .count-in, .timer, .tb-trackname, .lib-title {
+.go-btn, .roll-btn, .pg-role, .count-in, .timer, .tb-trackname, .lib-title {
   font-family: var(--font-display);
 }
 .brand, .logo { letter-spacing: .12em; text-transform: uppercase; }
@@ -646,36 +642,12 @@ body.phone .editor, body.phone .couch-ed .ed-toolbar { min-width: 0; }
   body.phone .couch-ed .tb-tools { gap: 3px; }
   body.phone .couch-ed .tb-tools .tb-value { min-width: 0; padding: 0 3px; }
 }
-/* Thump Lab on a phone: big pads 2x2, the four drum modules 2x2 (desktop keeps its row layout). */
-body.phone .panel-body.thumplab { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "pads" "mods" "master"; gap: 10px; padding: 8px; }
-body.phone .thumplab .pads.four { grid-area: pads; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, 68px); gap: 8px; }
-body.phone .thumplab .pad { width: auto; padding: 8px 10px; }
-body.phone .thumplab .pad-label { font-size: 17px; }
-body.phone .thumplab .modules { grid-area: mods; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-body.phone .thumplab .module { max-width: none; justify-content: space-evenly; align-content: flex-start; padding: 6px 4px 4px; }
-body.phone .thumplab .module-title { padding-left: 4px; }
-body.phone .thumplab > .knob-row { grid-area: master; justify-content: center; }
-@media (orientation: landscape) {
-  body.phone .panel-body.thumplab { grid-template-columns: 220px minmax(0, 1fr); grid-template-areas: "pads mods" "master mods"; align-items: start; }
-}
 /* Phones: the preset bar on one line (the instrument's description is for the big screen). */
 body.phone .preset-bar { flex-wrap: nowrap; min-width: 0; }
 body.phone .inst-role { display: none; }
 body.phone .inst-name { white-space: nowrap; flex: none; }
 body.phone .preset-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 body.phone .preset-save { flex: none; padding-left: 8px; padding-right: 8px; }
-body.phone .thumplab .pads.four { grid-template-rows: repeat(2, 60px); }
-@media (orientation: landscape) {
-  body.phone .thumplab .module { flex-wrap: nowrap; gap: 0; justify-content: space-between; }
-  body.phone .thumplab .module-title { position: absolute; }
-  body.phone .thumplab .module { position: relative; padding-top: 18px; }
-}
-@media (orientation: landscape) {
-  body.phone .thumplab .module-title { top: 3px; left: 8px; }
-  body.phone .thumplab .module .knob { width: auto; flex: 1 1 0; min-width: 0; }
-  body.phone .thumplab .module .knob-label { font-size: 9px; letter-spacing: 0; }
-  body.phone .thumplab .module .knob-value { font-size: 10px; }
-}
 
 /* ---------- TILT: a hint of pinball (dot-matrix display amber on the logo and the timer only) ---------- */
 :root { --dmd: #ffa62b; }
@@ -832,7 +804,37 @@ body.phone .dice-bar .roll-btn, body.phone .dice-bar .go-btn { padding: 8px 14px
 /* Thump Lab: brushed metal with screws; knurled caps. */
 .panel.kind-analog .inst-name { color: #2a1607; border: none; border-radius: 4px; padding: 3px 18px;
   background: radial-gradient(circle at 7px 50%, #0006 0 2px, transparent 2.5px), radial-gradient(circle at calc(100% - 7px) 50%, #0006 0 2px, transparent 2.5px), repeating-linear-gradient(90deg, #ffffff14 0 1px, transparent 1px 3px), var(--track); }
-.panel.kind-analog { --cap-dash: 1.2 1.2; --cap-edge: color-mix(in srgb, var(--track) 70%, #000); --cap-edge-w: 1.6; --cap-fill: #2a2018; }
+.panel.kind-analog { --cap-fill: #f1efe8; --cap-edge: #0005; --cap-edge-w: 1; --knob-dot: #1b1b1b; --arc-w: 3; }
+/* Thump Lab: eight powder-coated modules in bright colours, white knob caps, engraved numbers. */
+.panel-body.thumplab { display: flex; flex-direction: row; gap: 10px; align-items: stretch; padding: 10px; background: #1d1d20; }
+.tl-rack { flex: 1; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; min-width: 0; }
+.tl-mod { --mod: #e8644f; display: flex; flex-direction: column; gap: 4px; padding: 5px 4px 4px; border-radius: 8px; min-width: 0;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--mod) 92%, #fff), color-mix(in srgb, var(--mod) 78%, #000));
+  box-shadow: inset 0 1px 0 #fff5, inset 0 -2px 0 #0003, 0 2px 4px #0006; color: #141414; }
+.tl-mod.m0 { --mod: #e8644f; } .tl-mod.m1 { --mod: #f09a3c; } .tl-mod.m2 { --mod: #e9c946; } .tl-mod.m3 { --mod: #9bcf54; }
+.tl-mod.m4 { --mod: #4fc2a6; } .tl-mod.m5 { --mod: #57a6e3; } .tl-mod.m6 { --mod: #9b82e0; } .tl-mod.m7 { --mod: #e27bb4; }
+.tl-mod.sel { outline: 2px solid #fff; outline-offset: 1px; }
+.tl-mod .pad { width: auto; min-height: 44px; padding: 4px 6px; background: #0000002a; border: 1px solid #0003; color: #111; border-radius: 6px; box-shadow: inset 0 1px 2px #0004; }
+.tl-mod .pad.selected { background: #fff9; }
+.tl-mod .pad-num { color: #0008; font-weight: 800; }
+.tl-mod .pad-label { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #111; }
+.tl-knobs, .tl-foot { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); justify-items: center; gap: 0 2px; }
+.tl-foot { margin-top: auto; padding-top: 4px; border-top: 1px dashed #0004; }
+.tl-mod .knob { width: auto; }
+.panel .tl-mod .knob-label { color: #121212; opacity: 1; font-weight: 700; font-size: 10px; letter-spacing: .02em; }
+.panel .tl-mod .knob-value { color: #222; opacity: .85; font-size: 10px; }
+.panel .tl-mod .knob-track { stroke: #0000002a; }
+.panel .tl-mod .knob-val { stroke: #161616; }
+.tl-mod .switch { min-width: 0; padding: 4px; background: #1c1c1c; color: #fff; grid-column: 1 / -1; }
+.tl-master { display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 10px; border-left: 1px solid #fff2; min-width: 86px; }
+.tl-logo { font: 900 14px/1.05 var(--font-display); letter-spacing: .18em; text-align: center; color: #f1efe8; }
+.tl-master .knob-label { color: #f1efe8; }
+.tl-master .knob:first-of-type .knob-label { color: #ffcf4a; }
+@media (max-width: 1100px) { .tl-rack { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+body.phone .panel-body.thumplab { flex-direction: column; padding: 8px; }
+body.phone .tl-rack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+body.phone .tl-knobs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+body.phone .tl-master { flex-direction: row; border-left: none; border-top: 1px solid #fff2; padding-top: 8px; }
 /* Squelch: brushed silver, black engraved labels, red pointer knobs, an accent LED. */
 .panel.kind-acid .inst-name { font-family: var(--font-mono); background: #0d1306; color: var(--track); border: 1px solid color-mix(in srgb, var(--track) 45%, #000); box-shadow: inset 0 0 8px #000a; text-shadow: 0 0 6px color-mix(in srgb, var(--track) 60%, transparent); }
 .panel.kind-acid { --arc-w: 2.5; --cap-fill: #1b1b1d; --cap-edge: #000; --cap-edge-w: 1.4; --knob-dot: #e8322c; --dot-w: 3; }
@@ -936,15 +938,6 @@ button.rail-btn.rec.on .rail-label, button.rail-btn.play.on .rail-label { color:
 .pad.lit { background: var(--track); color: var(--key-ink); box-shadow: 0 0 14px color-mix(in srgb, var(--track) 50%, transparent); }
 
 /* Thump Lab on desktop: big pads | the four drum modules 2x2 | master, across the whole width. */
-body:not(.phone) .panel-body.thumplab { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) auto; grid-template-areas: "pads mods master"; align-items: stretch; gap: 14px; }
-body:not(.phone) .thumplab .pads.four { grid-area: pads; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(70px, 1fr)); gap: 8px; }
-body:not(.phone) .thumplab .pad { width: auto; padding: 10px 12px; }
-body:not(.phone) .thumplab .pad-label { font-size: 17px; }
-body:not(.phone) .thumplab .modules { grid-area: mods; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-body:not(.phone) .thumplab .module { max-width: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; justify-items: center; gap: 2px; padding: 6px 8px 6px; }
-body:not(.phone) .thumplab .module-title { grid-column: 1 / -1; justify-self: start; }
-body:not(.phone) .thumplab .module .knob { width: auto; }
-body:not(.phone) .thumplab > .knob-row { grid-area: master; flex-direction: column; justify-content: center; padding-left: 14px; border-left: 1px solid var(--line); }
 
 /* ---------- The setup screen as a quick start: editable reels, HOLD, NUDGE, NEW SONG ---------- */
 .reel-value { background: transparent; border: none; box-shadow: none; padding: 4px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--ink); border-radius: var(--r-s); }
@@ -1049,16 +1042,6 @@ body.phone .song-grid .cell, body.phone .song-grid .scene-head, body.phone .song
 .menu-layer:has(.menu.sheet) { background: #0007; }
 @keyframes sheet-up { from { transform: translateY(30%); opacity: .4; } }
 @media (prefers-reduced-motion: reduce) { .menu.sheet { animation: none; } }
-
-/* Thump Lab between phone and wide desktop (~800-1100 px): pads in one row on top, so the
-   modules get the width and their knob labels don't run into each other. */
-@media (max-width: 1100px) {
-  body:not(.phone) .panel-body.thumplab { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "pads pads" "mods master"; row-gap: 10px; }
-  body:not(.phone) .thumplab .pads.four { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: minmax(52px, auto); }
-  body:not(.phone) .thumplab .module { padding: 6px 4px; }
-  body:not(.phone) .thumplab .module .knob-label { font-size: 10px; letter-spacing: 0; }
-  body:not(.phone) .thumplab .module .switch { min-width: 0; padding: 4px 2px; }
-}
 
 /* ---------- First-song tutorial: soft spotlight, a small card, the offer ---------- */
 .coach-spot { position: fixed; z-index: 40; pointer-events: none; border-radius: 12px; display: none;

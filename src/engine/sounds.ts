@@ -76,9 +76,13 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
     pick(`p${i}smp`, 0.35, sounds), knob(`p${i}tune`, 0.08), knob(`p${i}decay`, 0.12), knob(`p${i}drive`, 0.15, 0, 0.6), knob(`p${i}tone`, 0.12, 0.2, 0.8),
   ]),
   analog: [
-    knob("kTune", 0.12), knob("kDecay", 0.18), knob("kBend", 0.22), knob("kDrive", 0.2, 0, 0.7), knob("sTune", 0.18), knob("sDecay", 0.18),
-    knob("sSnappy", 0.22), knob("sTone", 0.2), knob("tTune", 0.2), knob("tDecay", 0.2), knob("tBend", 0.2), knob("tNoise", 0.2, 0, 0.6),
-    knob("pTune", 0.22), knob("pDecay", 0.18), knob("pDepth", 0.22), pick("pShape", 0.3, [0, 1, 2, 3]),
+    pick("model", 0.2, [0, 1, 2, 3, 4]),
+    knob("kTune", 0.12), knob("kDecay", 0.18), knob("kBend", 0.22), knob("kBoost", 0.2, 0, 0.8), knob("kClick", 0.2),
+    knob("sTune", 0.18), knob("sDecay", 0.18), knob("sSnappy", 0.22), knob("sPunch", 0.2), knob("sTone", 0.2),
+    knob("cDecay", 0.18), knob("cSpread", 0.25), knob("cTone", 0.2), knob("cRoom", 0.2),
+    knob("hDecay", 0.15), knob("hTone", 0.2), knob("hMetal", 0.25), knob("oDecay", 0.18), knob("oTone", 0.2), knob("oMetal", 0.25),
+    knob("ltTune", 0.18), knob("ltDecay", 0.18), knob("ltBend", 0.22), knob("htTune", 0.18), knob("htDecay", 0.18), knob("htBend", 0.22),
+    pick("pType", 0.3, [0, 1, 2]), knob("pTune", 0.2), knob("pDecay", 0.18),
   ],
   acid: [
     pick("wave", 0.3, [0, 1]), knob("cutoff", 0.2, 0.15, 0.75), knob("reso", 0.22, 0.1, 0.92), knob("envmod", 0.25), knob("decay", 0.2, 0.05, 0.8),

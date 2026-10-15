@@ -4,7 +4,8 @@
 import { AcidDSP, DrumsDSP, PolyDSP, type Clock, type InstrumentDSP } from "./instruments-dsp";
 import { makeFx, type Fx } from "./fx-dsp";
 import { FX_SLOTS, type InstrumentKind } from "../model";
-import { AnalogDrumsDSP, LeadDSP, PadDSP, WobbleDSP } from "./instruments2-dsp";
+import { LeadDSP, PadDSP, WobbleDSP } from "./instruments2-dsp";
+import { ThumpLabDSP } from "./thumplab-dsp";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "./instruments3-dsp";
 import { Toolkit } from "./toolkit-dsp";
 import { hasToolkit } from "../toolkit";
@@ -72,7 +73,7 @@ class RbInstrument extends AudioWorkletProcessor {
       this.dsp = d;
     } else if (o.kind === "acid") this.dsp = new AcidDSP(o.params, sampleRate, this.clock);
     else if (o.kind === "lead") this.dsp = new LeadDSP(o.params, sampleRate);
-    else if (o.kind === "analog") this.dsp = new AnalogDrumsDSP(o.params, sampleRate);
+    else if (o.kind === "analog") this.dsp = new ThumpLabDSP(o.params, sampleRate);
     else if (o.kind === "wobble") this.dsp = new WobbleDSP(o.params, sampleRate, this.clock);
     else if (o.kind === "pad") this.dsp = new PadDSP(o.params, sampleRate);
     else if (o.kind === "chip") this.dsp = new ChipDSP(o.params, sampleRate);

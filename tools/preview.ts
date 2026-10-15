@@ -5,7 +5,8 @@
 import { INSTRUMENTS, presetParams } from "../src/engine/instruments.ts";
 import type { InstrumentKind } from "../src/engine/model.ts";
 import { AcidDSP, PolyDSP, type InstrumentDSP } from "../src/engine/dsp/instruments-dsp.ts";
-import { AnalogDrumsDSP, LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.ts";
+import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.ts";
+import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
 import { ChipDSP, FmDSP } from "../src/engine/dsp/instruments3-dsp.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
@@ -31,6 +32,17 @@ function phrase(params: Record<string, number>): Ev[] {
     ];
     return line.map(([s, pitch, l, acc]) => ({ t: s * step, len: l * step * 0.6, pitch, vel: acc ? 120 : 90 }));
   }
+  if (kind === "analog" || kind === "drums") {
+    // 2 bars: [part, 16th steps, velocity]; the second bar ends with a tom fill.
+    const bar: [number, number[], number][] = [[0, [0, 4, 8, 12], 115], [1, [4, 12], 105], [3, [0, 2, 4, 6, 8, 10, 12, 14], 80], [4, [2, 10], 95], [7, [3, 11], 85], [2, [12], 90]];
+    const out: Ev[] = [];
+    for (let b = 0; b < 2; b++) for (const [part, steps, vel] of bar) for (const s of steps) {
+      if (b === 1 && s >= 12 && part !== 0) continue;
+      out.push({ t: (b * 16 + s) * step, len: step, pitch: 36 + part, vel });
+    }
+    [[5, 12], [5, 13], [6, 14], [6, 15]].forEach(([part, s]) => out.push({ t: (16 + s) * step, len: step, pitch: 36 + part, vel: 100 }));
+    return out;
+  }
   return [{ t: 0, len: 1.5, pitch: 60, vel: 100 }];
 }
 
@@ -38,7 +50,7 @@ function dspFor(params: Record<string, number>, clock: { bpm: number; zero: numb
   switch (kind) {
     case "acid": return new AcidDSP(params, SR, clock);
     case "lead": return new LeadDSP(params, SR);
-    case "analog": return new AnalogDrumsDSP(params, SR);
+    case "analog": return new ThumpLabDSP(params, SR);
     case "wobble": return new WobbleDSP(params, SR, clock);
     case "pad": return new PadDSP(params, SR);
     case "chip": return new ChipDSP(params, SR);

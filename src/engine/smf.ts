@@ -10,7 +10,7 @@ const GM_BY_SAMPLE: Record<string, number> = {
   "kick-deep": 36, "kick-punch": 36, "kick-boom": 35, "snare-crack": 38, "snare-body": 40, clap: 39, rim: 37,
   "hat-closed": 42, "hat-open": 46, "hat-pedal": 44, "tom-low": 45, "tom-high": 48, cowbell: 56, shaker: 70, crash: 49, zap: 81,
 };
-const GM_ANALOG = [36, 38, 45, 56];
+const GM_ANALOG = [36, 38, 39, 42, 46, 45, 50, 37]; // kick, snare, clap, hats, toms, rim
 
 function gmDrum(track: Track, pitch: number): number {
   const part = pitch - DRUM_BASE_NOTE;
