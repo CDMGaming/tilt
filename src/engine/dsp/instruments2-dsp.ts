@@ -120,6 +120,8 @@ export class WobbleDSP implements InstrumentDSP {
   private delay = new Float32Array(2048);
   private dw = 0;
   private cut = 600;
+  private bpLow = 0;
+  private bpBand = 0;
   constructor(public params: Record<string, number>, private sr: number, private clock: Clock) {}
 
   noteOn(pitch: number, vel: number) {
@@ -141,17 +143,23 @@ export class WobbleDSP implements InstrumentDSP {
   render(L: Float32Array, R: Float32Array, i0: number, i1: number, t0: number) {
     const p = this.params, sr = this.sr;
     if (!this.gate && this.amp < 1e-4) return;
+    // The three character controls:
+    //   Wobble: the LFO's depth on the cutoff, a resonance lift, and a little of the LFO on the level.
+    //   Growl: cross-mod depth and tune, and a formant-like band-pass that follows the wobble.
+    //   Crush: sample-rate and bit reduction, then drive.
     const wave = Math.round(p.wave ?? 0), xWave = [3, 0, 1][Math.round(p.xWave ?? 0)] ?? 3;
-    const xRatio = Math.pow(2, (p.xTune ?? 7) / 12), xmod = p.xmod ?? 0.3;
+    const growl = p.growl ?? 0.3;
+    const xRatio = Math.pow(2, ((p.xTune ?? 7) + growl * 12) / 12), xmod = (p.xmod ?? 0.15) + growl * 0.75;
     const glideK = 1 - Math.exp(-1 / ((p.glide ?? 0.05) * sr));
-    const beats = WOB_BEATS[Math.round(p.wobRate ?? 2)] ?? 0.5;
+    const beats = WOB_BEATS[Math.round(p.wobRate ?? 3)] ?? 0.5;
     const shape = Math.round(p.wobShape ?? 0), depth = p.wobble ?? 0.7;
     const crush = p.crush ?? 0.2;
     const step = 1 + Math.floor(crush * crush * 24);
     const levels = Math.pow(2, 16 - crush * 12);
-    const reso = Math.min(0.95, p.reso ?? 0.45);
+    const crushDrive = 1 + crush * 3, crushDn = Math.tanh(crushDrive * 1.3) / 1.3;
+    const reso = Math.min(0.95, (p.reso ?? 0.35) + depth * 0.25);
     const width = p.width ?? 0.4, dly = Math.floor(width * 0.012 * sr);
-    const level = (p.level ?? 0.65) * 0.5;
+    const level = (p.level ?? 0.65) * 1.1;
     const oscWave = [0, 1, 3][wave];
     for (let i = i0; i < i1; i++) {
       this.freq *= Math.pow(this.target / this.freq, glideK);
@@ -169,7 +177,13 @@ export class WobbleDSP implements InstrumentDSP {
       this.cut = smooth(this.cut, p.cutoff ?? 600, 0.002);
       const fc = Math.min(sr * 0.42, this.cut * Math.pow(2, depth * lfo * 5));
       let y = this.filt.process(x * 1.5, fc, reso, sr) * (1 + reso);
-      y = this.dc.hp(Math.tanh(y * 1.3), 25, sr) * this.amp * level;
+      if (growl > 0.01) { // a vowel-ish band moving with the wobble (Chamberlin state-variable band-pass)
+        const f = 2 * Math.sin(Math.PI * Math.min(0.2, (500 + lfo * 1400) / sr));
+        this.bpLow += f * this.bpBand;
+        this.bpBand += f * (y - this.bpLow - 0.35 * this.bpBand);
+        y = y * (1 - growl * 0.5) + this.bpBand * growl * 1.4;
+      }
+      y = this.dc.hp(Math.tanh(y * 1.3 * crushDrive) / crushDn / crushDrive, 25, sr) * this.amp * level * (1 - depth * 0.25 * (1 - lfo));
       this.delay[this.dw] = y;
       const yr = dly ? this.delay[(this.dw - dly + 2048) % 2048] : y;
       this.dw = (this.dw + 1) % 2048;

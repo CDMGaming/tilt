@@ -241,6 +241,9 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** F, a giant Wobble knob ringed by LEDs, rate tiles under it.
 - **Theme:** carbon-fibre weave, neon green edge light.
 - **Presets:** 24 (wobbles, growls, reese, talking bass, risers).
+- **Status: built.** Wobble also lifts the resonance and dips the level with the LFO; Growl adds a
+  vowel-like band-pass that moves with the wobble; Crush drives after the bit / rate reduction. Rate tiles
+  1/1 to 1/16 plus 1/8T and 1/16T. 24 presets, level-matched.
 
 ### Haze: lo-fi pads
 - **Idea:** dreamy, worn-tape pads that drift and breathe.

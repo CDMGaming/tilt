@@ -180,40 +180,65 @@ export const ANALOG: InstrumentDef = {
 
 // ---------- wobble bass: "Wobbler" ----------
 
-export const WOB_RATES = ["1/2", "1/4", "1/8", "1/8T", "1/16", "1/16T", "1/32"];
-export const WOB_BEATS = [2, 1, 0.5, 1 / 3, 0.25, 1 / 6, 0.125];
+export const WOB_RATES = ["1/1", "1/2", "1/4", "1/8", "1/16", "1/8T", "1/16T"];
+export const WOB_BEATS = [4, 2, 1, 0.5, 0.25, 1 / 3, 1 / 6];
+
+const wb = (name: string, params: Record<string, number>) => ({ name, params });
 
 export const WOBBLE: InstrumentDef = {
   kind: "wobble",
   name: "Wobbler",
-  role: "Mono bass: cross-mod, crush filter, tempo wobble",
+  role: "The growling, tempo-locked wobble bass",
   group: "bass",
   params: [
-    { id: "wave", label: "Wave", min: 0, max: 2, def: 0, options: ["Saw", "Square", "Sine"] },
+    { id: "wobble", label: "Wobble", min: 0, max: 1, def: 0.7 },
+    { id: "wobRate", label: "Rate", min: 0, max: 6, def: 3, options: WOB_RATES },
+    { id: "growl", label: "Growl", min: 0, max: 1, def: 0.3 },
+    { id: "crush", label: "Crush", min: 0, max: 1, def: 0.2 },
+    { id: "cutoff", label: "Cutoff", min: 40, max: 8000, def: 600, curve: "exp", unit: "Hz" },
     { id: "sub", label: "Sub", min: 0, max: 1, def: 0.5 },
+    { id: "glide", label: "Glide", min: 0.002, max: 0.5, def: 0.05, curve: "exp", unit: "s" },
+    { id: "level", label: "Level", min: 0, max: 1, def: 0.65 },
+    // Hidden voicing:
+    { id: "wave", label: "Wave", min: 0, max: 2, def: 0, options: ["Saw", "Square", "Sine"] },
     { id: "xWave", label: "X-mod wave", min: 0, max: 2, def: 0, options: ["Sine", "Saw", "Square"] },
     { id: "xTune", label: "X-mod tune", min: -12, max: 24, def: 7, unit: "st" },
-    { id: "xmod", label: "X-mod", min: 0, max: 1, def: 0.3 },
-    { id: "cutoff", label: "Cutoff", min: 40, max: 8000, def: 600, curve: "exp", unit: "Hz" },
-    { id: "reso", label: "Reso", min: 0, max: 1, def: 0.45 },
-    { id: "crush", label: "Crush", min: 0, max: 1, def: 0.2 },
-    { id: "wobble", label: "Wobble", min: 0, max: 1, def: 0.7 },
-    { id: "wobRate", label: "Rate", min: 0, max: 6, def: 2, options: WOB_RATES },
+    { id: "xmod", label: "X-mod", min: 0, max: 1, def: 0.15 },
+    { id: "reso", label: "Reso", min: 0, max: 1, def: 0.35 },
     { id: "wobShape", label: "Shape", min: 0, max: 3, def: 0, options: ["Sine", "Saw", "Square", "Ramp"] },
-    { id: "glide", label: "Glide", min: 0.002, max: 0.5, def: 0.05, curve: "exp", unit: "s" },
     { id: "width", label: "Stereo", min: 0, max: 1, def: 0.4 },
-    { id: "level", label: "Level", min: 0, max: 1, def: 0.65 },
   ],
-  macros: ["cutoff", "reso", "wobble", "wobRate", "xmod", "xTune", "crush", "level"],
+  macros: ["wobble", "wobRate", "growl", "crush", "cutoff", "sub", "glide", "level"],
   presets: [
-    { name: "Wub Classic", params: {} },
-    { name: "Fast Talk", params: { wobRate: 4, wobble: 0.8, reso: 0.6, xmod: 0.45 } },
-    { name: "Growl", params: { xmod: 0.8, xTune: 12, crush: 0.5, cutoff: 900, wobble: 0.5, wobRate: 3 } },
-    { name: "Sub Wub", params: { wave: 2, sub: 0.9, xmod: 0.1, cutoff: 300, wobble: 0.6, wobRate: 1 } },
-    { name: "Robot", params: { wave: 1, xWave: 2, xmod: 0.6, crush: 0.8, wobShape: 2, wobRate: 4 } },
-    { name: "Half Wobble", params: { wobRate: 0, wobble: 0.9, wobShape: 3, reso: 0.55 } },
-    { name: "Clean Reese", params: { xmod: 0, crush: 0, wobble: 0.15, wobRate: 0, width: 1, cutoff: 1500, reso: 0.2 } },
-    { name: "Laser Wob", params: { wobShape: 1, wobRate: 5, xTune: 19, xmod: 0.5, reso: 0.7 } },
+    // Wobbles
+    wb("Wub Classic", { level: 0.50,}),
+    wb("Fast Talk", { level: 0.56, wobRate: 4, wobble: 0.8, reso: 0.5, growl: 0.45 }),
+    wb("Half Time", { level: 0.50, wobRate: 1, wobble: 0.9, wobShape: 3, reso: 0.45 }),
+    wb("Triplet Wub", { level: 0.50, wobRate: 5, wobble: 0.75, growl: 0.3 }),
+    wb("Square Chop", { level: 0.54, wobShape: 2, wobRate: 3, wobble: 0.85, crush: 0.3 }),
+    wb("Saw Swing", { level: 0.49, wobShape: 1, wobRate: 2, wobble: 0.8, growl: 0.2 }),
+    wb("Sub Wub", { level: 0.42, wave: 2, sub: 0.9, growl: 0.05, cutoff: 300, wobble: 0.6, wobRate: 2 }),
+    // Growls
+    wb("Growl", { level: 0.74, growl: 0.8, xTune: 0, crush: 0.5, cutoff: 900, wobble: 0.5, wobRate: 5 }),
+    wb("Robot", { level: 0.73, wave: 1, xWave: 2, growl: 0.6, crush: 0.8, wobShape: 2, wobRate: 4 }),
+    wb("Laser Wob", { level: 0.57, wobShape: 1, wobRate: 4, xTune: 7, growl: 0.5, reso: 0.55 }),
+    wb("Metal Jaw", { level: 0.54, wave: 1, growl: 1, xTune: 5, crush: 0.4, wobble: 0.6, wobRate: 3, cutoff: 1100 }),
+    wb("Grinder", { level: 0.93, growl: 0.7, crush: 0.9, wobble: 0.5, wobRate: 4, cutoff: 1400 }),
+    // Reese
+    wb("Clean Reese", { level: 0.28, growl: 0, xmod: 0, crush: 0, wobble: 0.15, wobRate: 0, width: 1, cutoff: 1500, reso: 0.15 }),
+    wb("Dark Reese", { level: 0.39, growl: 0.15, xmod: 0.05, crush: 0.1, wobble: 0.25, wobRate: 0, width: 1, cutoff: 700, sub: 0.7 }),
+    wb("Moving Reese", { level: 0.48, growl: 0.25, wobble: 0.35, wobRate: 1, wobShape: 0, width: 0.9, cutoff: 1000 }),
+    wb("Square Reese", { level: 0.34, wave: 1, growl: 0.1, wobble: 0.2, wobRate: 0, width: 1, cutoff: 1200 }),
+    // Talking
+    wb("Talking Bass", { level: 0.49, growl: 0.6, xTune: 0, wobble: 0.55, wobRate: 3, reso: 0.5, crush: 0.1 }),
+    wb("Yoi Yoi", { level: 0.57, growl: 0.75, wobble: 0.7, wobRate: 4, wobShape: 3, reso: 0.4 }),
+    wb("Mouthy", { level: 0.60, growl: 0.9, wobble: 0.4, wobRate: 2, crush: 0.2, cutoff: 800 }),
+    // Risers and fx
+    wb("Riser Wub", { level: 0.62, wobRate: 6, wobble: 0.9, growl: 0.5, crush: 0.3, glide: 0.4 }),
+    wb("Siren", { level: 0.47, wave: 2, sub: 0.2, growl: 0.4, wobble: 1, wobRate: 2, wobShape: 0, cutoff: 2000, reso: 0.6 }),
+    wb("Bit Storm", { level: 1.00, crush: 1, growl: 0.5, wobble: 0.8, wobRate: 6, cutoff: 1800 }),
+    wb("Zapper", { level: 0.54, wobShape: 1, wobRate: 6, wobble: 1, growl: 0.3, reso: 0.6, crush: 0.2 }),
+    wb("Deep Pulse", { level: 0.28, wave: 2, sub: 1, growl: 0, crush: 0, wobble: 0.5, wobRate: 3, cutoff: 200 }),
   ],
 };
 

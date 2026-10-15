@@ -8,6 +8,7 @@ import type { Track } from "../engine/model";
 import { chordName, noteName, scaleById, scaleDegree } from "../engine/music";
 import { decodeFile, listSamples, putSample, sampleLabel } from "./samples";
 import { SFX, WT_FRAMES, WT_SIZE } from "../engine/instruments3";
+import { WOB_RATES } from "../engine/instruments2";
 import { allPresets, applyPreset, deleteUserPreset, presetPosition, saveUserPreset, userPresets, USER_MARK, type PresetEntry } from "./presets";
 import { getParam } from "../engine/params";
 import { RECIPES, genBase, mutateParams, pickSound, soundKey, soundRoles, type SoundRef } from "../engine/sounds";
@@ -20,7 +21,7 @@ import { trackColor } from "./theme";
 import { control, type ControlHost } from "./knob";
 
 /** Instruments rebuilt in the overhaul (docs/instruments.md): their own panel only, no MORE page. */
-const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums", "poly", "lead"]);
+const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums", "poly", "lead", "wobble"]);
 /** Chordette: the category its sound list shows (null: the current sound's). */
 let chordetteCat: string | null = null;
 /** Kitbox: the channel whose More drawer is open (per session). */
@@ -117,14 +118,20 @@ export function buildPanel(app: App, track: Track): HTMLElement {
       keyboard(app, track),
     );
   } else if (track.kind === "wobble") {
+    // Wobbler: a giant Wobble knob ringed by LEDs, the rate tiles under it, the rest around.
+    const wob = track.params.wobble ?? 0.7, rate = Math.round(track.params.wobRate ?? 3);
+    const ring = h("div", { class: "wb-ring" }, Array.from({ length: 20 }, (_, i) =>
+      h("span", { class: "wb-led" + (i / 19 <= wob ? " on" : ""), style: `--a:${-135 + i * (270 / 19)}deg` })));
     body = h("div", { class: "panel-body wobbler" },
-      h("div", { class: "knob-row" },
-        h("div", { class: "section-title small" }, "Carrier"), ctl("wave", "Wave"), ctl("sub", "Sub"),
-        h("div", { class: "section-title small" }, "X-mod"), ctl("xWave", "Wave"), ctl("xTune", "Tune"), ctl("xmod", "X-MOD", "l"),
-        h("div", { class: "section-title small" }, "Filter"), ctl("cutoff", "Cutoff", "l"), ctl("reso", "Reso"), ctl("crush", "Crush")),
-      h("div", { class: "knob-row" },
-        h("div", { class: "section-title small" }, "Wobble"), ctl("wobble", "WOBBLE", "l"), ctl("wobRate", "Rate"), ctl("wobShape", "Shape"),
-        h("div", { class: "section-title small" }, "Out"), ctl("glide", "Glide", "s"), ctl("width", "Stereo", "s"), ctl("level", "Level", "s")),
+      h("div", { class: "wb-face" },
+        h("div", { class: "wb-side" }, ctl("growl", "★ Growl", "l"), ctl("crush", "★ Crush", "l")),
+        h("div", { class: "wb-hero" },
+          h("div", { class: "wb-dial" }, ring, ctl("wobble", "★ WOBBLE", "l")),
+          h("div", { class: "wb-tiles", role: "radiogroup" }, WOB_RATES.map((r, i) => h("button", {
+            class: "wb-tile" + (i === rate ? " on" : ""), "data-nav": `rate-${i}`, "aria-pressed": String(i === rate), title: `Wobble every ${r}`,
+            onclick: () => { app.edit("Rate", () => (track.params.wobRate = i)); app.screens.edit.render(); },
+          }, r)))),
+        h("div", { class: "wb-side" }, ctl("cutoff", "Cutoff"), ctl("sub", "Sub"), ctl("glide", "Glide"), ctl("level", "Level"))),
       keyboard(app, track),
     );
   } else if (track.kind === "pad") {

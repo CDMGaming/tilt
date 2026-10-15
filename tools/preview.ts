@@ -23,6 +23,11 @@ type Ev = { t: number; len: number; pitch: number; vel: number };
 
 /** A phrase that shows the instrument's idea: an acid line with accents and slides; held chords for arps. */
 function phrase(params: Record<string, number>): Ev[] {
+  if (kind === "wobble") {
+    // A bass line held long enough to hear the wobble: two bars, a slide in the second.
+    return [[0, 36, 7.5], [8, 36, 3.5], [12, 39, 3.5], [16, 34, 7.5], [24, 36, 8.5], [32, 43, 0]].filter(([, , l]) => l > 0)
+      .map(([s0, pitch, l]) => ({ t: s0 * step, len: l * step, pitch, vel: 100 }));
+  }
   if (kind === "acid") {
     if (params.arpOn >= 0.5) return [36, 43, 48].flatMap((p) => [{ t: 0, len: step * 15.5, pitch: p, vel: 100 }, { t: step * 16, len: step * 15.5, pitch: p - 2, vel: 100 }]);
     // 2 bars: [step, pitch, length in steps, accent, slide into the next]
