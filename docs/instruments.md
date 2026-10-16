@@ -345,6 +345,11 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** L, the pad grid under a big waveform of the selected pad.
 - **Theme:** a chrome boombox: speaker-grille pattern, a cassette-window waveform.
 - **Presets:** 24 kits of sounds (SFX, vocal chops, stabs).
+- **Status: built.** 50 built-in sounds now (tools/make-sfx.ts, synthesised, CC0): 20 FX, 10 vocal chops
+  (formant synthesis, no recordings), 10 chord stabs, 10 hand percussion; the sound menu groups them. A preset
+  now carries its eight pad sounds (and a saved user preset keeps yours). Crunch (bits, rate, saturation),
+  Vinyl (crackle, wow, low and high cut, hiss) and Pitch (all pads, tape style) work on the whole box.
+  24 kits, level-matched. Real recorded vocal chops would need samples you approve.
 
 ---
 

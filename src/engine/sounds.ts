@@ -143,7 +143,11 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
   wave: [
     pick("table", 0.4, range(0, 6)), knob("pos", 0.3), knob("warp", 0.25), knob("envAmt", 0.25), knob("envDecay", 0.22),
     knob("lfoAmt", 0.2, 0, 0.7), knob("lfoRate", 0.22), knob("detune", 0.2), knob("cutoff", 0.18, 0.3, 1), knob("reso", 0.15, 0, 0.6),
+  ],  sampler: [
+    knob("crunch", 0.2, 0, 0.8), knob("vinyl", 0.2, 0, 0.8), knob("pitch", 0.1),
+    ...Array.from({ length: 8 }, (_, i) => [knob(`p${i}tune`, 0.06), knob(`p${i}start`, 0.08, 0, 0.4), knob(`p${i}decay`, 0.1)]).flat(),
   ],
+
 
 };
 

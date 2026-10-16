@@ -7,7 +7,7 @@ import { FX_TYPES } from "../engine/params";
 import type { Track } from "../engine/model";
 import { chordName, noteName, scaleById, scaleDegree } from "../engine/music";
 import { decodeFile, listSamples, putSample, sampleLabel } from "./samples";
-import { CHIP_WAVES, SFX, WT_FRAMES, WT_SIZE } from "../engine/instruments3";
+import { CHIP_WAVES, SFX_GROUPS, WT_FRAMES, WT_SIZE } from "../engine/instruments3";
 import { WOB_RATES } from "../engine/instruments2";
 import { allPresets, applyPreset, deleteUserPreset, presetPosition, saveUserPreset, userPresets, USER_MARK, type PresetEntry } from "./presets";
 import { getParam } from "../engine/params";
@@ -21,7 +21,7 @@ import { trackColor } from "./theme";
 import { control, type ControlHost } from "./knob";
 
 /** Instruments rebuilt in the overhaul (docs/instruments.md): their own panel only, no MORE page. */
-const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums", "poly", "lead", "wobble", "pad", "chip", "fm", "wave"]);
+const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums", "poly", "lead", "wobble", "pad", "chip", "fm", "wave", "sampler"]);
 /** Chordette: the category its sound list shows (null: the current sound's). */
 let chordetteCat: string | null = null;
 /** Kitbox: the channel whose More drawer is open (per session). */
@@ -184,20 +184,24 @@ export function buildPanel(app: App, track: Track): HTMLElement {
       keyboard(app, track),
     );
   } else if (track.kind === "sampler") {
+    // Grab: a chrome boombox. The selected pad's waveform in the cassette window, the pads under it,
+    // that pad's controls beside them, and the box's Crunch / Vinyl / Pitch.
     const part = Math.min(app.ed.drumPart, 7);
     body = h("div", { class: "panel-body grab" },
-      h("div", { class: "pads" }, Array.from({ length: 8 }, (_, i) => pad(app, track, i))),
-      h("div", { class: "part-edit" },
-        h("div", { class: "section-title" }, `Pad ${part + 1} · ${sampleLabel(track.samples?.[part], track.sampleNames, part)}`),
-        h("div", { class: "knob-row" },
-          h("button", { class: "sound-btn", "data-nav": "sound", onclick: (e: Event) => soundMenu(app, track, part, e.currentTarget as HTMLElement) },
-            h("div", { class: "switch-label" }, "Sound"), h("div", { class: "switch-value" }, sampleLabel(track.samples?.[part], track.sampleNames, part) + " ▾")),
-          ctl(`p${part}tune`, "Tune"), ctl(`p${part}start`, "Start"), ctl(`p${part}decay`, "Decay"), ctl(`p${part}level`, "Level"), ctl(`p${part}pan`, "Pan")),
-        h("div", { class: "knob-row" },
-          ctl(`p${part}rev`, "Reverse"), ctl(`p${part}mode`, "Mode"),
-          h("div", { class: "section-title small" }, "Master"), ctl("level", "Level"),
-          h("div", { class: "note drop-hint" }, "Drop an audio file on a pad to load it.")),
-      ),
+      h("div", { class: "gb-box" },
+        h("div", { class: "gb-grille" }),
+        h("div", { class: "gb-centre" },
+          h("div", { class: "gb-cassette" }, padWaveView(app, track, part),
+            h("div", { class: "gb-label" }, `${part + 1} · ${sampleLabel(track.samples?.[part], track.sampleNames, part)}`)),
+          h("div", { class: "gb-row" },
+            h("div", { class: "pads gb-pads" }, Array.from({ length: 8 }, (_, i) => pad(app, track, i))),
+            h("div", { class: "gb-pad-ctl" },
+              h("button", { class: "sound-btn", "data-nav": "sound", title: "Choose this pad's sound, or load your own", onclick: (e: Event) => soundMenu(app, track, part, e.currentTarget as HTMLElement) },
+                h("div", { class: "switch-label" }, "Sound"), h("div", { class: "switch-value" }, sampleLabel(track.samples?.[part], track.sampleNames, part) + " ▾")),
+              ctl(`p${part}tune`, "Tune", "s"), ctl(`p${part}start`, "Start", "s"), ctl(`p${part}decay`, "Decay", "s"), ctl(`p${part}rev`, "Reverse")))),
+        h("div", { class: "gb-master" }, ctl("crunch", "★ Crunch", "l"), ctl("vinyl", "★ Vinyl", "l"), ctl("pitch", "★ Pitch", "l"), ctl("level", "Level")),
+        h("div", { class: "gb-grille" })),
+      h("div", { class: "note drop-hint" }, "Drop an audio file on a pad to load it."),
     );
   } else if (track.kind === "acid") {
     // Squelch: one row of big knobs (Bite and Gnaw are the character controls), the arp under a lid.
@@ -563,11 +567,41 @@ async function soundMenu(app: App, track: Track, pad: number, anchor: HTMLElemen
   const mine = await listSamples().catch(() => []);
   const r = anchor.getBoundingClientRect();
   const current = track.samples?.[pad];
+  const pick = (ref: string, name: string) => { setPadSound(app, track, pad, ref, name); setTimeout(() => app.engine.preview(track.id, DRUM_BASE_NOTE + pad, 110, 0.6), 150); };
   app.overlays.menu(`Pad ${pad + 1} sound`, () => [
     { label: "Load audio file…", hint: "WAV, MP3, OGG…", run: async () => { const f = await pickFile(); if (f) await loadFileToPad(app, track, pad, f); } },
-    ...SFX.map((name) => ({ label: sampleLabel(`sfx:${name}`), hint: "built in", checked: current === `sfx:${name}`, run: () => { setPadSound(app, track, pad, `sfx:${name}`, ""); app.engine.preview(track.id, DRUM_BASE_NOTE + pad, 110, 0.6); } })),
-    ...mine.map((m) => ({ label: m.name, hint: `${m.seconds.toFixed(1)} s`, checked: current === `user:${m.id}`, run: () => { setPadSound(app, track, pad, `user:${m.id}`, m.name); app.engine.preview(track.id, DRUM_BASE_NOTE + pad, 110, 0.6); } })),
+    ...Object.entries(SFX_GROUPS).map(([group, names]) => ({
+      label: group, hint: "built in", sub: () => names.map((name) => ({ label: sampleLabel(`sfx:${name}`), checked: current === `sfx:${name}`, keepOpen: true, run: () => pick(`sfx:${name}`, "") })),
+    })),
+    ...(mine.length ? [{ label: "Your sounds", sub: () => mine.map((m) => ({ label: m.name, hint: `${m.seconds.toFixed(1)} s`, checked: current === `user:${m.id}`, keepOpen: true, run: () => pick(`user:${m.id}`, m.name) })) }] : []),
   ], { x: r.left, y: r.bottom });
+}
+
+/** The selected pad's sound as a waveform, in Grab's cassette window. */
+function padWaveView(app: App, track: Track, part: number): HTMLElement {
+  const cv = h("canvas", { class: "gb-wave", width: 360, height: 70 });
+  const ref = track.samples?.[part];
+  const draw = async () => {
+    const g = cv.getContext("2d")!;
+    g.clearRect(0, 0, cv.width, cv.height);
+    const s = ref ? await app.engine.sample(ref) : null;
+    if (!s?.data.length) return;
+    const d = s.data, mid = cv.height / 2, start = (track.params[`p${part}start`] ?? 0) * cv.width;
+    g.fillStyle = "#ffffff16";
+    g.fillRect(0, 0, start, cv.height);
+    g.strokeStyle = "#ffcf7a";
+    g.beginPath();
+    for (let x = 0; x < cv.width; x++) {
+      let peak = 0;
+      const a = Math.floor((x / cv.width) * d.length), b = Math.floor(((x + 1) / cv.width) * d.length);
+      for (let i = a; i < b; i++) peak = Math.max(peak, Math.abs(d[i]));
+      g.moveTo(x + 0.5, mid - peak * mid * 0.95);
+      g.lineTo(x + 0.5, mid + peak * mid * 0.95);
+    }
+    g.stroke();
+  };
+  requestAnimationFrame(() => void draw());
+  return cv;
 }
 
 // ---------------------------------------------------------------- wavetable view

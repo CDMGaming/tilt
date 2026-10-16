@@ -1,7 +1,7 @@
 // DSP for Pixel (chip), Glint (FM), Morph (wavetable) and Grab (sampler).
 // Runs in the AudioWorklet.
 
-import { ADSR, SVF, TAU, blep, mtof, smooth, voiceMod } from "./units";
+import { ADSR, OnePole, SVF, TAU, blep, mtof, smooth, voiceMod } from "./units";
 import { velGain, type InstrumentDSP } from "./instruments-dsp";
 import { DRUM_BASE_NOTE } from "../instruments";
 import { JUMP_STEPS, M_RATIOS, C_RATIOS, SAMPLER_PADS, WT_FRAMES, WT_LEVELS, WT_SIZE } from "../instruments3";
@@ -293,10 +293,22 @@ export class WavetableDSP implements InstrumentDSP {
 
 interface PadVoice { part: number; pos: number; rate: number; amp: number; decayK: number; vel: number; releasing: boolean; held: boolean }
 
+/**
+ * Grab: eight sample pads. Per pad: sound, tune, start, decay, reverse (and hidden mode, pan, level).
+ * Character controls on the whole box: Crunch (fewer bits, a lower sample rate, saturation), Vinyl
+ * (crackle, wow, the lows and highs rolled off) and Pitch (every pad up or down, tape style).
+ */
 export class SamplerDSP implements InstrumentDSP {
   private voices: PadVoice[] = [];
   samples: Float32Array[] = [];
   rates: number[] = [];
+  private bl = new Float32Array(128);
+  private br = new Float32Array(128);
+  private hold = [0, 0];
+  private cnt = 0;
+  private wow = 0;
+  private lc = [new OnePole(), new OnePole()];
+  private hc = [new OnePole(), new OnePole()];
   constructor(public params: Record<string, number>, private sr: number) {}
 
   setSamples(s: Float32Array[], rates: number[]) { this.samples = s; this.rates = rates; }
@@ -312,7 +324,7 @@ export class SamplerDSP implements InstrumentDSP {
     this.voices.push({
       part, vel: velGain(vel / 127), amp: 1, held: true, releasing: false,
       pos: rev ? data.length - 2 - start : start, // reversed starts one step inside the end
-      rate: Math.pow(2, (p[`p${part}tune`] ?? 0) / 12) * ((this.rates[part] ?? this.sr) / this.sr) * (rev ? -1 : 1),
+      rate: Math.pow(2, ((p[`p${part}tune`] ?? 0) + (p.pitch ?? 0)) / 12) * ((this.rates[part] ?? this.sr) / this.sr) * (rev ? -1 : 1),
       decayK: Math.exp(-4.6 / ((p[`p${part}decay`] ?? 10) * this.sr)),
     });
     if (this.voices.length > 24) this.voices.shift();
@@ -328,30 +340,54 @@ export class SamplerDSP implements InstrumentDSP {
   allOff() { for (const v of this.voices) v.releasing = true; }
 
   render(L: Float32Array, R: Float32Array, i0: number, i1: number) {
-    const p = this.params, master = p.level ?? 0.8;
-    const relK = Math.exp(-6.9 / (0.02 * this.sr));
+    const p = this.params, master = (p.level ?? 0.8) * 1.4, sr = this.sr, n = i1 - i0;
+    const crunch = p.crunch ?? 0, vinyl = p.vinyl ?? 0;
+    const relK = Math.exp(-6.9 / (0.02 * sr));
+    if (this.bl.length < n) { this.bl = new Float32Array(n); this.br = new Float32Array(n); }
+    const bl = this.bl, br = this.br;
+    bl.fill(0, 0, n); br.fill(0, 0, n);
+    for (let i = 0; i < n; i++) this.wow = (this.wow + 0.55 / sr) % 1;
+    const wobble = 1 + vinyl * 0.006 * Math.sin(TAU * this.wow); // Vinyl's wow, per block
     for (const v of this.voices) {
       const data = this.samples[v.part];
       if (!data) { v.amp = 0; continue; }
-      const level = (p[`p${v.part}level`] ?? 0.8) * v.vel * master * 0.6;
+      const level = (p[`p${v.part}level`] ?? 0.8) * v.vel;
       const pan = p[`p${v.part}pan`] ?? 0;
       const gl = panL(pan) * level, gr = panR(pan) * level;
       const loop = Math.round(p[`p${v.part}mode`] ?? 0) === 2;
       const startPos = (p[`p${v.part}start`] ?? 0) * data.length;
-      for (let i = i0; i < i1; i++) {
+      for (let i = 0; i < n; i++) {
         if (v.pos < 0 || v.pos >= data.length - 1) {
           if (loop && !v.releasing) v.pos = v.rate > 0 ? startPos : data.length - 2 - startPos;
           else { v.amp = 0; break; }
         }
         const ip = Math.floor(v.pos), fr = v.pos - ip;
         const x = (data[ip] + (data[ip + 1] - data[ip]) * fr) * v.amp;
-        L[i] += x * gl;
-        R[i] += x * gr;
-        v.pos += v.rate;
+        bl[i] += x * gl;
+        br[i] += x * gr;
+        v.pos += v.rate * wobble;
         v.amp *= v.releasing ? relK : v.decayK;
         if (v.amp < 1e-4) { v.amp = 0; break; }
       }
     }
     this.voices = this.voices.filter((v) => v.amp >= 1e-4);
+    // Crunch then Vinyl, on the whole box.
+    const step = 1 + Math.floor(crunch * crunch * 14), levels = Math.pow(2, 15 - crunch * 11), drive = 1 + crunch * 3, dn = Math.tanh(drive);
+    const lowCut = 20 + vinyl * 220, highCut = 18000 * Math.pow(2, -vinyl * 2.8);
+    for (let i = 0; i < n; i++) {
+      let l = bl[i], r = br[i];
+      if (crunch > 0.01) {
+        if (this.cnt++ % step === 0) { this.hold[0] = Math.round(l * levels) / levels; this.hold[1] = Math.round(r * levels) / levels; }
+        l = Math.tanh(this.hold[0] * drive) / dn; r = Math.tanh(this.hold[1] * drive) / dn;
+      }
+      if (vinyl > 0.01) {
+        const crackle = Math.random() < vinyl * 0.0006 ? (Math.random() - 0.5) * vinyl * 0.6 : 0;
+        const hiss = (Math.random() - 0.5) * vinyl * 0.006;
+        l = this.hc[0].lp(this.lc[0].hp(l, lowCut, sr), highCut, sr) + crackle + hiss;
+        r = this.hc[1].lp(this.lc[1].hp(r, lowCut, sr), highCut, sr) + crackle + hiss;
+      }
+      L[i0 + i] += l * master;
+      R[i0 + i] += r * master;
+    }
   }
 }

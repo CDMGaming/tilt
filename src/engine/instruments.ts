@@ -29,7 +29,7 @@ export interface InstrumentDef {
   params: ParamDef[];
   macros: string[]; // exactly 8 param ids
   /** `cat`: a category, for instruments that browse their sounds by kind (Chordette). */
-  presets: { name: string; params: Record<string, number>; cat?: string }[];
+  presets: { name: string; params: Record<string, number>; cat?: string; samples?: string[] }[];
 }
 
 // ---------- drum machine: "Kitbox" ----------

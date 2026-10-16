@@ -8,7 +8,7 @@ import { expandPitch } from "../src/engine/timeline.ts";
 import { AcidDSP, DrumsDSP, PolyDSP, type InstrumentDSP } from "../src/engine/dsp/instruments-dsp.ts";
 import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.ts";
 import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
-import { ChipDSP, FmDSP, WavetableDSP } from "../src/engine/dsp/instruments3-dsp.ts";
+import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "../src/engine/dsp/instruments3-dsp.ts";
 import { buildMips, parseWav } from "../src/engine/wavetable.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
@@ -38,6 +38,11 @@ function phrase(params: Record<string, number>): Ev[] {
       [26, 39, 1, 0], [27, 41, 2.2, 1], [29, 43, 1, 0], [30, 46, 1, 0],
     ];
     return line.map(([s, pitch, l, acc]) => ({ t: s * step, len: l * step * 0.6, pitch, vel: acc ? 120 : 90 }));
+  }
+  if (kind === "sampler") {
+    // Each pad once, then a little pattern on the first four.
+    return [...Array.from({ length: 8 }, (_, i) => ({ t: i * 2 * step, len: 1.5 * step, pitch: 36 + i, vel: 100 })),
+      ...[0, 2, 1, 3, 0, 1, 2, 3].map((p0, i) => ({ t: (16 + i * 2) * step, len: 1.5 * step, pitch: 36 + p0, vel: 100 }))];
   }
   if (kind === "analog" || kind === "drums") {
     // 2 bars: [part, 16th steps, velocity]; the second bar ends with a tom fill.
@@ -82,6 +87,12 @@ const kitSounds = kind === "drums" ? KIT_SAMPLES.map((name) => {
 }) : [];
 
 const mipCache: Float32Array[][] = [];
+let currentPreset = 0;
+function readWav16(url: URL): Float32Array {
+  const b = Deno.readFileSync(url), v = new DataView(b.buffer), n = (b.length - 44) / 2, x = new Float32Array(n);
+  for (let i = 0; i < n; i++) x[i] = v.getInt16(44 + i * 2, true) / 32768;
+  return x;
+}
 
 function dspFor(params: Record<string, number>, clock: { bpm: number; zero: number }): InstrumentDSP {
   switch (kind) {
@@ -90,6 +101,12 @@ function dspFor(params: Record<string, number>, clock: { bpm: number; zero: numb
       mipCache[t] ??= buildMips(parseWav(Deno.readFileSync(new URL(`../public/wavetables/wavetable0${t + 1}.wav`, import.meta.url)).buffer).data);
       w.setMips(mipCache[t]);
       return w;
+    }
+    case "sampler": {
+      const d = new SamplerDSP(params, SR);
+      const refs = INSTRUMENTS.sampler.presets[currentPreset]?.samples ?? [];
+      d.setSamples(refs.map((r) => readWav16(new URL(`../public/sfx/${r.slice(4)}.wav`, import.meta.url))), refs.map(() => 32000));
+      return d;
     }
     case "drums": { const d = new DrumsDSP(params, kitSounds, SR); d.samplesRate = KIT_RATE; return d; }
     case "acid": return new AcidDSP(params, SR, clock);
@@ -145,6 +162,7 @@ if (import.meta.main) {
   if (wavs) Deno.mkdirSync(out, { recursive: true });
   const rows: string[] = [];
   INSTRUMENTS[kind].presets.forEach((p, i) => {
+    currentPreset = i;
     let s = 7;
     Math.random = () => ((s = (s * 16807) % 2147483647) / 2147483647);
     const audio = render(presetParams(kind, i));

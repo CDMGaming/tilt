@@ -207,37 +207,74 @@ export const WAVE: InstrumentDef = {
 // ---------- sampler / SFX pads: "Grab" ----------
 
 /** Built-in sounds (rendered by tools/make-sfx.ts, CC0). Pads reference them as "sfx:<name>". */
-export const SFX = ["riser", "impact", "laser", "downlifter", "tape-stop", "horn", "glitch", "stab", "sweep-up", "noise-hit"];
+/** Grab's built-in sounds (synthesised by tools/make-sfx.ts, ours, CC0), in groups for the sound menu. */
+export const SFX_GROUPS: Record<string, string[]> = {
+  FX: ["riser", "impact", "laser", "downlifter", "tape-stop", "horn", "glitch", "stab", "sweep-up", "noise-hit",
+    "boom", "zap", "whoosh", "reverse-cymbal", "siren", "bubble", "alarm", "coin", "drop", "thunder"],
+  Vox: ["vox-ah", "vox-oh", "vox-ee", "vox-oo", "vox-hey", "vox-yeah", "vox-choir", "vox-chop-up", "vox-chop-down", "vox-breath"],
+  Stabs: ["stab-major", "stab-minor", "stab-seventh", "stab-organ", "stab-brass", "stab-hit", "stab-piano", "stab-bell", "stab-rave", "stab-sus"],
+  Perc: ["snap", "clap", "shaker", "tamb", "conga", "bongo", "woodblock", "triangle", "cowbell", "scratch"],
+};
+export const SFX = Object.values(SFX_GROUPS).flat();
 export const SAMPLER_PADS = 8;
 export const PAD_MODES = ["One-shot", "Gate", "Loop"];
 export const DEFAULT_SAMPLER_REFS = ["sfx:riser", "sfx:impact", "sfx:laser", "sfx:downlifter", "sfx:tape-stop", "sfx:horn", "sfx:glitch", "sfx:stab"];
 
-const samplerParams: ParamDef[] = [];
+const samplerParams: ParamDef[] = [
+  { id: "crunch", label: "Crunch", min: 0, max: 1, def: 0 },
+  { id: "vinyl", label: "Vinyl", min: 0, max: 1, def: 0 },
+  { id: "pitch", label: "Pitch", min: -12, max: 12, def: 0, unit: "st" },
+  { id: "level", label: "Level", min: 0, max: 1, def: 0.8 },
+];
 for (let i = 0; i < SAMPLER_PADS; i++) {
   samplerParams.push(
     { id: `p${i}tune`, label: "Tune", min: -24, max: 24, def: 0, unit: "st" },
     { id: `p${i}start`, label: "Start", min: 0, max: 0.9, def: 0 },
     { id: `p${i}decay`, label: "Decay", min: 0.05, max: 10, def: 10, curve: "exp", unit: "s" },
+    { id: `p${i}rev`, label: "Reverse", min: 0, max: 1, def: 0, options: ["Off", "On"] },
+    // Hidden voicing:
     { id: `p${i}level`, label: "Level", min: 0, max: 1, def: 0.8 },
     { id: `p${i}pan`, label: "Pan", min: -1, max: 1, def: 0 },
-    { id: `p${i}rev`, label: "Reverse", min: 0, max: 1, def: 0, options: ["Off", "On"] },
     { id: `p${i}mode`, label: "Mode", min: 0, max: 2, def: 0, options: PAD_MODES },
   );
 }
-samplerParams.push({ id: "level", label: "Level", min: 0, max: 1, def: 0.8 });
+
+/** A Grab kit: its eight pad sounds (built-in names) and its settings. */
+const kit = (name: string, sounds: string[], params: Record<string, number> = {}) => ({ name, params, samples: sounds.map((x) => `sfx:${x}`) });
+const allPads = (k: string, v: number) => Object.fromEntries(Array.from({ length: SAMPLER_PADS }, (_, i) => [`p${i}${k}`, v]));
 
 export const SAMPLER: InstrumentDef = {
   kind: "sampler",
   name: "Grab",
-  role: "Sampler pads: built-in SFX or drop in your own WAVs",
+  role: "Your own sounds and found sounds, in a boombox",
   group: "fx",
   drumParts: SAMPLER_PADS,
   params: samplerParams,
-  macros: ["p0tune", "p0decay", "p1tune", "p1decay", "p2tune", "p3tune", "p0start", "level"],
+  macros: ["crunch", "vinyl", "pitch", "p0tune", "p0start", "p1tune", "p0decay", "level"],
   presets: [
-    { name: "SFX Kit", params: {} },
-    { name: "Reversed", params: Object.fromEntries(Array.from({ length: SAMPLER_PADS }, (_, i) => [`p${i}rev`, 1])) },
-    { name: "Pitched Down", params: Object.fromEntries(Array.from({ length: SAMPLER_PADS }, (_, i) => [`p${i}tune`, -7])) },
-    { name: "Gated", params: Object.fromEntries(Array.from({ length: SAMPLER_PADS }, (_, i) => [`p${i}mode`, 1])) },
+    kit("SFX Kit", ["riser", "impact", "laser", "downlifter", "tape-stop", "horn", "glitch", "stab"], { level: 0.59 }),
+    kit("Big Drops", ["riser", "downlifter", "impact", "boom", "reverse-cymbal", "sweep-up", "noise-hit", "thunder"], { level: 0.39 }),
+    kit("Transitions", ["riser", "sweep-up", "whoosh", "downlifter", "reverse-cymbal", "impact", "tape-stop", "boom"], { level: 0.40 }),
+    kit("Arcade", ["laser", "zap", "coin", "bubble", "alarm", "glitch", "drop", "siren"], { level: 0.19, crunch: 0.3 }),
+    kit("Sci-Fi", ["laser", "zap", "siren", "bubble", "glitch", "alarm", "sweep-up", "noise-hit"], { level: 0.28, pitch: -3 }),
+    kit("Game Show", ["coin", "alarm", "horn", "drop", "laser", "bubble", "stab-brass", "impact"], { level: 0.32 }),
+    kit("Dub Siren", ["siren", "horn", "impact", "boom", "drop", "thunder", "stab-minor", "vox-hey"], { level: 0.37, vinyl: 0.4 }),
+    kit("Vox Chops", ["vox-ah", "vox-oh", "vox-ee", "vox-oo", "vox-hey", "vox-chop-up", "vox-chop-down", "vox-breath"], { level: 0.47 }),
+    kit("Choir Pad", ["vox-choir", "vox-ah", "vox-oh", "vox-oo", "vox-ee", "vox-yeah", "vox-hey", "vox-breath"], { level: 0.76, ...allPads("mode", 1), vinyl: 0.15 }),
+    kit("Chipmunk", ["vox-ah", "vox-oh", "vox-ee", "vox-oo", "vox-hey", "vox-yeah", "vox-chop-up", "vox-chop-down"], { level: 0.55, pitch: 12 }),
+    kit("Monster", ["vox-ah", "vox-oh", "vox-ee", "vox-oo", "vox-hey", "vox-yeah", "vox-chop-up", "vox-chop-down"], { level: 0.26, pitch: -12, crunch: 0.3 }),
+    kit("House Stabs", ["stab-major", "stab-minor", "stab-seventh", "stab-organ", "stab-bell", "stab-sus", "stab-piano", "stab-brass"], { level: 1.00 }),
+    kit("Rave Stabs", ["stab-rave", "stab-hit", "stab-minor", "stab-brass", "horn", "siren", "zap", "impact"], { level: 0.23, crunch: 0.2 }),
+    kit("Gospel Stabs", ["stab-seventh", "stab-sus", "stab-organ", "vox-choir", "stab-brass", "stab-piano", "stab-major", "vox-hey"], { level: 0.86 }),
+    kit("Low Stabs", ["stab-major", "stab-minor", "stab-seventh", "stab-organ", "stab-brass", "stab-hit", "stab-piano", "stab-sus"], { level: 0.98, pitch: -5, vinyl: 0.2 }),
+    kit("Hand Perc", ["snap", "clap", "shaker", "tamb", "conga", "bongo", "woodblock", "triangle"], { level: 0.91 }),
+    kit("Latin Perc", ["conga", "bongo", "cowbell", "woodblock", "shaker", "tamb", "triangle", "snap"], { level: 0.87, p0tune: -3, p1tune: 2 }),
+    kit("Crunch Perc", ["snap", "clap", "shaker", "tamb", "conga", "bongo", "woodblock", "cowbell"], { level: 0.31, crunch: 0.75 }),
+    kit("Lo-fi Box", ["stab-piano", "vox-oo", "snap", "shaker", "stab-seventh", "vox-breath", "conga", "scratch"], { level: 0.55, vinyl: 0.65, crunch: 0.3 }),
+    kit("Vinyl Dust", ["vox-choir", "stab-piano", "stab-bell", "vox-oo", "triangle", "snap", "stab-sus", "scratch"], { level: 0.90, vinyl: 0.85 }),
+    kit("Tape Mess", ["tape-stop", "reverse-cymbal", "glitch", "scratch", "whoosh", "vox-chop-down", "drop", "noise-hit"], { level: 0.34, vinyl: 0.5, crunch: 0.4 }),
+    kit("Reversed", ["riser", "impact", "laser", "downlifter", "tape-stop", "horn", "glitch", "stab"], { level: 0.67, ...allPads("rev", 1) }),
+    kit("Pitched Down", ["riser", "impact", "laser", "downlifter", "tape-stop", "horn", "glitch", "stab"], { level: 0.53, pitch: -7 }),
+    kit("Gated", ["vox-choir", "stab-organ", "siren", "riser", "whoosh", "vox-ah", "stab-brass", "thunder"], { level: 0.53, ...allPads("mode", 1) }),
   ],
 };
