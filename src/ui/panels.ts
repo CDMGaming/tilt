@@ -276,6 +276,20 @@ export function buildPanel(app: App, track: Track): HTMLElement {
         h("div", { class: "pw-cheek" })),
       keyboard(app, track),
     );
+  } else if (track.kind === "vox") {
+    // Vox: a robot face, the vowel pad as a chrome microphone grille, the controls beside it.
+    const vx0 = track.params.vowelX ?? 0.5, vy0 = track.params.vowelY ?? 0.8;
+    body = h("div", { class: "panel-body vox" },
+      h("div", { class: "vx-face" },
+        h("div", { class: "vx-robot", "aria-hidden": "true" },
+          h("div", { class: "vx-eyes" }, h("span"), h("span")),
+          h("div", { class: "vx-mouth", style: `width:${18 + vx0 * 22}px;height:${4 + vy0 * 18}px` })),
+        h("div", { class: "vx-mic" }, xyPad(app, track, host), h("div", { class: "vx-vowels" }, "u · o · a · e · i")),
+        h("div", { class: "vx-knobs" },
+          h("div", { class: "vx-char" }, ctl("throat", "★ Throat", "l")),
+          ctl("breath", "Breath"), ctl("choir", "Choir"), ctl("attack", "Attack"), ctl("release", "Release"), ctl("level", "Level"))),
+      keyboard(app, track),
+    );
   } else if (track.kind === "acid") {
     // Squelch: one row of big knobs (Bite and Gnaw are the character controls), the arp under a lid.
     const arpOn = (track.params.arpOn ?? 0) >= 0.5;

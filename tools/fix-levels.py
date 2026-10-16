@@ -9,7 +9,7 @@ DEFS = {
     "lead": ("src/engine/instruments2.ts", "LEAD"), "analog": ("src/engine/instruments2.ts", "ANALOG"), "wobble": ("src/engine/instruments2.ts", "WOBBLE"),
     "pad": ("src/engine/instruments2.ts", "PAD"), "chip": ("src/engine/instruments3.ts", "CHIP"), "fm": ("src/engine/instruments3.ts", "FM"),
     "wave": ("src/engine/instruments3.ts", "WAVE"), "sampler": ("src/engine/instruments3.ts", "SAMPLER"), "epiano": ("src/engine/instruments4.ts", "TINE"),
-    "pluck": ("src/engine/instruments4.ts", "PLUCK"), "organ": ("src/engine/instruments4.ts", "ORGAN"), "anthem": ("src/engine/instruments4.ts", "ANTHEM"), "patch": ("src/engine/instruments4.ts", "PATCHWORK"),
+    "pluck": ("src/engine/instruments4.ts", "PLUCK"), "organ": ("src/engine/instruments4.ts", "ORGAN"), "anthem": ("src/engine/instruments4.ts", "ANTHEM"), "patch": ("src/engine/instruments4.ts", "PATCHWORK"), "vox": ("src/engine/instruments4.ts", "VOX"),
 }
 files = {}
 changed = 0

@@ -549,3 +549,113 @@ export class PatchworkDSP implements InstrumentDSP {
     }
   }
 }
+
+// ---------------------------------------------------------------- Vox: formant synth
+
+/** Vowels on the pad: x = back (u, o) to front (i, e), y = closed (u, i) to open (a). Formants F1-F3 in Hz. */
+const VOX_VOWELS: { x: number; y: number; f: [number, number, number] }[] = [
+  { x: 0, y: 0, f: [325, 700, 2530] }, // u
+  { x: 1, y: 0, f: [270, 2300, 3000] }, // i
+  { x: 0, y: 0.6, f: [450, 800, 2830] }, // o
+  { x: 1, y: 0.6, f: [400, 2000, 2550] }, // e
+  { x: 0.5, y: 1, f: [800, 1150, 2900] }, // a
+];
+/** The formants at a pad position: an inverse-distance blend of the five vowels. */
+export function vowelFormants(x: number, y: number): [number, number, number] {
+  let w = 0;
+  const out: [number, number, number] = [0, 0, 0];
+  for (const v of VOX_VOWELS) {
+    const d = (v.x - x) ** 2 + (v.y - y) ** 2, k = 1 / (d * d + 1e-4);
+    w += k;
+    for (let n = 0; n < 3; n++) out[n] += v.f[n] * k;
+  }
+  return out.map((f) => f / w) as [number, number, number];
+}
+
+interface VoxVoice {
+  pitch: number; held: boolean; age: number; amp: ADSR; vel: number; t: number;
+  ph: Float64Array; vib: Float64Array; vibRate: Float64Array; lo: number[]; bd: number[];
+}
+
+/**
+ * Vox: voices without singers. Each note is a few glottal pulses (Choir: 1-5, detuned, each with its own
+ * vibrato) plus breath noise, through three formant band-passes set by the vowel pad. Throat (the
+ * character control): the formants slide from child to giant, the pulse gets rounder or buzzier, and a
+ * low resonance grows. A hidden vowel LFO makes basses talk.
+ */
+export class VoxDSP implements InstrumentDSP {
+  private voices: VoxVoice[] = [];
+  private counter = 0;
+  private vlfo = 0;
+  private low = new SVF();
+  /** The glottal pulse shape for the current Throat, as a table (rebuilt only when Throat moves). */
+  private pulse = new Float32Array(1025);
+  private pulseBuzz = -1;
+  constructor(public params: Record<string, number>, private sr: number) {}
+
+  noteOn(pitch: number, vel: number) {
+    const v = claim(this.voices, 8, pitch, () => ({
+      pitch, held: true, age: 0, amp: new ADSR(), vel: 1, t: 0,
+      ph: Float64Array.from({ length: 5 }, () => Math.random()), vib: Float64Array.from({ length: 5 }, () => Math.random()),
+      vibRate: Float64Array.from({ length: 5 }, () => 4.5 + Math.random() * 1.8), lo: [0, 0, 0], bd: [0, 0, 0],
+    }), ++this.counter);
+    v.vel = vel / 127; v.t = 0;
+    v.amp.gate(true);
+  }
+  noteOff(pitch: number) { for (const v of this.voices) if (v.pitch === pitch && v.held) { v.held = false; v.amp.gate(false); } }
+  allOff() { for (const v of this.voices) { v.held = false; v.amp.gate(false); } }
+
+  render(L: Float32Array, R: Float32Array, i0: number, i1: number) {
+    const p = this.params, sr = this.sr, n = i1 - i0;
+    const throat = p.throat ?? 0.5, breath = p.breath ?? 0.15, choir = Math.max(1, Math.min(5, Math.round(p.choir ?? 1)));
+    const a = p.attack ?? 0.05, r = p.release ?? 0.4;
+    const vibDepth = (p.vibrato ?? 0.3) * 0.006;
+    const lfoAmt = p.vowelLfo ?? 0, lfoRate = p.vowelRate ?? 2;
+    this.vlfo = (this.vlfo + (lfoRate * n) / sr) % 1;
+    const sway = Math.sin(TAU * this.vlfo) * lfoAmt;
+    const x = Math.max(0, Math.min(1, (p.vowelX ?? 0.5) + sway * 0.5)), y = Math.max(0, Math.min(1, (p.vowelY ?? 0.8) - Math.abs(sway) * 0.4));
+    const shift = Math.pow(2, (0.5 - throat) * 1.1);
+    const F = vowelFormants(x, y).map((f) => Math.min(sr * 0.4, f * shift));
+    const fk = F.map((f) => 2 * Math.sin((Math.PI * f) / sr)), damp = [0.12, 0.09, 0.08], gains = [1, 0.55, 0.3];
+    const buzz = 1 + throat * 3; // rounder (low throat) to buzzier pulses
+    if (buzz !== this.pulseBuzz) {
+      this.pulseBuzz = buzz;
+      for (let k = 0; k <= 1024; k++) this.pulse[k] = Math.pow(1 - k / 1024, buzz) - 1 / (buzz + 1);
+    }
+    const pulse = this.pulse;
+    const level = (p.level ?? 0.6) * 1.1 / Math.sqrt(choir);
+    for (const v of this.voices) {
+      if (!v.amp.active) continue;
+      const f0 = mtof(v.pitch) * voiceMod.pitch;
+      for (let i = 0; i < n; i++) {
+        const env = v.amp.next(a, 0.3, 1, r, sr) * velGain(v.vel);
+        let src = 0;
+        for (let c = 0; c < choir; c++) {
+          v.vib[c] = (v.vib[c] + v.vibRate[c] / sr) % 1;
+          const det = choir === 1 ? 0 : ((c / (choir - 1)) * 2 - 1) * 0.008;
+          const fc = f0 * (1 + det + Math.sin(TAU * v.vib[c]) * vibDepth * Math.min(1, v.t / 0.35));
+          v.ph[c] = (v.ph[c] + fc / sr) % 1;
+          // A glottal pulse: a falling ramp raised to a power (higher = sharper, buzzier).
+          const xi = v.ph[c] * 1024, ki = xi | 0;
+          src += pulse[ki] + (pulse[ki + 1] - pulse[ki]) * (xi - ki);
+        }
+        src = src * 1.6 + noise() * breath * 0.9;
+        let y3 = 0;
+        for (let k = 0; k < 3; k++) { // Chamberlin band-pass per formant
+          v.lo[k] += fk[k] * v.bd[k];
+          const hi = src - v.lo[k] - damp[k] * 2 * v.bd[k];
+          v.bd[k] += fk[k] * hi;
+          y3 += v.bd[k] * gains[k] * damp[k] * 2;
+        }
+        // The body: the fundamental itself, so low (talking bass) notes carry; more with a bigger throat.
+        y3 += Math.sin(TAU * v.ph[0]) * (0.1 + throat * 0.5) * Math.min(1, 300 / f0);
+        const out = y3 * env * level;
+        L[i0 + i] += out; R[i0 + i] += out;
+        v.t += 1 / sr;
+      }
+    }
+    // Throat's low resonance (a gentle boost around 200 Hz).
+    if (throat > 0.55) for (let i = i0; i < i1; i++) { const b = this.low.lp(L[i], 220, 0.6, sr) * (throat - 0.55) * 1.2; L[i] += b; R[i] += b; }
+    this.voices = this.voices.filter((v) => v.amp.active || v.held);
+  }
+}

@@ -10,7 +10,7 @@ import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.t
 import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "../src/engine/dsp/instruments3-dsp.ts";
 import { buildMips, parseWav } from "../src/engine/wavetable.ts";
-import { AnthemDSP, OrganDSP, PatchworkDSP, PluckDSP, TineDSP } from "../src/engine/dsp/instruments4-dsp.ts";
+import { AnthemDSP, OrganDSP, PatchworkDSP, PluckDSP, TineDSP, VoxDSP } from "../src/engine/dsp/instruments4-dsp.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
 import { hasToolkit } from "../src/engine/toolkit.ts";
@@ -62,6 +62,12 @@ function phrase(params: Record<string, number>): Ev[] {
     return [...[60, 63, 67, 72, 67, 63].map((pitch, i) => ({ t: i * 2 * step, len: 1.8 * step, pitch: pitch + lo, vel: 100 })),
       ...[60, 64, 67].map((pitch) => ({ t: 14 * step, len: 8 * step, pitch: pitch + lo, vel: 90 })),
       ...[48, 51, 55, 53].map((pitch, i) => ({ t: (24 + i * 2) * step, len: 1.8 * step, pitch: pitch + lo, vel: 110 }))];
+  }
+  if (kind === "vox") {
+    // Basses play a low line; everything else a held chord, then a short melody.
+    if ((params.release ?? 1) < 0.25 && (params.throat ?? 0) >= 0.7) return [[0, 36, 3.5], [4, 36, 1.5], [6, 39, 1.5], [8, 41, 3.5], [12, 43, 3.5], [16, 36, 7.5], [24, 34, 7]].map(([s0, pitch, l]) => ({ t: s0 * step, len: l * step, pitch, vel: 100 }));
+    return [...[60, 63, 67].map((pitch) => ({ t: 0, len: 14 * step, pitch, vel: 100 })),
+      ...[[16, 72, 2], [18, 75, 2], [20, 79, 4], [24, 77, 6]].map(([s0, pitch, l]) => ({ t: s0 * step, len: l * step, pitch, vel: 100 }))];
   }
   if (kind === "anthem") {
     // A chord bar, then the lead line.
@@ -133,6 +139,7 @@ function dspFor(params: Record<string, number>, clock: { bpm: number; zero: numb
     case "organ": return new OrganDSP(params, SR);
     case "anthem": return new AnthemDSP(params, SR);
     case "patch": return new PatchworkDSP(params, SR);
+    case "vox": return new VoxDSP(params, SR);
     case "sampler": {
       const d = new SamplerDSP(params, SR);
       const refs = INSTRUMENTS.sampler.presets[currentPreset]?.samples ?? [];

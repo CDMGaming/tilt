@@ -13,14 +13,19 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 
 /** Instruments the dice may pick (the sampler is for sounds you bring). */
-export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "patch", "poly", "epiano", "organ", "pluck", "pad", "fm", "wave", "lead", "anthem", "chip"];
+export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "patch", "poly", "epiano", "organ", "pluck", "pad", "vox", "fm", "wave", "lead", "anthem", "chip"];
 
 // Role tags per preset, by name. A preset not listed gets its instrument's default.
 const DEFAULT_ROLE: Record<InstrumentKind, Role[]> = {
   drums: ["drums"], analog: ["drums"], acid: ["bass"], wobble: ["bass"], poly: ["keys"], pad: ["pad"],
-  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"], epiano: ["keys"], pluck: ["pluck"], organ: ["keys"], anthem: ["lead"], patch: ["bass"],
+  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"], epiano: ["keys"], pluck: ["pluck"], organ: ["keys"], anthem: ["lead"], patch: ["bass"], vox: ["pad"],
 };
 const TAGS: Partial<Record<InstrumentKind, Record<string, Role[]>>> = {
+  vox: {
+    "Talk Bass": ["bass"], "Yoi Bass": ["bass"], "Mouth Bass": ["bass"], "Wah Bass": ["bass"], "Grunt": ["bass", "fx"],
+    "Robot Lead": ["lead"], "Diva": ["lead"], "Yeah Lead": ["lead"], "Chipmunk": ["lead", "fx"], "Giant": ["lead"],
+    "Vox Pluck": ["pluck", "keys"], "Hey Stab": ["keys", "pluck"], "Ooh Stab": ["keys", "pluck"], "Alien Chat": ["fx"], "Breath": ["fx", "pad"], "Siren Choir": ["fx", "pad"],
+  },
   patch: {
     "Patch Lead": ["lead"], "Screamer": ["lead"], "Sync-ish Sweep": ["lead"], "Flute Patch": ["lead"], "Bleep": ["arp", "pluck"], "S&H Burble": ["arp", "fx"],
     "Trill": ["arp", "lead"], "Siren": ["fx"], "Laser": ["fx"], "Wind": ["fx"], "UFO": ["fx"], "Tremolo Drone": ["pad", "fx"], "Noise Snap": ["fx", "drums"],
@@ -158,7 +163,11 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
   wave: [
     pick("table", 0.4, range(0, 6)), knob("pos", 0.3), knob("warp", 0.25), knob("envAmt", 0.25), knob("envDecay", 0.22),
     knob("lfoAmt", 0.2, 0, 0.7), knob("lfoRate", 0.22), knob("detune", 0.2), knob("cutoff", 0.18, 0.3, 1), knob("reso", 0.15, 0, 0.6),
-  ],  patch: [
+  ],  vox: [
+    knob("vowelX", 0.25), knob("vowelY", 0.25), knob("throat", 0.2), knob("breath", 0.15, 0, 0.6), pick("choir", 0.25, [1, 2, 3, 4, 5]),
+    knob("vibrato", 0.15), knob("vowelLfo", 0.15, 0, 0.8), knob("vowelRate", 0.2),
+  ],
+  patch: [
     knob("vco1", 0.2), knob("vco2", 0.2), knob("cutoff", 0.15, 0.2, 0.85), knob("peak", 0.18, 0, 0.85), knob("drive", 0.2), pick("vco2Semi", 0.3, [-12, 0, 5, 7, 12]),
     knob("mg1Rate", 0.2), knob("mg2Rate", 0.2), knob("mg1Amt", 0.15), knob("egAmt", 0.15), pick("mg1To", 0.2, [0, 2, 7, 8]),
   ],

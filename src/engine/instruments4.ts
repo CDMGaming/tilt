@@ -299,3 +299,62 @@ export const PATCHWORK: InstrumentDef = {
     pw("Noise Snap", { level: 0.63, vco1: 0, vco2: 0.3, noise: 0.9, cutoff: 3000, peak: 0.5, release: 0.06, egAmt: 0.9 }),
   ],
 };
+
+// ---------- formant synth: "Vox" ----------
+
+const vx = (name: string, params: Record<string, number>) => ({ name, params });
+// Pad positions of the vowels (x, y), for presets.
+const A = { vowelX: 0.5, vowelY: 1 }, E = { vowelX: 1, vowelY: 0.6 }, I = { vowelX: 1, vowelY: 0 }, O = { vowelX: 0, vowelY: 0.6 }, U = { vowelX: 0, vowelY: 0 };
+
+export const VOX: InstrumentDef = {
+  kind: "vox",
+  name: "Vox",
+  role: "Voices without singers: choirs and talking basses",
+  group: "harmony",
+  params: [
+    { id: "vowelX", label: "Vowel X", min: 0, max: 1, def: 0.5 },
+    { id: "vowelY", label: "Vowel Y", min: 0, max: 1, def: 0.8 },
+    { id: "throat", label: "Throat", min: 0, max: 1, def: 0.5 },
+    { id: "breath", label: "Breath", min: 0, max: 1, def: 0.15 },
+    { id: "choir", label: "Choir", min: 1, max: 5, def: 3, options: ["1", "2", "3", "4", "5"] },
+    { id: "attack", label: "Attack", min: 0.005, max: 3, def: 0.08, curve: "exp", unit: "s" },
+    { id: "release", label: "Release", min: 0.02, max: 5, def: 0.6, curve: "exp", unit: "s" },
+    { id: "level", label: "Level", min: 0, max: 1, def: 0.6 },
+    // Hidden voicing:
+    { id: "vibrato", label: "Vibrato", min: 0, max: 1, def: 0.3 },
+    { id: "vowelLfo", label: "Vowel LFO", min: 0, max: 1, def: 0 },
+    { id: "vowelRate", label: "Vowel LFO rate", min: 0.1, max: 12, def: 2, curve: "exp", unit: "Hz" },
+  ],
+  macros: ["vowelX", "vowelY", "throat", "breath", "choir", "attack", "release", "level"],
+  presets: [
+    // Choirs and pads
+    vx("Aah Choir", { level: 0.56, ...A, choir: 5, attack: 0.4, release: 1.5 }),
+    vx("Ooh Choir", { level: 0.37, ...U, choir: 5, attack: 0.5, release: 1.8, throat: 0.45 }),
+    vx("Oh Choir", { level: 0.51, ...O, choir: 4, attack: 0.4, release: 1.5 }),
+    vx("Angel Pad", { level: 0.66, ...A, choir: 5, throat: 0.25, breath: 0.25, attack: 1, release: 2.5, "ifx:type": 15, "ifx:a": 0.7, "ifx:b": 0.4 }),
+    vx("Monk Drone", { level: 0.44, ...O, choir: 4, throat: 0.85, breath: 0.1, attack: 0.8, release: 2, vibrato: 0.1 }),
+    vx("Whisper Pad", { level: 0.39, ...E, choir: 3, breath: 1, attack: 0.6, release: 2, vibrato: 0 }),
+    vx("Glass Voices", { level: 0.41, vowelX: 0.8, vowelY: 0.3, choir: 4, throat: 0.3, attack: 0.3, release: 1.5, "ifx:type": 8, "ifx:a": 0.3, "ifx:b": 0.5 }),
+    vx("Haunted", { level: 0.38, ...U, choir: 5, throat: 0.6, breath: 0.4, vowelLfo: 0.3, vowelRate: 0.2, attack: 1.2, release: 3 }),
+    // Talking basses
+    vx("Talk Bass", { level: 0.45, ...O, choir: 1, throat: 0.75, vowelLfo: 0.8, vowelRate: 2, attack: 0.005, release: 0.12, vibrato: 0 }),
+    vx("Yoi Bass", { level: 0.46, ...U, choir: 2, throat: 0.8, vowelLfo: 1, vowelRate: 4, attack: 0.005, release: 0.1, vibrato: 0 }),
+    vx("Mouth Bass", { level: 0.39, ...A, choir: 1, throat: 0.9, attack: 0.005, release: 0.15, vibrato: 0, breath: 0.05 }),
+    vx("Wah Bass", { level: 0.42, ...U, choir: 1, throat: 0.7, vowelLfo: 0.6, vowelRate: 1, attack: 0.01, release: 0.2, vibrato: 0 }),
+    vx("Grunt", { level: 0.44, ...O, choir: 2, throat: 1, breath: 0.2, attack: 0.005, release: 0.1, vibrato: 0 }),
+    // Leads
+    vx("Robot Lead", { level: 0.31, ...E, choir: 1, throat: 0.55, vibrato: 0, attack: 0.01, release: 0.2 }),
+    vx("Diva", { level: 0.60, ...A, choir: 1, throat: 0.35, vibrato: 0.7, attack: 0.08, release: 0.6, "ifx:type": 15, "ifx:a": 0.5, "ifx:b": 0.3 }),
+    vx("Yeah Lead", { level: 0.40, vowelX: 0.8, vowelY: 0.5, choir: 2, throat: 0.45, vowelLfo: 0.25, vowelRate: 0.6, attack: 0.02, release: 0.3 }),
+    vx("Chipmunk", { level: 0.44, ...I, choir: 1, throat: 0, vibrato: 0.5, attack: 0.01, release: 0.2 }),
+    vx("Giant", { level: 0.34, ...O, choir: 2, throat: 1, vibrato: 0.2, attack: 0.05, release: 0.6 }),
+    // Plucks and chops
+    vx("Vox Pluck", { level: 0.52, ...A, choir: 2, attack: 0.003, release: 0.15, vibrato: 0, throat: 0.45 }),
+    vx("Hey Stab", { level: 0.42, ...E, choir: 4, attack: 0.003, release: 0.12, breath: 0.3, vibrato: 0 }),
+    vx("Ooh Stab", { level: 0.36, ...U, choir: 4, attack: 0.003, release: 0.2, vibrato: 0 }),
+    // FX
+    vx("Alien Chat", { level: 0.30, ...I, choir: 1, throat: 0.4, vowelLfo: 1, vowelRate: 9, vibrato: 0, attack: 0.01, release: 0.2 }),
+    vx("Breath", { level: 0.41, ...A, choir: 1, breath: 1, vibrato: 0, attack: 0.2, release: 0.8 }),
+    vx("Siren Choir", { level: 0.50, ...A, choir: 5, vowelLfo: 0.7, vowelRate: 0.3, vibrato: 0.6, attack: 0.5, release: 2 }),
+  ],
+};

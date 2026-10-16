@@ -483,6 +483,11 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** J, the vowel pad drawn as a retro microphone grille.
 - **Theme:** chrome mic and a robot face.
 - **Presets:** 24.
+- **Status: built** (kind `vox`). Glottal pulses (Choir: 1-5 detuned singers with their own vibrato) plus breath,
+  through three formant band-passes blended from u / i / o / e / a on the pad (x = back to front, y = closed to
+  open), with a body (the fundamental) so low notes carry. Throat: formants child to giant, pulse round to buzzy,
+  a low resonance. A hidden vowel LFO makes the basses talk. The robot's mouth follows the vowel. 24 presets,
+  level-matched and stress-checked.
 
 ### Chop: loop slicer
 - **Idea:** cut a breakbeat into 16 slices on pads.

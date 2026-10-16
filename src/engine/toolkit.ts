@@ -10,9 +10,9 @@ import type { InstrumentKind } from "./model";
 import { FX_TYPES } from "./params";
 
 /** Synths that get the toolkit (drum machines and the sampler don't). */
-export const TOOLKIT_KINDS: InstrumentKind[] = ["acid", "poly", "lead", "wobble", "pad", "chip", "fm", "wave", "epiano", "pluck", "anthem", "patch"];
+export const TOOLKIT_KINDS: InstrumentKind[] = ["acid", "poly", "lead", "wobble", "pad", "chip", "fm", "wave", "epiano", "pluck", "anthem", "patch", "vox"];
 /** Polyphonic synths: these get the voice-mode section (the mono ones have their own glide / legato). */
-export const POLY_KINDS: InstrumentKind[] = ["poly", "pad", "chip", "fm", "wave", "epiano", "pluck"];
+export const POLY_KINDS: InstrumentKind[] = ["poly", "pad", "chip", "fm", "wave", "epiano", "pluck", "vox"];
 /** Lead synths: these get the performance FX (Pump, Repeat). */
 export const LEAD_KINDS: InstrumentKind[] = ["lead", "chip", "anthem"];
 
@@ -29,6 +29,7 @@ export const TONE_PARAM: Partial<Record<InstrumentKind, { id: string; label: str
 /** The XY pad (X, Y): only where the pad is the instrument's idea (Morph's Warp pad; Vox later). */
 export const XY_PARAMS: Partial<Record<InstrumentKind, [string, string]>> = {
   wave: ["pos", "warp"],
+  vox: ["vowelX", "vowelY"],
 };
 
 export const FILTER_TYPES = ["Off", "LP12", "LP24", "HP", "BP", "Notch"];

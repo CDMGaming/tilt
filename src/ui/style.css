@@ -53,6 +53,7 @@
   --inst-pluck: #c9955a;   /* Pluck: honey wood */
   --inst-organ: #b5462f;   /* Wheelhouse: oxblood */
   --inst-anthem: #ff4fb8;  /* Anthem: magenta */
+  --inst-vox: #9ad0ff;     /* Vox: chrome sky */
   --inst-patch: #f2b134;   /* Patchwork: amber (an orange-gold, not the DMD yellow) */
 
   /* ---- shape ---- */
@@ -206,7 +207,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .chip[class*="kind-"] { color: var(--kc); box-shadow: inset 2px 0 0 var(--kc); }
 .kind-drums { --kc: var(--inst-drums); } .kind-analog { --kc: var(--inst-analog); } .kind-acid { --kc: var(--inst-acid); }
 .kind-wobble { --kc: var(--inst-wobble); } .kind-poly { --kc: var(--inst-poly); } .kind-pad { --kc: var(--inst-pad); } .kind-lead { --kc: var(--inst-lead); }
-.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); } .kind-epiano { --kc: var(--inst-epiano); } .kind-pluck { --kc: var(--inst-pluck); } .kind-organ { --kc: var(--inst-organ); } .kind-anthem { --kc: var(--inst-anthem); } .kind-patch { --kc: var(--inst-patch); }
+.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); } .kind-epiano { --kc: var(--inst-epiano); } .kind-pluck { --kc: var(--inst-pluck); } .kind-organ { --kc: var(--inst-organ); } .kind-anthem { --kc: var(--inst-anthem); } .kind-patch { --kc: var(--inst-patch); } .kind-vox { --kc: var(--inst-vox); }
 .dice-actions { display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap; justify-content: center; }
 .roll-btn { font-size: 28px; font-weight: 900; padding: 16px 36px; border-radius: 16px; background: var(--raise); border: 2px solid var(--accent); display: flex; flex-direction: column; align-items: center; }
 .roll-btn small, .go-btn small { font-size: 11px; color: var(--dim); font-weight: 400; }
@@ -1486,3 +1487,25 @@ body.phone .gb-master { flex-direction: row; border-left: none; }
 .pw-jack.armed { color: #fff; }
 .pw-cables { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .pw-cables path { fill: none; stroke-width: 4; stroke-linecap: round; opacity: .9; filter: drop-shadow(0 2px 2px #000a); }
+
+/* Vox: a chrome microphone grille for the vowel pad, and a robot face whose mouth follows the vowel. */
+.panel-body.vox { padding: 0; overflow: hidden; border-top-color: #9ad0ff; }
+.vx-face { display: flex; gap: 18px; align-items: center; justify-content: center; flex-wrap: wrap; padding: 12px 16px;
+  background: radial-gradient(circle at 30% 20%, #3a4452, #1c222b 70%); }
+.vx-robot { width: 86px; height: 96px; border-radius: 18px 18px 26px 26px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: linear-gradient(180deg, #e7ecf2, #9aa5b2); box-shadow: inset 0 2px 0 #fff, 0 3px 8px #0009; }
+.vx-eyes { display: flex; gap: 16px; }
+.vx-eyes span { width: 14px; height: 14px; border-radius: 50%; background: #1b2633; box-shadow: inset 0 0 0 3px #9ad0ff, 0 0 8px #9ad0ff; }
+.vx-mouth { border-radius: 999px; background: #1b2633; box-shadow: inset 0 0 6px #9ad0ff88; transition: width .2s, height .2s; }
+.vx-mic { width: min(300px, 90vw); }
+.vx-mic .xy-pad { height: 170px; border-radius: 40px; border: 3px solid #cfd6de;
+  background: radial-gradient(circle, #0b0f14 1.4px, transparent 1.8px) 0 0 / 7px 7px, radial-gradient(circle at 40% 30%, #c5ced8, #6f7b88 75%); box-shadow: inset 0 0 18px #000a, 0 3px 8px #0009; }
+.vx-mic .xy-dot { background: #9ad0ff; box-shadow: 0 0 12px #9ad0ff; }
+.vx-mic .xy-axis, .vx-mic .xy-readout, .vx-vowels { color: #dfe7ef; }
+.vx-vowels { text-align: center; font: 700 11px var(--font-mono); letter-spacing: .3em; opacity: .7; margin-top: 2px; }
+.vx-knobs { display: flex; gap: 6px 12px; align-items: flex-end; flex-wrap: wrap; max-width: 330px; }
+.vx-char .knob-label { color: #9ad0ff !important; }
+.panel-body.vox .knob-label { color: #e7ecf2; opacity: 1; font-weight: 800; }
+.panel-body.vox .knob-value { color: #aab6c3; }
+.panel.kind-vox .panel-body.vox { --cap-fill: #d5dce4; --cap-edge: #6f7b88; --knob-dot: #1b2633; }
+.panel-body.vox .knob-val { stroke: #9ad0ff; }
