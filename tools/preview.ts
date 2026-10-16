@@ -10,7 +10,7 @@ import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.t
 import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "../src/engine/dsp/instruments3-dsp.ts";
 import { buildMips, parseWav } from "../src/engine/wavetable.ts";
-import { OrganDSP, PluckDSP, TineDSP } from "../src/engine/dsp/instruments4-dsp.ts";
+import { AnthemDSP, OrganDSP, PluckDSP, TineDSP } from "../src/engine/dsp/instruments4-dsp.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
 import { hasToolkit } from "../src/engine/toolkit.ts";
@@ -62,6 +62,11 @@ function phrase(params: Record<string, number>): Ev[] {
     return [...[60, 63, 67, 72, 67, 63].map((pitch, i) => ({ t: i * 2 * step, len: 1.8 * step, pitch: pitch + lo, vel: 100 })),
       ...[60, 64, 67].map((pitch) => ({ t: 14 * step, len: 8 * step, pitch: pitch + lo, vel: 90 })),
       ...[48, 51, 55, 53].map((pitch, i) => ({ t: (24 + i * 2) * step, len: 1.8 * step, pitch: pitch + lo, vel: 110 }))];
+  }
+  if (kind === "anthem") {
+    // A chord bar, then the lead line.
+    return [...[60, 63, 67].map((pitch) => ({ t: 0, len: 7.5 * step, pitch, vel: 100 })), ...[56, 60, 63].map((pitch) => ({ t: 8 * step, len: 7.5 * step, pitch, vel: 100 })),
+      ...[[16, 72, 2], [18, 75, 2], [20, 79, 3.5], [24, 77, 2], [26, 75, 6]].map(([s0, pitch, l]) => ({ t: s0 * step, len: l * step, pitch, vel: 100 }))];
   }
   if (kind === "organ") {
     // Held chords (the rotary and vibrato need time), then a short riff.
@@ -126,6 +131,7 @@ function dspFor(params: Record<string, number>, clock: { bpm: number; zero: numb
     case "epiano": return new TineDSP(params, SR);
     case "pluck": return new PluckDSP(params, SR);
     case "organ": return new OrganDSP(params, SR);
+    case "anthem": return new AnthemDSP(params, SR);
     case "sampler": {
       const d = new SamplerDSP(params, SR);
       const refs = INSTRUMENTS.sampler.presets[currentPreset]?.samples ?? [];

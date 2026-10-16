@@ -197,7 +197,7 @@ export function usedPresets(song: Song, kind: InstrumentKind, exceptTrackId?: nu
 
 const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"; // Crockford base32: no I, L, O, U
 // Order is part of the share-code format: only ever append.
-const KIND_CODE: InstrumentKind[] = ["drums", "acid", "poly", "lead", "analog", "wobble", "pad", "chip", "fm", "wave", "sampler", "epiano", "pluck", "organ"];
+const KIND_CODE: InstrumentKind[] = ["drums", "acid", "poly", "lead", "analog", "wobble", "pad", "chip", "fm", "wave", "sampler", "epiano", "pluck", "organ", "anthem"];
 
 /**
  * The setup as a short code. Format 1 (the original): one byte per slot, 4 bits instrument

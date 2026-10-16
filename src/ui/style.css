@@ -52,6 +52,7 @@
   --inst-epiano: #e07a5f;  /* Tine: terracotta */
   --inst-pluck: #c9955a;   /* Pluck: honey wood */
   --inst-organ: #b5462f;   /* Wheelhouse: oxblood */
+  --inst-anthem: #ff4fb8;  /* Anthem: magenta */
 
   /* ---- shape ---- */
   --r-s: 4px;
@@ -204,7 +205,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .chip[class*="kind-"] { color: var(--kc); box-shadow: inset 2px 0 0 var(--kc); }
 .kind-drums { --kc: var(--inst-drums); } .kind-analog { --kc: var(--inst-analog); } .kind-acid { --kc: var(--inst-acid); }
 .kind-wobble { --kc: var(--inst-wobble); } .kind-poly { --kc: var(--inst-poly); } .kind-pad { --kc: var(--inst-pad); } .kind-lead { --kc: var(--inst-lead); }
-.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); } .kind-epiano { --kc: var(--inst-epiano); } .kind-pluck { --kc: var(--inst-pluck); } .kind-organ { --kc: var(--inst-organ); }
+.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); } .kind-epiano { --kc: var(--inst-epiano); } .kind-pluck { --kc: var(--inst-pluck); } .kind-organ { --kc: var(--inst-organ); } .kind-anthem { --kc: var(--inst-anthem); }
 .dice-actions { display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap; justify-content: center; }
 .roll-btn { font-size: 28px; font-weight: 900; padding: 16px 36px; border-radius: 16px; background: var(--raise); border: 2px solid var(--accent); display: flex; flex-direction: column; align-items: center; }
 .roll-btn small, .go-btn small { font-size: 11px; color: var(--dim); font-weight: 400; }
@@ -1443,3 +1444,19 @@ body.phone .gb-master { flex-direction: row; border-left: none; }
 .wh-char .knob-label { color: #ffb38a !important; }
 .panel.kind-organ .panel-body.wheelhouse { --cap-fill: #c9ced4; --cap-edge: #555; --knob-dot: #b5462f; }
 .panel-body.wheelhouse .knob-val { stroke: #ffb38a; }
+
+/* Anthem: gloss white with a magenta glow ring around a big Twist knob. */
+.panel-body.anthem { padding: 0; overflow: hidden; border-top-color: #ff4fb8; }
+.an-face { display: flex; gap: 22px; align-items: center; justify-content: center; flex-wrap: wrap; padding: 14px 16px;
+  background: radial-gradient(circle at 50% 40%, #ffffff, #e9ecf1 60%, #d3d8e0); color: #1d1f24; box-shadow: inset 0 2px 0 #fff, inset 0 -4px 10px #0002; }
+.an-ring { display: grid; grid-template-columns: repeat(3, auto); gap: 6px 12px; }
+.an-hero { position: relative; display: grid; place-items: center; width: 150px; height: 150px; border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 55%, transparent 56%), conic-gradient(from 0deg, #ff4fb8, #b84fff, #ff4fb8);
+  box-shadow: 0 0 22px #ff4fb877, inset 0 0 0 2px #ff4fb8; }
+.an-hero .knob .knob-svg { width: 96px; height: 96px; }
+.an-hero .knob .knob-label { color: #d61f8a; font-weight: 900; letter-spacing: .2em; }
+.panel-body.anthem .knob-label { color: #1d1f24; opacity: 1; font-weight: 800; }
+.panel-body.anthem .knob-value { color: #4a4f59; }
+.panel.kind-anthem .panel-body.anthem { --cap-fill: #f7f8fa; --cap-edge: #b9bec7; --knob-dot: #ff4fb8; }
+.panel-body.anthem .knob-val { stroke: #ff4fb8; }
+.panel-body.anthem .knob-track { stroke: #0000001a; }

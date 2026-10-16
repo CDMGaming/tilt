@@ -334,3 +334,100 @@ export class OrganDSP implements InstrumentDSP {
     this.voices = this.voices.filter((v) => v.amp.active || v.held);
   }
 }
+
+// ---------------------------------------------------------------- Anthem: supersaw
+
+interface SawVoice { pitch: number; held: boolean; age: number; amp: ADSR; vel: number; t: number; ph: Float64Array; sub: number; f: SVF[]; from: number }
+
+/**
+ * Anthem: the huge festival supersaw, polyphonic. Twist (the character control) sets how many saws
+ * (1-9), how far apart they're detuned and spread, with the level compensated so it gets bigger, not
+ * louder. Diffuse smears it wider (a short modulated delay per side), Bottom adds a sub an octave
+ * down, Shine is its own big reverb. Pump and Repeat come from the shared performer.
+ */
+export class AnthemDSP implements InstrumentDSP {
+  private voices: SawVoice[] = [];
+  private counter = 0;
+  private last = 60;
+  private room: Reverb;
+  private bl = new Float32Array(128);
+  private br = new Float32Array(128);
+  private il = new Float32Array(128);
+  private ir = new Float32Array(128);
+  private dL = new Float32Array(2048);
+  private dR = new Float32Array(2048);
+  private dw = 0;
+  private dph = 0;
+  constructor(public params: Record<string, number>, private sr: number) {
+    this.room = new Reverb(sr, 1.8);
+  }
+
+  noteOn(pitch: number, vel: number) {
+    const v = claim(this.voices, 10, pitch, () => ({
+      pitch, held: true, age: 0, amp: new ADSR(), vel: 1, t: 0, ph: Float64Array.from({ length: 9 }, () => Math.random()), sub: 0, f: [new SVF(), new SVF()], from: pitch,
+    }), ++this.counter);
+    v.vel = vel / 127; v.t = 0; v.from = this.last; this.last = pitch;
+    v.amp.gate(true);
+  }
+  noteOff(pitch: number) { for (const v of this.voices) if (v.pitch === pitch && v.held) { v.held = false; v.amp.gate(false); } }
+  allOff() { for (const v of this.voices) { v.held = false; v.amp.gate(false); } }
+
+  render(L: Float32Array, R: Float32Array, i0: number, i1: number) {
+    const p = this.params, sr = this.sr, n = i1 - i0;
+    const twist = p.twist ?? 0.6, diffuse = p.diffuse ?? 0.3, bottom = p.bottom ?? 0.2, shine = p.shine ?? 0.3;
+    const count = 1 + Math.round(twist * 8), det = 0.02 + twist * 0.5; // semitones each side at the edge
+    const spread = Math.min(1, 0.2 + twist * 0.9), comp = 1 / Math.sqrt(count);
+    const a = p.attack ?? 0.01, d = p.decay ?? 0.5, s = p.sustain ?? 0.85, r = p.release ?? 0.35;
+    const cut = p.cutoff ?? 9000, fenv = p.fenv ?? 0.2, fdec = p.fdecay ?? 0.4, res = p.reso ?? 0.1;
+    const glide = p.glide ?? 0;
+    const level = (p.level ?? 0.6) * 1.0;
+    if (this.bl.length < n) { this.bl = new Float32Array(n); this.br = new Float32Array(n); this.il = new Float32Array(n); this.ir = new Float32Array(n); }
+    const bl = this.bl, br = this.br;
+    bl.fill(0, 0, n); br.fill(0, 0, n);
+    for (const v of this.voices) {
+      if (!v.amp.active) continue;
+      for (let i = 0; i < n; i++) {
+        const g = glide > 0.005 ? Math.exp(-v.t / glide) : 0;
+        const pitch = v.pitch + (v.from - v.pitch) * g;
+        const f0 = mtof(pitch) * voiceMod.pitch;
+        const env = v.amp.next(a, d, s, r, sr) * velGain(v.vel);
+        let l = 0, rr = 0;
+        for (let k = 0; k < count; k++) {
+          const off = count === 1 ? 0 : (k / (count - 1)) * 2 - 1; // -1..1 across the stack
+          const fk = f0 * Math.pow(2, (off * det * (0.6 + 0.4 * Math.abs(off))) / 12);
+          v.ph[k] += fk / sr; if (v.ph[k] >= 1) v.ph[k] -= 1;
+          const x = 2 * v.ph[k] - 1;
+          l += x * panL(off * spread); rr += x * panR(off * spread);
+        }
+        v.sub += (f0 * 0.5) / sr; if (v.sub >= 1) v.sub -= 1;
+        const sub = Math.sin(TAU * v.sub) * bottom * 1.2;
+        const fc = Math.min(sr * 0.45, cut * Math.pow(2, fenv * 5 * Math.exp(-v.t / fdec)));
+        bl[i] += (v.f[0].lp(l * comp, fc, res, sr) + sub) * env;
+        br[i] += (v.f[1].lp(rr * comp, fc, res, sr) + sub) * env;
+        v.t += 1 / sr;
+      }
+    }
+    this.voices = this.voices.filter((v) => v.amp.active || v.held);
+    // Diffuse: each side through its own slowly-moving short delay, mixed in.
+    const len = this.dL.length;
+    for (let i = 0; i < n; i++) {
+      if (diffuse > 0.01) {
+        this.dL[this.dw] = bl[i]; this.dR[this.dw] = br[i];
+        this.dph = (this.dph + 0.23 / sr) % 1;
+        const tap = (buf: Float32Array, dly: number) => { const pos = (this.dw - dly + len) % len, k = Math.floor(pos); return buf[k] + (buf[(k + 1) % len] - buf[k]) * (pos - k); };
+        const m = Math.sin(TAU * this.dph) * 0.002 * sr;
+        bl[i] = bl[i] * (1 - diffuse * 0.4) + tap(this.dR, 0.017 * sr + m) * diffuse * 0.7;
+        br[i] = br[i] * (1 - diffuse * 0.4) + tap(this.dL, 0.023 * sr - m) * diffuse * 0.7;
+        this.dw = (this.dw + 1) % len;
+      }
+    }
+    // Shine: only the reverb's own sound is added.
+    this.il.set(bl.subarray(0, n)); this.ir.set(br.subarray(0, n));
+    if (shine > 0.01) this.room.process(this.il, this.ir, n, 0.55 + shine * 0.4, 1);
+    for (let i = 0; i < n; i++) {
+      const wl = shine > 0.01 ? (this.il[i] - bl[i] * 0.65) * shine * 1.4 : 0, wr = shine > 0.01 ? (this.ir[i] - br[i] * 0.65) * shine * 1.4 : 0;
+      L[i0 + i] += (bl[i] + wl) * level;
+      R[i0 + i] += (br[i] + wr) * level;
+    }
+  }
+}

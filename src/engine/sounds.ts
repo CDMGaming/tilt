@@ -13,14 +13,19 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 
 /** Instruments the dice may pick (the sampler is for sounds you bring). */
-export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "poly", "epiano", "organ", "pluck", "pad", "fm", "wave", "lead", "chip"];
+export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "poly", "epiano", "organ", "pluck", "pad", "fm", "wave", "lead", "anthem", "chip"];
 
 // Role tags per preset, by name. A preset not listed gets its instrument's default.
 const DEFAULT_ROLE: Record<InstrumentKind, Role[]> = {
   drums: ["drums"], analog: ["drums"], acid: ["bass"], wobble: ["bass"], poly: ["keys"], pad: ["pad"],
-  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"], epiano: ["keys"], pluck: ["pluck"], organ: ["keys"],
+  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"], epiano: ["keys"], pluck: ["pluck"], organ: ["keys"], anthem: ["lead"],
 };
 const TAGS: Partial<Record<InstrumentKind, Record<string, Role[]>>> = {
+  anthem: {
+    "Saw Pad": ["pad"], "Pump Pad": ["pad"], "Wide Chords": ["pad", "keys"], "Dark Stack": ["pad"], "Sunrise": ["pad"], "Gated Pad": ["pad", "arp"],
+    "Pluck Saw": ["pluck", "arp"], "Big Pluck": ["pluck"], "Stab": ["keys", "pluck"], "Pump Stab": ["keys", "pluck"],
+    "Saw Bass": ["bass"], "Reese-ish": ["bass"], "Riser Saw": ["fx"], "Crowd Roar": ["fx", "pad"], "Laser Saw": ["lead", "fx"],
+  },
   organ: { "Soft Flute": ["keys", "pad"], "Dark Pad": ["pad"], "Cathedral": ["pad", "keys"], "Ballad": ["keys", "pad"], "Bass Pedal": ["bass"], "Whistle": ["lead"], "Screamer": ["keys", "lead"] },
   pluck: {
     "Finger Bass": ["bass"], "Pick Bass": ["bass"], "Muted Bass": ["bass"], "Upright-ish": ["bass"],
@@ -149,7 +154,11 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
   wave: [
     pick("table", 0.4, range(0, 6)), knob("pos", 0.3), knob("warp", 0.25), knob("envAmt", 0.25), knob("envDecay", 0.22),
     knob("lfoAmt", 0.2, 0, 0.7), knob("lfoRate", 0.22), knob("detune", 0.2), knob("cutoff", 0.18, 0.3, 1), knob("reso", 0.15, 0, 0.6),
-  ],  organ: [
+  ],  anthem: [
+    knob("twist", 0.2, 0.2, 1), knob("diffuse", 0.22), knob("bottom", 0.2, 0, 0.7), knob("shine", 0.2, 0, 0.8),
+    knob("cutoff", 0.15, 0.4, 1), knob("fenv", 0.2), knob("fdecay", 0.18), knob("glide", 0.1, 0, 0.4),
+  ],
+  organ: [
     ...Array.from({ length: 9 }, (_, k) => pick(`db${k}`, 0.3, [0, 2, 4, 6, 8])), knob("drive", 0.2, 0, 0.9), pick("rotary", 0.3, [0, 1, 2]),
     pick("vibChorus", 0.3, [0, 1, 2, 3, 4, 5, 6]), pick("perc", 0.25, [0, 1, 2]), knob("click", 0.2),
   ],

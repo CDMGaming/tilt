@@ -168,3 +168,62 @@ export const ORGAN: InstrumentDef = {
     reg("Garage Organ", "008808000", { level: 0.29, drive: 0.6, rotary: 2, vibChorus: 3, click: 0.4 }),
   ],
 };
+
+// ---------- supersaw: "Anthem" ----------
+
+const an = (name: string, params: Record<string, number>) => ({ name, params });
+
+export const ANTHEM: InstrumentDef = {
+  kind: "anthem",
+  name: "Anthem",
+  role: "The huge festival supersaw",
+  group: "lead",
+  params: [
+    { id: "twist", label: "Twist", min: 0, max: 1, def: 0.6 },
+    { id: "diffuse", label: "Diffuse", min: 0, max: 1, def: 0.3 },
+    { id: "bottom", label: "Bottom", min: 0, max: 1, def: 0.2 },
+    { id: "shine", label: "Shine", min: 0, max: 1, def: 0.3 },
+    { id: "level", label: "Level", min: 0, max: 1, def: 0.6 },
+    // Hidden voicing (Pump and Repeat are the shared performer's tk:pump / tk:repeat):
+    { id: "glide", label: "Glide", min: 0, max: 0.5, def: 0 },
+    { id: "cutoff", label: "Cutoff", min: 200, max: 16000, def: 9000, curve: "exp", unit: "Hz" },
+    { id: "reso", label: "Reso", min: 0, max: 1, def: 0.1 },
+    { id: "fenv", label: "Filter env", min: 0, max: 1, def: 0.2 },
+    { id: "fdecay", label: "F decay", min: 0.02, max: 3, def: 0.4, curve: "exp", unit: "s" },
+    { id: "attack", label: "Attack", min: 0.001, max: 3, def: 0.01, curve: "exp", unit: "s" },
+    { id: "decay", label: "Decay", min: 0.02, max: 3, def: 0.5, curve: "exp", unit: "s" },
+    { id: "sustain", label: "Sustain", min: 0, max: 1, def: 0.85 },
+    { id: "release", label: "Release", min: 0.01, max: 4, def: 0.35, curve: "exp", unit: "s" },
+  ],
+  macros: ["twist", "diffuse", "tk:pump", "tk:repeat", "bottom", "shine", "glide", "level"],
+  presets: [
+    // Leads
+    an("Festival", { level: 0.32,}),
+    an("Main Stage", { level: 0.28, twist: 0.85, diffuse: 0.4, shine: 0.45, "tk:pump": 0.5 }),
+    an("Hands Up", { level: 0.26, twist: 0.75, shine: 0.35, glide: 0.04, cutoff: 12000 }),
+    an("Trance Gate", { level: 0.24, twist: 0.7, "tk:repeat": 0.8, "tk:repDiv": 1, shine: 0.5 }),
+    an("Thin Lead", { level: 0.31, twist: 0.25, diffuse: 0.1, shine: 0.2, cutoff: 7000 }),
+    an("Glide Lead", { level: 0.31, twist: 0.5, glide: 0.12, shine: 0.3 }),
+    an("Stutter Lead", { level: 0.43, twist: 0.6, "tk:repeat": 0.6, "tk:repDiv": 2, shine: 0.25 }),
+    an("Hardstyle-ish", { level: 0.51, twist: 0.9, bottom: 0.3, cutoff: 6000, reso: 0.25, fenv: 0.4, "ifx:type": 6, "ifx:a": 0.4, "ifx:b": 0.15 }),
+    an("Pluck Saw", { level: 0.87, twist: 0.55, attack: 0.002, decay: 0.25, sustain: 0, release: 0.2, fenv: 0.6, fdecay: 0.15, cutoff: 2000, shine: 0.4 }),
+    an("Big Pluck", { level: 0.74, twist: 0.8, attack: 0.002, decay: 0.4, sustain: 0.1, release: 0.3, fenv: 0.5, fdecay: 0.2, cutoff: 3000, shine: 0.5, "tk:pump": 0.4 }),
+    an("Euphoria", { level: 0.19, twist: 1, diffuse: 0.6, shine: 0.7, "tk:pump": 0.35 }),
+    an("Laser Saw", { level: 0.32, twist: 0.6, fenv: 0.9, fdecay: 0.08, cutoff: 1500, reso: 0.4 }),
+    // Pads and chords
+    an("Saw Pad", { level: 0.22, twist: 0.9, diffuse: 0.7, attack: 0.6, release: 2, shine: 0.6, cutoff: 5000 }),
+    an("Pump Pad", { level: 0.31, twist: 0.8, diffuse: 0.5, attack: 0.05, release: 0.6, "tk:pump": 0.8, shine: 0.4 }),
+    an("Wide Chords", { level: 0.26, twist: 0.75, diffuse: 0.8, shine: 0.4, sustain: 0.9 }),
+    an("Dark Stack", { level: 0.28, twist: 0.7, cutoff: 1800, diffuse: 0.4, bottom: 0.35, shine: 0.3 }),
+    an("Sunrise", { level: 0.26, twist: 0.65, attack: 1.2, release: 2.5, diffuse: 0.6, shine: 0.8, cutoff: 4000 }),
+    an("Gated Pad", { level: 0.33, twist: 0.8, diffuse: 0.6, "tk:repeat": 0.9, "tk:repDiv": 1, shine: 0.3, attack: 0.1 }),
+    // Basses and stabs
+    an("Saw Bass", { level: 0.24, twist: 0.35, bottom: 0.6, cutoff: 1500, shine: 0, diffuse: 0, release: 0.12 }),
+    an("Reese-ish", { level: 0.25, twist: 0.3, bottom: 0.5, cutoff: 900, reso: 0.2, shine: 0, diffuse: 0.1, sustain: 1 }),
+    an("Stab", { level: 0.84, twist: 0.7, attack: 0.002, decay: 0.15, sustain: 0, release: 0.1, fenv: 0.5, fdecay: 0.1, shine: 0.35 }),
+    an("Pump Stab", { level: 0.93, twist: 0.75, attack: 0.002, decay: 0.3, sustain: 0.2, release: 0.15, "tk:pump": 0.7, shine: 0.3 }),
+    // FX
+    an("Riser Saw", { level: 0.91, twist: 0.9, attack: 2.5, cutoff: 600, fenv: 0, glide: 0.4, shine: 0.6, diffuse: 0.5 }),
+    an("Crowd Roar", { level: 0.11, twist: 1, diffuse: 1, shine: 1, cutoff: 3500, attack: 0.3, release: 3 }),
+  ],
+};

@@ -444,6 +444,10 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** F, knobs ringed around the Twist knob.
 - **Theme:** gloss white with a magenta glow ring.
 - **Presets:** 24.
+- **Status: built** (kind `anthem`). Polyphonic: Twist sets 1-9 saws, their detune (wider at the edges) and
+  spread, level-compensated; Diffuse cross-feeds short moving delays; Bottom is a sub an octave down; Shine
+  its own big reverb; Pump and Repeat are the shared performer (tk:pump / tk:repeat). 24 presets (leads,
+  pads, plucks, basses, stabs, FX), level-matched.
 
 ### Patchwork: semi-modular bass
 - **Idea:** a little patchable mono synth for deep basses.

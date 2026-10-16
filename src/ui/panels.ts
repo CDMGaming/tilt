@@ -250,6 +250,15 @@ export function buildPanel(app: App, track: Track): HTMLElement {
           h("div", { class: "wh-knobs" }, h("div", { class: "wh-char" }, ctl("drive", "★ Drive", "l")), ctl("level", "Level")))),
       keyboard(app, track),
     );
+  } else if (track.kind === "anthem") {
+    // Anthem: the Twist knob big in the centre with a magenta glow ring, the rest ringed around it.
+    body = h("div", { class: "panel-body anthem" },
+      h("div", { class: "an-face" },
+        h("div", { class: "an-ring left" }, ctl("diffuse", "Diffuse"), ctl("tk:pump", "Pump"), ctl("tk:repeat", "Repeat")),
+        h("div", { class: "an-hero" }, ctl("twist", "★ TWIST", "l")),
+        h("div", { class: "an-ring right" }, ctl("bottom", "Bottom"), ctl("shine", "Shine"), ctl("level", "Level"))),
+      keyboard(app, track),
+    );
   } else if (track.kind === "acid") {
     // Squelch: one row of big knobs (Bite and Gnaw are the character controls), the arp under a lid.
     const arpOn = (track.params.arpOn ?? 0) >= 0.5;

@@ -4,7 +4,7 @@
 import type { InstrumentKind } from "./model";
 import { ANALOG, LEAD, PAD, WOBBLE } from "./instruments2";
 import { CHIP, FM, SAMPLER, WAVE } from "./instruments3";
-import { ORGAN, PLUCK, TINE } from "./instruments4";
+import { ANTHEM, ORGAN, PLUCK, TINE } from "./instruments4";
 import { isToolkitKey, toolkitParams } from "./toolkit";
 
 export interface ParamDef {
@@ -267,11 +267,11 @@ export const POLY: InstrumentDef = {
 
 export const INSTRUMENTS: Record<InstrumentKind, InstrumentDef> = {
   drums: DRUMS, acid: ACID, poly: POLY, lead: LEAD, analog: ANALOG, wobble: WOBBLE, pad: PAD,
-  chip: CHIP, fm: FM, wave: WAVE, sampler: SAMPLER, epiano: TINE, pluck: PLUCK, organ: ORGAN,
+  chip: CHIP, fm: FM, wave: WAVE, sampler: SAMPLER, epiano: TINE, pluck: PLUCK, organ: ORGAN, anthem: ANTHEM,
 };
 
 /** Every instrument, in picker order. */
-export const ALL_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "poly", "epiano", "organ", "pluck", "pad", "fm", "wave", "lead", "chip", "sampler"];
+export const ALL_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "poly", "epiano", "organ", "pluck", "pad", "fm", "wave", "lead", "anthem", "chip", "sampler"];
 
 export const isDrumKind = (k: InstrumentKind) => !!INSTRUMENTS[k].drumParts;
 export const drumCount = (k: InstrumentKind) => INSTRUMENTS[k].drumParts ?? 0;
