@@ -54,6 +54,7 @@
   --inst-organ: #b5462f;   /* Wheelhouse: oxblood */
   --inst-anthem: #ff4fb8;  /* Anthem: magenta */
   --inst-vox: #9ad0ff;     /* Vox: chrome sky */
+  --inst-boom: #ff6a3d;    /* Boom: hot orange */
   --inst-patch: #f2b134;   /* Patchwork: amber (an orange-gold, not the DMD yellow) */
 
   /* ---- shape ---- */
@@ -207,7 +208,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .chip[class*="kind-"] { color: var(--kc); box-shadow: inset 2px 0 0 var(--kc); }
 .kind-drums { --kc: var(--inst-drums); } .kind-analog { --kc: var(--inst-analog); } .kind-acid { --kc: var(--inst-acid); }
 .kind-wobble { --kc: var(--inst-wobble); } .kind-poly { --kc: var(--inst-poly); } .kind-pad { --kc: var(--inst-pad); } .kind-lead { --kc: var(--inst-lead); }
-.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); } .kind-epiano { --kc: var(--inst-epiano); } .kind-pluck { --kc: var(--inst-pluck); } .kind-organ { --kc: var(--inst-organ); } .kind-anthem { --kc: var(--inst-anthem); } .kind-patch { --kc: var(--inst-patch); } .kind-vox { --kc: var(--inst-vox); }
+.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); } .kind-epiano { --kc: var(--inst-epiano); } .kind-pluck { --kc: var(--inst-pluck); } .kind-organ { --kc: var(--inst-organ); } .kind-anthem { --kc: var(--inst-anthem); } .kind-patch { --kc: var(--inst-patch); } .kind-vox { --kc: var(--inst-vox); } .kind-boom { --kc: var(--inst-boom); }
 .dice-actions { display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap; justify-content: center; }
 .roll-btn { font-size: 28px; font-weight: 900; padding: 16px 36px; border-radius: 16px; background: var(--raise); border: 2px solid var(--accent); display: flex; flex-direction: column; align-items: center; }
 .roll-btn small, .go-btn small { font-size: 11px; color: var(--dim); font-weight: 400; }
@@ -1509,3 +1510,22 @@ body.phone .gb-master { flex-direction: row; border-left: none; }
 .panel-body.vox .knob-value { color: #aab6c3; }
 .panel.kind-vox .panel-body.vox { --cap-fill: #d5dce4; --cap-edge: #6f7b88; --knob-dot: #1b2633; }
 .panel-body.vox .knob-val { stroke: #9ad0ff; }
+
+/* Boom: a black sound-system cabinet with a yellow grille ring around the cone. */
+.panel-body.boom { padding: 10px; border-top-color: #ff6a3d; background: #0d0d0e; }
+.bm-cab { display: flex; gap: 18px; align-items: center; justify-content: center; flex-wrap: wrap; padding: 14px 16px; border-radius: 8px;
+  background: radial-gradient(#ffffff09 1px, transparent 1.5px) 0 0 / 4px 4px, linear-gradient(180deg, #1c1c1e, #111112); box-shadow: inset 0 0 0 3px #000, inset 0 0 0 5px #2a2a2c; }
+.bm-pads { display: grid; gap: 8px; }
+.bm-pads .pad { width: 92px; min-height: 58px; background: linear-gradient(180deg, #2b2b2e, #18181a); color: #f0f0f0; border: 1px solid #000; }
+.bm-pads .pad.selected { box-shadow: 0 0 0 2px #ff6a3d; }
+.bm-cone { width: 132px; height: 132px; border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle, #1a1a1a 0 17%, #3a3a3d 18% 22%, #0e0e10 23% 60%, #222 61% 64%, #0b0b0c 65% 100%);
+  box-shadow: 0 0 0 6px #f5c400, 0 0 0 8px #000, 0 0 18px #f5c40044; }
+.bm-dust { width: 30px; height: 30px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #555, #111); }
+.bm-knobs { display: flex; gap: 8px 12px; align-items: flex-end; flex-wrap: wrap; }
+.bm-char { display: flex; gap: 8px; padding: 4px 8px 2px; border-radius: 8px; border: 1px solid #f5c40044; }
+.panel-body.boom .knob-label { color: #f0f0f0; opacity: 1; font-weight: 800; }
+.panel-body.boom .bm-char .knob-label { color: #f5c400; }
+.panel-body.boom .knob-value { color: #aaa; }
+.panel.kind-boom .panel-body.boom { --cap-fill: #222; --cap-edge: #000; --knob-dot: #ff6a3d; }
+.panel-body.boom .knob-val { stroke: #ff6a3d; }

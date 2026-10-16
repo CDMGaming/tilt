@@ -290,6 +290,18 @@ export function buildPanel(app: App, track: Track): HTMLElement {
           ctl("breath", "Breath"), ctl("choir", "Choir"), ctl("attack", "Attack"), ctl("release", "Release"), ctl("level", "Level"))),
       keyboard(app, track),
     );
+  } else if (track.kind === "boom") {
+    // Boom: a black sound-system cabinet; the speaker cone in the middle, the four pads around it.
+    body = h("div", { class: "panel-body boom" },
+      h("div", { class: "bm-cab" },
+        h("div", { class: "bm-pads" }, pad(app, track, 0), pad(app, track, 1)),
+        h("div", { class: "bm-cone", "aria-hidden": "true" }, h("div", { class: "bm-dust" })),
+        h("div", { class: "bm-pads" }, pad(app, track, 2), pad(app, track, 3)),
+        h("div", { class: "bm-knobs" },
+          h("div", { class: "bm-char" }, ctl("rise", "★ Rise", "l"), ctl("impact", "★ Impact", "l")),
+          ctl("tune", "Tune"), ctl("length", "Length"), ctl("level", "Level"))),
+      h("p", { class: "note" }, "The Stab plays a chord on the song's key (major or minor from its scale)."),
+    );
   } else if (track.kind === "acid") {
     // Squelch: one row of big knobs (Bite and Gnaw are the character controls), the arp under a lid.
     const arpOn = (track.params.arpOn ?? 0) >= 0.5;

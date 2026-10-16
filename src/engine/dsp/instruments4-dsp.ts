@@ -659,3 +659,98 @@ export class VoxDSP implements InstrumentDSP {
     this.voices = this.voices.filter((v) => v.amp.active || v.held);
   }
 }
+
+// ---------------------------------------------------------------- Boom: one-shot FX and stabs
+
+interface BoomHit { part: number; t: number; vel: number; ph: number[]; f: SVF; f2: OnePole; hold: number }
+
+/**
+ * Boom: four one-shot pads. 1 Riser (noise and detuned saws climbing, tempo-synced length), 2 Impact
+ * (a sub drop with a crack, drive and a long tail), 3 Sweep (falling filtered noise), 4 Stab (a chord on the
+ * song's key: major or minor from its scale). Rise: riser length in bars, filter sweep, noise. Impact: sub
+ * drop depth, reverb tail, distortion on the hits. Tune moves every pad; Length stretches the tails.
+ */
+export class BoomDSP implements InstrumentDSP {
+  private hits: BoomHit[] = [];
+  private room: Reverb;
+  private bl = new Float32Array(128);
+  private br = new Float32Array(128);
+  private il = new Float32Array(128);
+  private ir = new Float32Array(128);
+  constructor(public params: Record<string, number>, private sr: number, private clock: { bpm: number; zero: number }) {
+    this.room = new Reverb(sr, 2);
+  }
+
+  noteOn(pitch: number, vel: number) {
+    const part = pitch - 36;
+    if (part < 0 || part > 3) return;
+    this.hits = this.hits.filter((x) => x.part !== part); // a pad retriggers itself
+    this.hits.push({ part, t: 0, vel: velGain(vel / 127), ph: [0, 0.3, 0.6, 0.1, 0.5, 0.8], f: new SVF(), f2: new OnePole(), hold: 0 });
+  }
+  noteOff() { /* one-shots */ }
+  allOff() { this.hits = []; }
+
+  render(L: Float32Array, R: Float32Array, i0: number, i1: number) {
+    const p = this.params, sr = this.sr, n = i1 - i0;
+    const rise = p.rise ?? 0.5, impact = p.impact ?? 0.5, tune = p.tune ?? 0, len = p.length ?? 1;
+    const bars = [0.5, 1, 2, 4][Math.min(3, Math.round(rise * 3))];
+    const riseSec = (bars * 4 * 60) / Math.max(40, this.clock.bpm);
+    const key = p["song:key"] ?? 0, minor = (p["song:minor"] ?? 1) >= 0.5;
+    const tr = Math.pow(2, tune / 12);
+    const partLv = [p.p0level ?? 0.8, p.p1level ?? 0.9, p.p2level ?? 0.7, p.p3level ?? 0.7];
+    const level = (p.level ?? 0.7) * 0.2;
+    const drive = 1 + impact * 4, dn = Math.tanh(drive);
+    if (this.bl.length < n) { this.bl = new Float32Array(n); this.br = new Float32Array(n); this.il = new Float32Array(n); this.ir = new Float32Array(n); }
+    const bl = this.bl, br = this.br;
+    bl.fill(0, 0, n); br.fill(0, 0, n);
+    const stabNotes = [0, minor ? 3 : 4, 7, 12].map((iv) => mtof(60 + key + iv) * tr);
+    for (const h of this.hits) {
+      for (let i = 0; i < n; i++) {
+        const t = h.t;
+        let l = 0, r = 0;
+        if (h.part === 0) { // Riser
+          const k = Math.min(1, t / riseSec);
+          const f = 110 * tr * Math.pow(8, k);
+          let saw = 0;
+          for (let s = 0; s < 3; s++) { h.ph[s] = (h.ph[s] + (f * (1 + (s - 1) * 0.012)) / sr) % 1; saw += 2 * h.ph[s] - 1; }
+          const x = saw * 0.25 + noise() * (0.3 + rise * 0.5);
+          const fc = 200 + (6000 + rise * 8000) * k * k;
+          const y = h.f.lp(x, fc, 0.3, sr) * (0.15 + 0.85 * k) * (t > riseSec ? Math.exp(-(t - riseSec) / 0.03) : 1);
+          l = y; r = y;
+          if (t > riseSec + 0.2) h.hold = 1;
+        } else if (h.part === 1) { // Impact
+          h.ph[0] += (35 * tr + (90 + impact * 140) * tr * Math.exp(-t / (0.06 + impact * 0.1))) / sr;
+          const sub = Math.sin(TAU * h.ph[0]) * Math.exp(-t / (0.6 * len + impact * 0.8));
+          const crack = (noise() - h.f2.lp(noise(), 1500, sr)) * Math.exp(-t / 0.05) * 0.8;
+          const y = Math.tanh((sub + crack) * drive) / dn;
+          l = y; r = y;
+          if (t > 4 * len + 1) h.hold = 1;
+        } else if (h.part === 2) { // Sweep down
+          const d = 1.5 * len, k = Math.min(1, t / d);
+          const y = h.f.lp(noise(), 9000 * Math.pow(0.02, k) * tr + 120, 0.5, sr) * Math.exp(-t / (0.8 * len)) * 1.3;
+          l = y; r = y;
+          if (t > d * 2) h.hold = 1;
+        } else { // Stab, on the song's key
+          let x = 0;
+          stabNotes.forEach((f, s) => { h.ph[s] = (h.ph[s] + f / sr) % 1; x += 2 * h.ph[s] - 1; });
+          const y = h.f.lp(x * 0.3, 500 + 7000 * Math.exp(-t / 0.08), 0.2, sr) * Math.exp(-t / (0.25 * len));
+          const yd = impact > 0.4 ? Math.tanh(y * drive) / dn : y;
+          l = yd * 0.9; r = yd;
+          if (t > 2 * len) h.hold = 1;
+        }
+        const g = h.vel * partLv[h.part];
+        bl[i] += l * g; br[i] += r * g;
+        h.t += 1 / sr;
+      }
+    }
+    this.hits = this.hits.filter((h) => !h.hold);
+    // Impact's tail: a big reverb, deeper as Impact rises (only its own sound is added).
+    this.il.set(bl.subarray(0, n)); this.ir.set(br.subarray(0, n));
+    const tail = 0.15 + impact * 0.6;
+    this.room.process(this.il, this.ir, n, 0.6 + impact * 0.35, 1);
+    for (let i = 0; i < n; i++) {
+      L[i0 + i] += (bl[i] + (this.il[i] - bl[i] * 0.65) * tail) * level;
+      R[i0 + i] += (br[i] + (this.ir[i] - br[i] * 0.65) * tail) * level;
+    }
+  }
+}

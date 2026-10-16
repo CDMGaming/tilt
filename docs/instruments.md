@@ -521,6 +521,11 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** M, a speaker cone in the middle.
 - **Theme:** a black sound-system cabinet with a yellow grille ring.
 - **Presets:** 24.
+- **Status: built** (kind `boom`, 4 pads). Riser (tempo-synced 1/2-4 bars by Rise, filter sweep, noise),
+  Impact (sub drop, crack, drive), Sweep (falling noise), Stab (a chord on the song's key, major or minor
+  from its scale: the worklet now gets the song key). Impact also sets a big shared reverb tail. Tune and
+  Length move every pad. 24 presets, matched on peaks (one-shots); the soft ones (Soft Swell, Gentle,
+  Airy) stay softer by design.
 
 ### Garage: acoustic drums
 - **Idea:** a real kit in a room.

@@ -358,3 +358,56 @@ export const VOX: InstrumentDef = {
     vx("Siren Choir", { level: 0.50, ...A, choir: 5, vowelLfo: 0.7, vowelRate: 0.3, vibrato: 0.6, attack: 0.5, release: 2 }),
   ],
 };
+
+// ---------- one-shot FX and stabs: "Boom" ----------
+
+export const BOOM_PARTS = ["Riser", "Impact", "Sweep", "Stab"];
+const bm = (name: string, params: Record<string, number>) => ({ name, params });
+
+export const BOOM: InstrumentDef = {
+  kind: "boom",
+  name: "Boom",
+  role: "Risers, impacts, sweeps and stabs in the song's key",
+  group: "fx",
+  drumParts: 4,
+  partNames: BOOM_PARTS,
+  params: [
+    { id: "rise", label: "Rise", min: 0, max: 1, def: 0.5 },
+    { id: "impact", label: "Impact", min: 0, max: 1, def: 0.5 },
+    { id: "tune", label: "Tune", min: -12, max: 12, def: 0, unit: "st" },
+    { id: "length", label: "Length", min: 0.25, max: 3, def: 1, curve: "exp" },
+    { id: "level", label: "Level", min: 0, max: 1, def: 0.7 },
+    // Hidden voicing:
+    { id: "p0level", label: "Riser level", min: 0, max: 1, def: 0.8 },
+    { id: "p1level", label: "Impact level", min: 0, max: 1, def: 0.9 },
+    { id: "p2level", label: "Sweep level", min: 0, max: 1, def: 0.7 },
+    { id: "p3level", label: "Stab level", min: 0, max: 1, def: 0.7 },
+  ],
+  macros: ["rise", "impact", "tune", "length", "p0level", "p1level", "p2level", "level"],
+  presets: [
+    bm("Big Drop", { level: 1.00 }),
+    bm("Festival Drop", { level: 0.68, rise: 1, impact: 0.85, length: 1.4 }),
+    bm("Short Build", { level: 1.00, rise: 0.2, impact: 0.5, length: 0.8 }),
+    bm("Long Build", { level: 0.90, rise: 1, impact: 0.6, length: 1.6 }),
+    bm("Soft Swell", { level: 1.00, rise: 0.6, impact: 0.15, length: 1.5, p1level: 0.5 }),
+    bm("Cinematic", { level: 0.70, rise: 0.9, impact: 1, length: 2.5, tune: -5 }),
+    bm("Trap Impact", { level: 0.78, rise: 0.3, impact: 0.9, length: 2, tune: -7 }),
+    bm("Thin Air", { level: 1.00, rise: 0.7, impact: 0.2, length: 0.7, tune: 7 }),
+    bm("Deep Sub", { level: 0.62, rise: 0.4, impact: 0.7, length: 2.2, tune: -12 }),
+    bm("Bright Stab", { level: 1.00, rise: 0.5, impact: 0.2, length: 0.6, tune: 12 }),
+    bm("Dirty Stab", { level: 0.65, rise: 0.5, impact: 0.9, length: 0.8 }),
+    bm("Long Stab", { level: 1.00, rise: 0.5, impact: 0.3, length: 2.4 }),
+    bm("Low Stab", { level: 0.83, rise: 0.5, impact: 0.5, length: 1, tune: -12 }),
+    bm("Downlift", { level: 1.00, rise: 0.5, impact: 0.3, length: 2.5, p2level: 0.9 }),
+    bm("Tight Hits", { level: 1.00, rise: 0.3, impact: 0.6, length: 0.4 }),
+    bm("Boomy", { level: 0.51, rise: 0.5, impact: 1, length: 3 }),
+    bm("Gentle", { level: 1.00, rise: 0.4, impact: 0.1, length: 1.2, p0level: 1, p2level: 1, p3level: 1 }),
+    bm("Distorted", { level: 0.62, rise: 0.6, impact: 1, length: 1, tune: -3 }),
+    bm("Quick Rise", { level: 1.00, rise: 0, impact: 0.5, length: 0.6 }),
+    bm("Tension", { level: 1.00, rise: 1, impact: 0.4, length: 1.2, tune: 5 }),
+    bm("Thunder", { level: 0.50, rise: 0.6, impact: 0.95, length: 3, tune: -9, p2level: 0.9 }),
+    bm("Pop Drop", { level: 1.00, rise: 0.6, impact: 0.45, length: 0.9, tune: 2 }),
+    bm("Sub Boom", { level: 0.37, rise: 0.3, impact: 0.8, length: 2.6, tune: -10, p3level: 0.4 }),
+    bm("Airy", { level: 1.00, rise: 0.8, impact: 0.15, length: 1.8, tune: 12, p1level: 0.4 }),
+  ],
+};

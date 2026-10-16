@@ -13,12 +13,12 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 
 /** Instruments the dice may pick (the sampler is for sounds you bring). */
-export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "patch", "poly", "epiano", "organ", "pluck", "pad", "vox", "fm", "wave", "lead", "anthem", "chip"];
+export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "patch", "poly", "epiano", "organ", "pluck", "pad", "vox", "fm", "wave", "lead", "anthem", "chip", "boom"];
 
 // Role tags per preset, by name. A preset not listed gets its instrument's default.
 const DEFAULT_ROLE: Record<InstrumentKind, Role[]> = {
   drums: ["drums"], analog: ["drums"], acid: ["bass"], wobble: ["bass"], poly: ["keys"], pad: ["pad"],
-  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"], epiano: ["keys"], pluck: ["pluck"], organ: ["keys"], anthem: ["lead"], patch: ["bass"], vox: ["pad"],
+  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"], epiano: ["keys"], pluck: ["pluck"], organ: ["keys"], anthem: ["lead"], patch: ["bass"], vox: ["pad"], boom: ["fx"],
 };
 const TAGS: Partial<Record<InstrumentKind, Record<string, Role[]>>> = {
   vox: {
@@ -163,7 +163,8 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
   wave: [
     pick("table", 0.4, range(0, 6)), knob("pos", 0.3), knob("warp", 0.25), knob("envAmt", 0.25), knob("envDecay", 0.22),
     knob("lfoAmt", 0.2, 0, 0.7), knob("lfoRate", 0.22), knob("detune", 0.2), knob("cutoff", 0.18, 0.3, 1), knob("reso", 0.15, 0, 0.6),
-  ],  vox: [
+  ],  boom: [knob("rise", 0.25), knob("impact", 0.25), knob("tune", 0.1), knob("length", 0.2)],
+  vox: [
     knob("vowelX", 0.25), knob("vowelY", 0.25), knob("throat", 0.2), knob("breath", 0.15, 0, 0.6), pick("choir", 0.25, [1, 2, 3, 4, 5]),
     knob("vibrato", 0.15), knob("vowelLfo", 0.15, 0, 0.8), knob("vowelRate", 0.2),
   ],

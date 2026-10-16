@@ -113,13 +113,13 @@ export class AudioEngine {
       if (tn && tn.kind !== t.kind) { this.dispose(tn); tn = undefined; }
       if (!tn) {
         tn = createTrackNodes(this.ctx, t, {
-          kind: t.kind, params: workletParams(t), samples: t.kind === "drums" ? this.samples : undefined,
+          kind: t.kind, params: workletParams(t, song), samples: t.kind === "drums" ? this.samples : undefined,
           samplesRate: this.samplesRate, clock: { bpm: song.tempo, zero: 0 },
         }, this.master);
         this.tracks.set(t.id, tn);
       }
       this.feed(t, tn);
-      const params = workletParams(t);
+      const params = workletParams(t, song);
       const json = JSON.stringify(params);
       if (json !== tn.paramsJson) {
         tn.paramsJson = json;
@@ -553,7 +553,7 @@ export class AudioEngine {
       const extra = t.kind === "wave" ? { mips: await this.mips(Math.round(t.params.table ?? 0)) }
         : t.kind === "sampler" ? await this.padSounds(t) : {};
       const tn = createTrackNodes(off, t, {
-        kind: t.kind, params: workletParams(t), samples: t.kind === "drums" ? samples : undefined, samplesRate: sr,
+        kind: t.kind, params: workletParams(t, song), samples: t.kind === "drums" ? samples : undefined, samplesRate: sr,
         events: byTrack.get(t.id) ?? [], clock: { bpm: song.tempo, zero: 0 }, ...extra,
       }, m);
       const audible = opts.onlyTrack !== undefined || (!t.mute && (!soloing || t.solo)) ? 1 : 0;

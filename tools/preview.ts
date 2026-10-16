@@ -10,7 +10,7 @@ import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.t
 import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "../src/engine/dsp/instruments3-dsp.ts";
 import { buildMips, parseWav } from "../src/engine/wavetable.ts";
-import { AnthemDSP, OrganDSP, PatchworkDSP, PluckDSP, TineDSP, VoxDSP } from "../src/engine/dsp/instruments4-dsp.ts";
+import { AnthemDSP, BoomDSP, OrganDSP, PatchworkDSP, PluckDSP, TineDSP, VoxDSP } from "../src/engine/dsp/instruments4-dsp.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
 import { hasToolkit } from "../src/engine/toolkit.ts";
@@ -62,6 +62,11 @@ function phrase(params: Record<string, number>): Ev[] {
     return [...[60, 63, 67, 72, 67, 63].map((pitch, i) => ({ t: i * 2 * step, len: 1.8 * step, pitch: pitch + lo, vel: 100 })),
       ...[60, 64, 67].map((pitch) => ({ t: 14 * step, len: 8 * step, pitch: pitch + lo, vel: 90 })),
       ...[48, 51, 55, 53].map((pitch, i) => ({ t: (24 + i * 2) * step, len: 1.8 * step, pitch: pitch + lo, vel: 110 }))];
+  }
+  if (kind === "boom") {
+    // The riser, then the impact on the downbeat, a sweep and two stabs.
+    return [{ t: 0, len: step, pitch: 36, vel: 100 }, { t: 16 * step, len: step, pitch: 37, vel: 110 }, { t: 20 * step, len: step, pitch: 38, vel: 100 },
+      { t: 24 * step, len: step, pitch: 39, vel: 100 }, { t: 28 * step, len: step, pitch: 39, vel: 100 }];
   }
   if (kind === "vox") {
     // Basses play a low line; everything else a held chord, then a short melody.
@@ -140,6 +145,7 @@ function dspFor(params: Record<string, number>, clock: { bpm: number; zero: numb
     case "anthem": return new AnthemDSP(params, SR);
     case "patch": return new PatchworkDSP(params, SR);
     case "vox": return new VoxDSP(params, SR);
+    case "boom": return new BoomDSP({ ...params, "song:key": 0, "song:minor": 1 }, SR, { bpm: 125, zero: 0 });
     case "sampler": {
       const d = new SamplerDSP(params, SR);
       const refs = INSTRUMENTS.sampler.presets[currentPreset]?.samples ?? [];

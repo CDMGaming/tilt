@@ -5,6 +5,7 @@
 // This module maps keys to ParamDefs and values, for knobs, MIDI, lanes and the worklet.
 
 import { paramDef, type ParamDef } from "./instruments";
+import { scaleById } from "./music";
 import type { Track } from "./model";
 
 export interface FxDef { id: string; name: string; a: string; b: string; defA: number; defB: number }
@@ -83,8 +84,10 @@ export function setParamValue(track: Track, key: string, v: number) {
 }
 
 /** Everything the worklet needs to know about a track, flattened into one params object. */
-export function workletParams(track: Track): Record<string, number> {
+/** Everything the worklet needs for a track; `song` adds its key and whether the scale is minor (Boom's stab follows them). */
+export function workletParams(track: Track, song?: { key: number; scale: string }): Record<string, number> {
   const out: Record<string, number> = { ...track.params, "mix:vol": track.volume, "mix:pan": track.pan, "mix:send": track.send };
+  if (song) { out["song:key"] = song.key; out["song:minor"] = scaleById(song.scale).steps.includes(3) ? 1 : 0; }
   track.fx.forEach((f, i) => {
     out[`fx${i}:type`] = fxIndex(f.type);
     out[`fx${i}:a`] = f.a;
