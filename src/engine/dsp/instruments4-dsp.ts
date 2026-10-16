@@ -849,3 +849,102 @@ export class PianoDSP implements InstrumentDSP {
     }
   }
 }
+
+// ---------------------------------------------------------------- Garage: acoustic kit
+
+interface KitHit { part: number; pos: number; rate: number; vel: number; mix: number; amp: number; decK: number; kill: boolean; f: OnePole }
+
+/**
+ * Garage: a real kit in a room (CC0 recordings). Eight parts, each a soft and a hard layer crossfaded by
+ * velocity. Room (character): room-mic level, early reflections and the tail. Smash (character): parallel
+ * compression (how much, how fast it lets go) plus saturation. Tune moves every drum; Damp shortens them
+ * and takes off the ring. The closed hat chokes the open one.
+ */
+export class GarageDSP implements InstrumentDSP {
+  private hits: KitHit[] = [];
+  private samples: Float32Array[] = [];
+  private rates: number[] = [];
+  private room: Reverb;
+  private er = new Float32Array(4096);
+  private ew = 0;
+  private env = 0;
+  private bl = new Float32Array(128);
+  private br = new Float32Array(128);
+  private il = new Float32Array(128);
+  private ir = new Float32Array(128);
+  constructor(public params: Record<string, number>, private sr: number) {
+    this.room = new Reverb(sr, 0.7);
+  }
+
+  setSamples(s: Float32Array[], rates: number[]) { this.samples = s; this.rates = rates; }
+
+  noteOn(pitch: number, vel: number) {
+    const part = pitch - 36;
+    if (part < 0 || part > 7) return;
+    const p = this.params, v01 = vel / 127;
+    const tune = (p.tune ?? 0) + (p[`p${part}tune`] ?? 0);
+    if (part === 3) for (const h of this.hits) if (h.part === 4) h.kill = true; // the closed hat chokes the open one
+    for (const h of this.hits) if (h.part === part) h.kill = true;
+    const damp = p.damp ?? 0.2;
+    const len = [1.2, 0.9, 0.6, 0.6, 1.8, 1.3, 1.6, 3][part] * (1 - damp * 0.75);
+    this.hits.push({
+      part, pos: 0, vel: velGain(v01), mix: Math.max(0, Math.min(1, (v01 - 0.3) * 1.6)), amp: 1,
+      rate: Math.pow(2, tune / 12) * ((this.rates[part * 2] ?? 32000) / this.sr), decK: Math.exp(-4.6 / (len * this.sr)), kill: false, f: new OnePole(),
+    });
+    if (this.hits.length > 24) this.hits.shift();
+  }
+  noteOff() { /* one-shots */ }
+  allOff() { for (const h of this.hits) h.kill = true; }
+
+  render(L: Float32Array, R: Float32Array, i0: number, i1: number) {
+    const p = this.params, sr = this.sr, n = i1 - i0;
+    const roomLv = p.room ?? 0.35, smash = p.smash ?? 0.25, damp = p.damp ?? 0.2;
+    const level = (p.level ?? 0.75) * 1.6;
+    const pans = [0, 0.05, 0.1, -0.35, -0.35, -0.2, 0.25, 0.4];
+    const cutDamp = 18000 * Math.pow(2, -damp * 3);
+    if (this.bl.length < n) { this.bl = new Float32Array(n); this.br = new Float32Array(n); this.il = new Float32Array(n); this.ir = new Float32Array(n); }
+    const bl = this.bl, br = this.br;
+    bl.fill(0, 0, n); br.fill(0, 0, n);
+    for (const h of this.hits) {
+      const soft = this.samples[h.part * 2], hard = this.samples[h.part * 2 + 1];
+      if (!soft?.length || !hard?.length) { h.amp = 0; continue; }
+      const g = h.vel * (p[`p${h.part}level`] ?? 0.8), gl = panL(pans[h.part]) * g, gr = panR(pans[h.part]) * g;
+      for (let i = 0; i < n; i++) {
+        const ip = h.pos | 0;
+        if (ip + 1 >= soft.length || ip + 1 >= hard.length || h.amp < 1e-4) { h.amp = 0; break; }
+        const fr = h.pos - ip;
+        const a = soft[ip] + (soft[ip + 1] - soft[ip]) * fr, b = hard[ip] + (hard[ip + 1] - hard[ip]) * fr;
+        let x = (a + (b - a) * h.mix) * h.amp;
+        if (damp > 0.02) x = h.f.lp(x, cutDamp, sr);
+        bl[i] += x * gl; br[i] += x * gr;
+        h.pos += h.rate;
+        h.amp *= h.kill ? 0.994 : h.decK;
+      }
+    }
+    this.hits = this.hits.filter((h) => h.amp >= 1e-4);
+    // Room: early reflections (three taps) and the tail, from the room mics.
+    this.il.set(bl.subarray(0, n)); this.ir.set(br.subarray(0, n));
+    if (roomLv > 0.01) this.room.process(this.il, this.ir, n, 0.3 + roomLv * 0.45, 1);
+    const elen = this.er.length, t1 = Math.round(0.007 * sr), t2 = Math.round(0.013 * sr), t3 = Math.round(0.021 * sr);
+    const thr = 0.12, ratio = 6, rel = Math.exp(-1 / ((0.04 + (1 - smash) * 0.25) * sr));
+    for (let i = 0; i < n; i++) {
+      const mono = (bl[i] + br[i]) * 0.5;
+      this.er[this.ew] = mono;
+      const early = (this.er[(this.ew - t1 + elen) % elen] * 0.5 + this.er[(this.ew - t2 + elen) % elen] * 0.35 + this.er[(this.ew - t3 + elen) % elen] * 0.25) * roomLv * 0.8;
+      this.ew = (this.ew + 1) % elen;
+      let l = bl[i] + early + (roomLv > 0.01 ? (this.il[i] - bl[i] * 0.65) * roomLv * 1.4 : 0);
+      let r = br[i] + early + (roomLv > 0.01 ? (this.ir[i] - br[i] * 0.65) * roomLv * 1.4 : 0);
+      // Smash: a squashed, saturated copy mixed under the dry kit.
+      if (smash > 0.01) {
+        const pk = Math.max(Math.abs(l), Math.abs(r));
+        this.env = pk > this.env ? pk : pk + (this.env - pk) * rel;
+        const gain = this.env > thr ? Math.pow(thr / this.env, 1 - 1 / ratio) : 1;
+        const mk = 2.5;
+        l += Math.tanh(l * gain * mk * (1 + smash)) * smash * 0.6;
+        r += Math.tanh(r * gain * mk * (1 + smash)) * smash * 0.6;
+      }
+      L[i0 + i] += l * level;
+      R[i0 + i] += r * level;
+    }
+  }
+}

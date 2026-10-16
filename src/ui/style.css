@@ -56,6 +56,7 @@
   --inst-vox: #9ad0ff;     /* Vox: chrome sky */
   --inst-boom: #ff6a3d;    /* Boom: hot orange */
   --inst-piano: #e8dcc2;   /* Parlor: ivory */
+  --inst-garage: #b08850;  /* Garage: oiled oak */
   --inst-patch: #f2b134;   /* Patchwork: amber (an orange-gold, not the DMD yellow) */
 
   /* ---- shape ---- */
@@ -209,7 +210,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .chip[class*="kind-"] { color: var(--kc); box-shadow: inset 2px 0 0 var(--kc); }
 .kind-drums { --kc: var(--inst-drums); } .kind-analog { --kc: var(--inst-analog); } .kind-acid { --kc: var(--inst-acid); }
 .kind-wobble { --kc: var(--inst-wobble); } .kind-poly { --kc: var(--inst-poly); } .kind-pad { --kc: var(--inst-pad); } .kind-lead { --kc: var(--inst-lead); }
-.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); } .kind-epiano { --kc: var(--inst-epiano); } .kind-pluck { --kc: var(--inst-pluck); } .kind-organ { --kc: var(--inst-organ); } .kind-anthem { --kc: var(--inst-anthem); } .kind-patch { --kc: var(--inst-patch); } .kind-vox { --kc: var(--inst-vox); } .kind-boom { --kc: var(--inst-boom); } .kind-piano { --kc: var(--inst-piano); }
+.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); } .kind-epiano { --kc: var(--inst-epiano); } .kind-pluck { --kc: var(--inst-pluck); } .kind-organ { --kc: var(--inst-organ); } .kind-anthem { --kc: var(--inst-anthem); } .kind-patch { --kc: var(--inst-patch); } .kind-vox { --kc: var(--inst-vox); } .kind-boom { --kc: var(--inst-boom); } .kind-piano { --kc: var(--inst-piano); } .kind-garage { --kc: var(--inst-garage); }
 .dice-actions { display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap; justify-content: center; }
 .roll-btn { font-size: 28px; font-weight: 900; padding: 16px 36px; border-radius: 16px; background: var(--raise); border: 2px solid var(--accent); display: flex; flex-direction: column; align-items: center; }
 .roll-btn small, .go-btn small { font-size: 11px; color: var(--dim); font-weight: 400; }
@@ -1551,3 +1552,25 @@ body.phone .gb-master { flex-direction: row; border-left: none; }
 .panel-body.parlor .knob-track { stroke: #ffffff14; }
 .panel-body.parlor .pl-cat.on, .panel-body.parlor button.pl-cat.on:hover:not(:disabled) { background: none; color: #e8dcc2; box-shadow: none; }
 .panel-body.parlor .pl-row.on, .panel-body.parlor button.pl-row.on:hover:not(:disabled) { background: none; color: #fff6e4; box-shadow: none; }
+
+/* Garage: oiled oak, brass knobs, wooden pads, engraved kit plates. */
+.panel-body.garage { padding: 10px; border-top-color: #b08850; background: #1a120a; }
+.gr-face { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; padding: 12px 16px; border-radius: 8px;
+  background: repeating-linear-gradient(94deg, #00000014 0 2px, transparent 2px 10px), linear-gradient(180deg, #a87f4a, #7a5630); box-shadow: inset 0 2px 0 #ffffff33, 0 3px 6px #000a; }
+.gr-pads { grid-template-columns: repeat(4, 78px); grid-template-rows: repeat(2, 60px); }
+.gr-pads .pad { background: repeating-linear-gradient(92deg, #0000001a 0 2px, transparent 2px 7px), linear-gradient(180deg, #d9b98a, #b38c58); color: #2a1a0a;
+  border: 1px solid #5a3d1e; box-shadow: inset 0 1px 0 #fff6, 0 2px 0 #4a3015; }
+.gr-pads .pad.selected { box-shadow: inset 0 0 0 2px #e6c27a, 0 2px 0 #4a3015; }
+.gr-pads .pad-label { color: #2a1a0a; font-weight: 800; }
+.gr-right { display: flex; flex-direction: column; gap: 10px; }
+.gr-kits { display: flex; gap: 6px; flex-wrap: wrap; }
+.gr-kit { padding: 4px 10px; font: 700 11px Georgia, serif; letter-spacing: .08em; color: #3a2510; background: linear-gradient(180deg, #e6c27a, #b8913f); border: 1px solid #6b5222; border-radius: 3px; box-shadow: inset 0 1px 0 #fff8; }
+.panel-body.garage .gr-kit.on, .panel-body.garage button.gr-kit.on:hover:not(:disabled) { color: #fff3d6; background: linear-gradient(180deg, #5a3d1e, #3a2510); border-color: #e6c27a; }
+.gr-knobs { display: flex; gap: 6px 12px; align-items: flex-end; flex-wrap: wrap; }
+.gr-char { display: flex; gap: 8px; padding: 4px 8px 2px; border-radius: 8px; background: #00000018; box-shadow: inset 0 1px 3px #0004; }
+.panel-body.garage .knob-label { color: #2a1a0a; opacity: 1; font: 700 12px Georgia, serif; text-transform: none; }
+.panel-body.garage .gr-char .knob-label { color: #5a1a0a; }
+.panel-body.garage .knob-value { color: #3a2510; }
+.panel.kind-garage .panel-body.garage { --cap-fill: #c9a24a; --cap-edge: #6b5222; --knob-dot: #2a1a0a; }
+.panel-body.garage .knob-val { stroke: #3a2510; }
+.panel-body.garage .knob-track { stroke: #0000002a; }

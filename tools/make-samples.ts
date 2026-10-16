@@ -104,4 +104,25 @@ if (import.meta.main) {
       "Trimmed, mixed to mono and resampled to 32 kHz for TILT by tools/make-samples.ts.", "",
     ].join("\n"));
   }
+  if (what === "garage") {
+    const out = new URL("../public/garage/", import.meta.url);
+    Deno.mkdirSync(out, { recursive: true });
+    // Seconds kept per sound (with a fade at the end).
+    const LEN: Record<string, number> = { kick: 1.2, snare: 0.9, snare2: 0.9, oldsnare: 0.7, deadsnare: 0.8, rim: 0.6, oldrim: 0.5, chat: 0.6, ohat: 1.8, tomh: 1.3, toml: 1.6, cym: 3, ride: 2.5 };
+    for (const f of Deno.readDirSync(dir)) {
+      if (!f.name.endsWith(".wav")) continue;
+      const name = f.name.replace(".wav", ""), len = LEN[name.replace(/-(soft|hard)$/, "")] ?? 1;
+      const src = readWav(Deno.readFileSync(`${dir}/${f.name}`));
+      Deno.writeFileSync(new URL(`${name}.wav`, out), wav16(shape(src.data, src.rate, len, Math.min(0.3, len / 3))));
+      console.log(name);
+    }
+    Deno.writeTextFileSync(new URL("LICENSE.txt", out), [
+      "Acoustic drum samples for Garage, all CC0 1.0 (public domain dedication):",
+      "  Versilian Community Sample Library (VCSL), https://github.com/sgossner/VCSL",
+      "    kick (Bass Drum 1), old snare and rim, hi-hats, toms 1 and 2 (stick), suspended cymbal 1 (stick hits, bell)",
+      "  VSCO 2 Community Edition, https://github.com/sgossner/VSCO-2-CE (VSCO 1 Percussion)",
+      "    snares drum1 and drum2, rimshots, snares-off hits",
+      "Trimmed, mixed to mono and resampled to 32 kHz for TILT by tools/make-samples.ts.", "",
+    ].join("\n"));
+  }
 }

@@ -1,0 +1,6 @@
+Acoustic drum samples for Garage, all CC0 1.0 (public domain dedication):
+  Versilian Community Sample Library (VCSL), https://github.com/sgossner/VCSL
+    kick (Bass Drum 1), old snare and rim, hi-hats, toms 1 and 2 (stick), suspended cymbal 1 (stick hits, bell)
+  VSCO 2 Community Edition, https://github.com/sgossner/VSCO-2-CE (VSCO 1 Percussion)
+    snares drum1 and drum2, rimshots, snares-off hits
+Trimmed, mixed to mono and resampled to 32 kHz for TILT by tools/make-samples.ts.

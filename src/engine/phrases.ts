@@ -217,6 +217,7 @@ function dedupe(notes: PNote[]): PNote[] {
 export function mapDrumPart(part: number, pads: number, kind?: string): number {
   // Thump Lab has Kitbox's order, with one tom pad more: rim and perc both go to its Perc.
   if (kind === "analog") return [0, 1, 2, 3, 4, 5, 7, 7][part] ?? 0;
+  if (kind === "garage") return [0, 1, 1, 3, 4, 5, 2, 3][part] ?? 0; // claps on the snare, perc on the hat
   if (kind === "boom") return [1, 3, 3, 2, 0, 1, 3, 2][part] ?? 1; // kicks hit, snares stab
   return part < pads ? part : 0;
 }

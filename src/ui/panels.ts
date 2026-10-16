@@ -8,7 +8,7 @@ import { chordName, noteName, scaleById, scaleDegree } from "../engine/music";
 import { decodeFile, listSamples, putSample, sampleLabel } from "./samples";
 import { CHIP_WAVES, SFX_GROUPS, WT_FRAMES, WT_SIZE } from "../engine/instruments3";
 import { WOB_RATES } from "../engine/instruments2";
-import { DRAWBAR_FEET, PIANO_CATS, PLUCK_BODIES, PW_JACKS, VIB_CHORUS } from "../engine/instruments4";
+import { DRAWBAR_FEET, GARAGE_KITS, PIANO_CATS, PLUCK_BODIES, PW_JACKS, VIB_CHORUS } from "../engine/instruments4";
 import { allPresets, applyPreset, deleteUserPreset, presetPosition, saveUserPreset, userPresets, USER_MARK, type PresetEntry } from "./presets";
 import { getParam } from "../engine/params";
 import { RECIPES, genBase, mutateParams, pickSound, soundKey, soundRoles, type SoundRef } from "../engine/sounds";
@@ -323,6 +323,21 @@ export function buildPanel(app: App, track: Track): HTMLElement {
           h("div", { class: "pl-char" }, ctl("character", "★ Character", "l")),
           ctl("release", "Release"), ctl("low", "Low"), ctl("mid", "Mid"), ctl("high", "High"), ctl("room", "Room"), ctl("level", "Level"))),
       keyboard(app, track),
+    );
+  } else if (track.kind === "garage") {
+    // Garage: wooden pads and brass knobs on oiled oak; the kit as engraved plates.
+    const kit = Math.round(track.params.kit ?? 0);
+    body = h("div", { class: "panel-body garage" },
+      h("div", { class: "gr-face" },
+        h("div", { class: "pads gr-pads" }, Array.from({ length: 8 }, (_, i) => pad(app, track, i))),
+        h("div", { class: "gr-right" },
+          h("div", { class: "gr-kits", role: "radiogroup", "aria-label": "Kit" }, GARAGE_KITS.map((k, i) => h("button", {
+            class: "gr-kit" + (i === kit ? " on" : ""), "data-nav": `kit-${i}`, "aria-pressed": String(i === kit),
+            onclick: () => { app.edit("Kit", () => (track.params.kit = i)); setTimeout(() => app.engine.preview(track.id, 37, 110, 0.4), 250); app.screens.edit.render(); },
+          }, k))),
+          h("div", { class: "gr-knobs" },
+            h("div", { class: "gr-char" }, ctl("room", "★ Room", "l"), ctl("smash", "★ Smash", "l")),
+            ctl("tune", "Tune"), ctl("damp", "Damp"), ctl("level", "Level")))),
     );
   } else if (track.kind === "acid") {
     // Squelch: one row of big knobs (Bite and Gnaw are the character controls), the arp under a lid.

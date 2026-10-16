@@ -10,7 +10,7 @@ import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.t
 import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "../src/engine/dsp/instruments3-dsp.ts";
 import { buildMips, parseWav } from "../src/engine/wavetable.ts";
-import { AnthemDSP, BoomDSP, OrganDSP, PatchworkDSP, PianoDSP, PluckDSP, TineDSP, VoxDSP } from "../src/engine/dsp/instruments4-dsp.ts";
+import { AnthemDSP, BoomDSP, GarageDSP, OrganDSP, PatchworkDSP, PianoDSP, PluckDSP, TineDSP, VoxDSP } from "../src/engine/dsp/instruments4-dsp.ts";
 import { sampleSetRefs } from "../src/engine/instruments4.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
@@ -46,7 +46,7 @@ function phrase(params: Record<string, number>): Ev[] {
     return [...Array.from({ length: 8 }, (_, i) => ({ t: i * 2 * step, len: 1.5 * step, pitch: 36 + i, vel: 100 })),
       ...[0, 2, 1, 3, 0, 1, 2, 3].map((p0, i) => ({ t: (16 + i * 2) * step, len: 1.5 * step, pitch: 36 + p0, vel: 100 }))];
   }
-  if (kind === "analog" || kind === "drums") {
+  if (kind === "analog" || kind === "drums" || kind === "garage") {
     // 2 bars: [part, 16th steps, velocity]; the second bar ends with a tom fill.
     const bar: [number, number[], number][] = [[0, [0, 4, 8, 12], 115], [1, [4, 12], 105], [3, [0, 2, 4, 6, 8, 10, 12, 14], 80], [4, [2, 10], 95], [7, [3, 11], 85], [2, [12], 90]];
     const out: Ev[] = [];
@@ -146,6 +146,11 @@ function dspFor(params: Record<string, number>, clock: { bpm: number; zero: numb
     case "anthem": return new AnthemDSP(params, SR);
     case "patch": return new PatchworkDSP(params, SR);
     case "vox": return new VoxDSP(params, SR);
+    case "garage": {
+      const d = new GarageDSP(params, SR), refs = sampleSetRefs({ kind: "garage", params } as never) ?? [];
+      d.setSamples(refs.map((r) => readWav16(new URL(`../public/${r.slice(6)}.wav`, import.meta.url))), refs.map(() => 32000));
+      return d;
+    }
     case "piano": {
       const d = new PianoDSP(params, SR), refs = sampleSetRefs({ kind: "piano" } as never) ?? [];
       d.setSamples(refs.map((r) => readWav16(new URL(`../public/${r.slice(6)}.wav`, import.meta.url))), refs.map(() => 32000));

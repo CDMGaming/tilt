@@ -547,6 +547,12 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** N, wooden pads and brass knobs.
 - **Theme:** oiled oak, brass.
 - **Presets:** 24.
+- **Status: built** (kind `garage`, 8 parts: kick, snare, rim, closed / open hat, high / low tom, cymbal).
+  Samples (CC0): VCSL (kick, old snare and rim, hats, toms, suspended cymbal) and VSCO 2 CE (snares 1 and 2,
+  rimshots, snares-off); soft and hard layer each, 1.7 MB in public/garage, loaded on first use. Kit picks
+  the snare: Studio, Bright, Vintage, Dead; the cymbal is a crash or the ride bell (hidden). Room: room mics,
+  early reflections, tail. Smash: parallel compression (amount and release) with saturation. The kick is a
+  damped concert bass drum: there's no CC0 kit kick in these libraries. 24 presets, level-matched.
 
 ---
 
@@ -560,7 +566,7 @@ label each), which record as automation like any knob.
 ## 7. Samples and licences
 
 Only CC0 or permissive (CC-BY with credit) sources, each folder with a LICENSE.txt naming its source.
-Downloads approved by you on 2026-10-15. In use: VCSL (CC0) for Parlor (public/piano).
+Downloads approved by you on 2026-10-15. In use: VCSL (CC0) for Parlor (public/piano); VCSL and VSCO 2 CE (CC0) for Garage (public/garage).
 
 Candidates to check (each licence verified on its own page before use):
 - **Versilian Community Sample Library (VCSL):** CC0. Piano, keys, mallets, orchestral, some percussion.

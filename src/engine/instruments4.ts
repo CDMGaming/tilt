@@ -422,6 +422,15 @@ const pn = (name: string, cat: string, params: Record<string, number>) => ({ nam
 /** The sample files an instrument plays from (loaded on first use), or null if it has none. */
 export function sampleSetRefs(t: Track): string[] | null {
   if (t.kind === "piano") return PIANO_NOTES.flatMap((n) => [`asset:piano/${n}-soft`, `asset:piano/${n}-hard`]);
+  if (t.kind === "garage") {
+    // Each part's soft and hard sound; the Kit picks the snare (and its rim).
+    const kit = Math.round(t.params.kit ?? 0);
+    const snare = ["snare", "snare2", "oldsnare", "deadsnare"][kit] ?? "snare";
+    const layers = (x: string) => [`asset:garage/${x}-soft`, `asset:garage/${x}-hard`];
+    const rim = kit === 2 ? ["asset:garage/oldrim", "asset:garage/oldrim"] : layers("rim");
+    const cym = (t.params.cymbal ?? 0) >= 0.5 ? ["asset:garage/ride", "asset:garage/ride"] : layers("cym");
+    return [...layers("kick"), ...layers(snare), ...rim, ...layers("chat"), ...layers("ohat"), ...layers("tomh"), ...layers("toml"), ...cym];
+  }
   return null;
 }
 
@@ -474,5 +483,61 @@ export const PARLOR: InstrumentDef = {
     pn("Phased", "Colour", { level: 1.00, character: 0.5, room: 0.2, "ifx:type": 9, "ifx:a": 0.2, "ifx:b": 0.5 }),
     pn("Echo Keys", "Colour", { level: 0.76, character: 0.5, room: 0.3, "ifx:type": 13, "ifx:a": 0.45, "ifx:b": 0.3 }),
     pn("Telephone", "Colour", { level: 0.65, character: 0.7, low: -12, high: -10, mid: 6, room: 0.05 }),
+  ],
+};
+
+// ---------- acoustic drums: "Garage" (CC0 samples, public/garage) ----------
+
+export const GARAGE_KITS = ["Studio", "Bright", "Vintage", "Dead"];
+export const GARAGE_PARTS = ["Kick", "Snare", "Rim", "C-Hat", "O-Hat", "Tom Hi", "Tom Lo", "Cymbal"];
+const gk = (name: string, params: Record<string, number>) => ({ name, params });
+
+export const GARAGE: InstrumentDef = {
+  kind: "garage",
+  name: "Garage",
+  role: "A real kit in a room",
+  group: "drums",
+  drumParts: 8,
+  partNames: GARAGE_PARTS,
+  params: [
+    { id: "kit", label: "Kit", min: 0, max: 3, def: 0, options: GARAGE_KITS },
+    { id: "room", label: "Room", min: 0, max: 1, def: 0.35 },
+    { id: "smash", label: "Smash", min: 0, max: 1, def: 0.25 },
+    { id: "tune", label: "Tune", min: -7, max: 7, def: 0, unit: "st" },
+    { id: "damp", label: "Damp", min: 0, max: 1, def: 0.2 },
+    { id: "level", label: "Level", min: 0, max: 1, def: 0.75 },
+    // Hidden voicing: per-part level and tune, the cymbal (crash or ride bell).
+    ...GARAGE_PARTS.flatMap((name, i) => [
+      { id: `p${i}level`, label: `${name} level`, min: 0, max: 1, def: [0.95, 0.8, 0.6, 0.5, 0.45, 0.7, 0.75, 0.45][i] },
+      { id: `p${i}tune`, label: `${name} tune`, min: -12, max: 12, def: 0, unit: "st" },
+    ]),
+    { id: "cymbal", label: "Cymbal", min: 0, max: 1, def: 0, options: ["Crash", "Ride bell"] },
+  ],
+  macros: ["room", "smash", "kit", "tune", "damp", "p0level", "p1level", "level"],
+  presets: [
+    gk("Studio Kit", { level: 0.60,}),
+    gk("Live Room", { level: 0.39, room: 0.75, smash: 0.2 }),
+    gk("Dry Funk", { level: 0.76, kit: 1, room: 0.05, damp: 0.5, smash: 0.3, p2level: 0.7 }),
+    gk("Big Rock", { level: 0.32, room: 0.6, smash: 0.75, tune: -2, p0level: 1 }),
+    gk("Vintage", { level: 0.52, kit: 2, room: 0.4, damp: 0.35, tune: 1 }),
+    gk("Dead 70s", { level: 0.80, kit: 3, room: 0.1, damp: 0.7, smash: 0.2, tune: -1 }),
+    gk("Jazz Club", { level: 0.79, kit: 1, room: 0.45, damp: 0.1, smash: 0, tune: 3, cymbal: 1, p0level: 0.7 }),
+    gk("Crushed", { level: 0.27, room: 0.5, smash: 1, damp: 0.2 }),
+    gk("Tight Pop", { level: 0.72, kit: 1, room: 0.15, smash: 0.4, damp: 0.45, tune: 2 }),
+    gk("Hall Drums", { level: 0.29, room: 1, smash: 0.15, damp: 0 }),
+    gk("Low Tuned", { level: 0.52, tune: -5, room: 0.4, smash: 0.35 }),
+    gk("High Tuned", { level: 0.74, tune: 5, room: 0.3, kit: 1 }),
+    gk("Lo-fi Kit", { level: 0.53, kit: 2, room: 0.3, damp: 0.6, smash: 0.5, "ifx:type": 7, "ifx:a": 0.6, "ifx:b": 0.5 }),
+    gk("Breakbeat", { level: 0.50, kit: 1, room: 0.25, smash: 0.65, damp: 0.3, tune: 1 }),
+    gk("Ride Groove", { level: 0.62, cymbal: 1, room: 0.35, smash: 0.2 }),
+    gk("Thud", { level: 0.78, kit: 3, damp: 0.85, room: 0.05, tune: -3, smash: 0.3 }),
+    gk("Arena", { level: 0.29, room: 0.85, smash: 0.6, tune: -1, p0level: 1, p1level: 0.9 }),
+    gk("Garage Band", { level: 0.42, kit: 2, room: 0.55, smash: 0.45 }),
+    gk("Session", { level: 0.62, room: 0.3, smash: 0.3, damp: 0.25 }),
+    gk("Bedroom", { level: 0.79, kit: 1, room: 0.15, damp: 0.4, smash: 0.15, "ifx:type": 2, "ifx:a": 0.7, "ifx:b": 0.2 }),
+    gk("Marching-ish", { level: 0.48, kit: 0, room: 0.6, damp: 0, tune: 2, p1level: 1 }),
+    gk("Soft Brushes-ish", { level: 0.69, kit: 3, room: 0.4, damp: 0.5, smash: 0, p3level: 0.35 }),
+    gk("Hip Hop Kit", { level: 0.46, kit: 2, room: 0.2, smash: 0.7, damp: 0.5, tune: -2 }),
+    gk("Punk", { level: 0.34, kit: 1, room: 0.35, smash: 0.9, tune: 1, damp: 0.15 }),
   ],
 };
