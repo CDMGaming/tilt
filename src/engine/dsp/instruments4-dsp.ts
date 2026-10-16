@@ -3,6 +3,7 @@
 import { ADSR, OnePole, SVF, TAU, mtof, voiceMod } from "./units";
 import { velGain, type InstrumentDSP } from "./instruments-dsp";
 import { claim } from "./instruments3-dsp";
+import { Reverb } from "./fx-dsp";
 
 const panL = (p: number) => Math.cos(((p + 1) * Math.PI) / 4);
 const panR = (p: number) => Math.sin(((p + 1) * Math.PI) / 4);
@@ -94,5 +95,142 @@ export class TineDSP implements InstrumentDSP {
     }
     this.voices = this.voices.filter((v) => v.amp.active || v.held);
     this.thumps = this.thumps.filter((k) => k.t < 0.15);
+  }
+}
+
+// ---------------------------------------------------------------- Pluck: physical modelling
+
+/** Pluck's bodies: strings (Karplus-Strong) first, then bars and drums (modal). */
+export const PLUCK_STRINGS = 4;
+/** Modal bodies: partial ratios at Wood (0) and at Metal (1); Wood <-> Metal moves between them. */
+const MODAL: { wood: number[]; metal: number[] }[] = [
+  { wood: [1, 5.9, 16.7, 3, 8, 12], metal: [1, 5.4, 9.2, 13.3, 17.9, 22.1] }, // kalimba
+  { wood: [1, 3.93, 9.9, 17.6, 2, 6], metal: [1, 2.76, 5.4, 8.93, 13.34, 4] }, // marimba (metal: glock-like)
+  { wood: [1, 2, 3, 3.9, 5.1, 6], metal: [1, 2, 3.01, 4.3, 5.2, 6.6] }, // steel drum
+  { wood: [1, 2, 3, 4.2, 5.4, 6.8], metal: [0.5, 1, 1.19, 1.56, 2, 2.66] }, // bell
+];
+
+interface PluckVoice {
+  pitch: number; held: boolean; age: number; amp: ADSR; vel: number; t: number;
+  buf: Float32Array; w: number; len: number; lp: number; ap: number; apX: number; damp: number;
+  ph: number[]; pan: number;
+}
+
+/**
+ * Pluck: plucked and struck things. Strings are Karplus-Strong (a noise burst shaped by the pick,
+ * circulating in a tuned delay with a loop filter); bars and drums are a bank of decaying partials.
+ * Pick: where and how hard it's plucked (position comb, brightness, noise). Wood <-> Metal: partial
+ * ratios harmonic -> inharmonic and highs that ring as long as the lows (strings: dispersion).
+ * Damp: a darker loop, shorter strings, and a quick palm-mute on release.
+ */
+export class PluckDSP implements InstrumentDSP {
+  private voices: PluckVoice[] = [];
+  private counter = 0;
+  private room: Reverb;
+  private bl = new Float32Array(128);
+  private br = new Float32Array(128);
+  private il = new Float32Array(128);
+  private ir = new Float32Array(128);
+  constructor(public params: Record<string, number>, private sr: number) {
+    this.room = new Reverb(sr, 0.8);
+  }
+
+  noteOn(pitch: number, vel: number) {
+    const p = this.params, sr = this.sr;
+    const v = claim(this.voices, 8, pitch, () => ({
+      pitch, held: true, age: 0, amp: new ADSR(), vel: 1, t: 0, buf: new Float32Array(4096), w: 0, len: 100, lp: 0, ap: 0, apX: 0, damp: 0,
+      ph: [0, 0, 0, 0, 0, 0], pan: 0,
+    }), ++this.counter);
+    v.vel = vel / 127; v.t = 0; v.damp = 0; v.pan = ((this.counter % 3) - 1) * 0.3;
+    v.amp.gate(true);
+    const body = Math.round(p.body ?? 0);
+    if (body < PLUCK_STRINGS) {
+      // Fill the delay with the pluck: noise and a smooth pulse, brightened by Pick, combed at the pick position.
+      const f = mtof(pitch) * voiceMod.pitch;
+      v.len = Math.max(2, Math.min(4000, sr / f));
+      const n = Math.ceil(v.len), pick = p.pick ?? 0.5;
+      const pos = Math.max(1, Math.round(n * (0.5 - pick * 0.42)));
+      const bright = 0.15 + pick * 0.8;
+      let z = 0;
+      const tmp = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        const x = noise() * (0.4 + pick * 0.6) + Math.sin(Math.PI * i / n) * (1 - pick * 0.5);
+        z += bright * (x - z);
+        tmp[i] = z;
+      }
+      for (let i = 0; i < n; i++) v.buf[i] = (tmp[i] - (i >= pos ? tmp[i - pos] : 0)) * 1.8;
+      v.w = n % v.buf.length; v.lp = 0; v.ap = 0; v.apX = 0;
+    } else v.ph = v.ph.map(() => Math.random() * 0.1);
+  }
+  noteOff(pitch: number) {
+    for (const v of this.voices) if (v.pitch === pitch && v.held) { v.held = false; v.amp.gate(false); v.damp = 1; }
+  }
+  allOff() { for (const v of this.voices) { v.held = false; v.amp.gate(false); } }
+
+  render(L: Float32Array, R: Float32Array, i0: number, i1: number) {
+    const p = this.params, sr = this.sr, n = i1 - i0;
+    const body = Math.round(p.body ?? 0), isString = body < PLUCK_STRINGS;
+    const pick = p.pick ?? 0.5, metal = p.metal ?? 0.2, damp = p.damp ?? 0.25;
+    const decay = (p.decay ?? 2) * (1 - damp * 0.7);
+    const level = (p.level ?? 0.6) * 1.0, roomLv = p.room ?? 0.2;
+    // Strings: loop brightness per body (guitar, nylon, harp, bass), lowered by Damp; Metal adds dispersion.
+    const bodyBright = [0.55, 0.35, 0.6, 0.3][Math.min(3, body)] ?? 0.5;
+    const loopK = Math.max(0.05, Math.min(0.98, bodyBright + (p.bright ?? 0) * 0.3 - damp * 0.4));
+    const disp = metal * 0.5;
+    const rel = 1 - damp * 0.9; // palm-mute: how much of the ring survives a release
+    const modal = MODAL[Math.max(0, body - PLUCK_STRINGS)] ?? MODAL[0];
+    const ratios = modal.wood.map((w, k) => w + (modal.metal[k] - w) * metal);
+    if (this.bl.length < n) { this.bl = new Float32Array(n); this.br = new Float32Array(n); this.il = new Float32Array(n); this.ir = new Float32Array(n); }
+    const bl = this.bl, br = this.br;
+    bl.fill(0, 0, n); br.fill(0, 0, n);
+    // The loop filter and the allpass add delay: take it off the string length so notes stay in tune.
+    const loopDelay = (1 - loopK) / loopK + (disp > 0.001 ? (1 + disp) / (1 - disp) : 0);
+    for (const v of this.voices) {
+      if (!v.amp.active) continue;
+      const f = mtof(v.pitch) * voiceMod.pitch;
+      if (isString) v.len = Math.max(2, Math.min(4000, sr / f - loopDelay));
+      const vg = velGain(v.vel);
+      // Feedback for the decay time; damping on release.
+      const g = Math.exp(-6.9 / (f * Math.max(0.05, decay)));
+      for (let i = 0; i < n; i++) {
+        const env = v.amp.next(0.001, 30, 1, 0.08 + rel * decay, sr);
+        let x: number;
+        if (isString) {
+          const size = v.buf.length, d = v.len, rp = v.w - d;
+          const i0r = Math.floor(rp), fr = rp - i0r;
+          const a = v.buf[(i0r + size) % size], b = v.buf[(i0r + 1 + size) % size];
+          const out = a + (b - a) * fr;
+          v.lp += loopK * (out - v.lp);
+          // A first-order allpass for stiffness (Metal): slightly inharmonic overtones.
+          const apOut = -disp * v.lp + v.apX + disp * v.ap;
+          v.apX = v.lp; v.ap = apOut;
+          const fb = (disp > 0.001 ? apOut : v.lp) * g * (v.damp ? 1 - damp * 0.02 : 1);
+          v.buf[v.w] = fb;
+          v.w = (v.w + 1) % size;
+          x = out;
+        } else {
+          x = 0;
+          for (let k = 0; k < 6; k++) {
+            v.ph[k] += (f * ratios[k]) / sr;
+            const highs = k / 5, dk = decay * (1 / (1 + k * (1.6 - metal * 1.3)));
+            const ak = [1, 0.5, 0.3, 0.2, 0.14, 0.1][k] * (1 - highs * (1 - pick) * 0.8);
+            x += Math.sin(TAU * v.ph[k]) * ak * Math.exp((-6.9 * v.t) / dk); // Decay is the time to -60 dB, as for strings
+          }
+          x += noise() * pick * 0.4 * Math.exp(-v.t / 0.004); // the mallet click
+        }
+        const y = x * env * vg;
+        bl[i] += y * panL(v.pan); br[i] += y * panR(v.pan);
+        v.t += 1 / sr;
+      }
+    }
+    this.voices = this.voices.filter((v) => v.amp.active || v.held);
+    // Room: only the reverb's own sound is added (it keeps 65% of its input).
+    this.il.set(bl.subarray(0, n)); this.ir.set(br.subarray(0, n));
+    if (roomLv > 0.01) this.room.process(this.il, this.ir, n, 0.4, 1);
+    for (let i = 0; i < n; i++) {
+      const wl = roomLv > 0.01 ? (this.il[i] - bl[i] * 0.65) * roomLv * 1.6 : 0, wr = roomLv > 0.01 ? (this.ir[i] - br[i] * 0.65) * roomLv * 1.6 : 0;
+      L[i0 + i] += (bl[i] + wl) * level;
+      R[i0 + i] += (br[i] + wr) * level;
+    }
   }
 }

@@ -10,7 +10,7 @@ import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.t
 import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "../src/engine/dsp/instruments3-dsp.ts";
 import { buildMips, parseWav } from "../src/engine/wavetable.ts";
-import { TineDSP } from "../src/engine/dsp/instruments4-dsp.ts";
+import { PluckDSP, TineDSP } from "../src/engine/dsp/instruments4-dsp.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
 import { hasToolkit } from "../src/engine/toolkit.ts";
@@ -55,6 +55,13 @@ function phrase(params: Record<string, number>): Ev[] {
     }
     [[5, 12], [5, 13], [6, 14], [6, 15]].forEach(([part, s]) => out.push({ t: (16 + s) * step, len: step, pitch: 36 + part, vel: 100 }));
     return out;
+  }
+  if (kind === "pluck") {
+    // An arpeggio, a held chord, then a low line (the basses play an octave down).
+    const lo = Math.round(params.body ?? 0) === 3 ? -24 : 0;
+    return [...[60, 63, 67, 72, 67, 63].map((pitch, i) => ({ t: i * 2 * step, len: 1.8 * step, pitch: pitch + lo, vel: 100 })),
+      ...[60, 64, 67].map((pitch) => ({ t: 14 * step, len: 8 * step, pitch: pitch + lo, vel: 90 })),
+      ...[48, 51, 55, 53].map((pitch, i) => ({ t: (24 + i * 2) * step, len: 1.8 * step, pitch: pitch + lo, vel: 110 }))];
   }
   if (kind === "epiano") {
     // Comping: two voiced chords, then a short melody on top.
@@ -110,6 +117,7 @@ function dspFor(params: Record<string, number>, clock: { bpm: number; zero: numb
       return w;
     }
     case "epiano": return new TineDSP(params, SR);
+    case "pluck": return new PluckDSP(params, SR);
     case "sampler": {
       const d = new SamplerDSP(params, SR);
       const refs = INSTRUMENTS.sampler.presets[currentPreset]?.samples ?? [];

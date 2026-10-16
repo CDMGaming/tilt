@@ -53,3 +53,61 @@ export const TINE: InstrumentDef = {
     tn("Wide Pan", { level: 0.55, trem: 2, tremRate: 7, tremDepth: 0.9, bark: 0.35 }),
   ],
 };
+
+// ---------- physical modelling: "Pluck" (strings and struck things, no samples) ----------
+
+export const PLUCK_BODIES = ["Guitar", "Nylon", "Harp", "Bass", "Kalimba", "Marimba", "Steel drum", "Bell"];
+const pl = (name: string, params: Record<string, number>) => ({ name, params });
+
+export const PLUCK: InstrumentDef = {
+  kind: "pluck",
+  name: "Pluck",
+  role: "Plucked and struck things: strings, bars, drums",
+  group: "harmony",
+  params: [
+    { id: "body", label: "Body", min: 0, max: 7, def: 0, options: PLUCK_BODIES },
+    { id: "pick", label: "Pick", min: 0, max: 1, def: 0.5 },
+    { id: "metal", label: "Wood ↔ Metal", min: 0, max: 1, def: 0.2 },
+    { id: "damp", label: "Damp", min: 0, max: 1, def: 0.25 },
+    { id: "decay", label: "Decay", min: 0.2, max: 12, def: 3.5, curve: "exp", unit: "s" },
+    { id: "room", label: "Room", min: 0, max: 1, def: 0.2 },
+    { id: "level", label: "Level", min: 0, max: 1, def: 0.6 },
+    // Hidden voicing:
+    { id: "bright", label: "Brightness", min: -1, max: 1, def: 0 },
+  ],
+  macros: ["pick", "metal", "damp", "decay", "body", "room", "bright", "level"],
+  presets: [
+    // Strings
+    pl("Steel Guitar", { level: 0.39, body: 0 }),
+    pl("Muted Funk", { level: 0.57, body: 0, damp: 0.75, pick: 0.7, decay: 0.6 }),
+    pl("Bright Strum", { level: 0.42, body: 0, pick: 0.85, bright: 0.5, room: 0.3 }),
+    pl("Twelve-ish", { level: 0.46, body: 0, metal: 0.4, pick: 0.6, "ifx:type": 8, "ifx:a": 0.3, "ifx:b": 0.6 }),
+    pl("Nylon", { level: 0.32, body: 1, pick: 0.35, decay: 2.5 }),
+    pl("Soft Nylon", { level: 0.16, body: 1, pick: 0.15, damp: 0.35, room: 0.35 }),
+    pl("Harp", { level: 0.20, body: 2, pick: 0.4, decay: 4, room: 0.45 }),
+    pl("Glass Harp", { level: 0.24, body: 2, pick: 0.6, metal: 0.5, decay: 5, room: 0.6, bright: 0.4 }),
+    pl("Koto-ish", { level: 0.51, body: 2, pick: 0.85, metal: 0.25, decay: 1.6, damp: 0.3 }),
+    pl("Sitar-ish", { level: 0.50, body: 0, pick: 0.9, metal: 0.8, decay: 3, bright: 0.4 }),
+    // Basses
+    pl("Finger Bass", { level: 0.27, body: 3, pick: 0.35, decay: 1.5 }),
+    pl("Pick Bass", { level: 0.45, body: 3, pick: 0.8, bright: 0.3, decay: 1.2 }),
+    pl("Muted Bass", { level: 0.46, body: 3, pick: 0.4, damp: 0.7, decay: 0.6 }),
+    pl("Upright-ish", { level: 0.26, body: 3, pick: 0.2, damp: 0.4, decay: 0.9, room: 0.25 }),
+    // Bars
+    pl("Kalimba", { level: 0.40, body: 4, pick: 0.45, decay: 3.5 }),
+    pl("Thumb Piano", { level: 0.44, body: 4, pick: 0.3, metal: 0, damp: 0.3, decay: 2.5, room: 0.3 }),
+    pl("Music Box", { level: 0.25, body: 4, pick: 0.6, metal: 0.8, decay: 5.5, room: 0.45 }),
+    pl("Marimba", { level: 0.43, body: 5, pick: 0.45, decay: 3 }),
+    pl("Soft Mallets", { level: 0.35, body: 5, pick: 0.15, decay: 4, room: 0.35 }),
+    pl("Glockenspiel", { level: 0.28, body: 5, pick: 0.75, metal: 1, decay: 6.25, room: 0.35 }),
+    pl("Vibes-ish", { level: 0.34, body: 5, pick: 0.35, metal: 0.75, decay: 8.75, damp: 0.1, "ifx:type": 10, "ifx:a": 0.45, "ifx:b": 0.4 }),
+    pl("Log Drum", { level: 0.62, body: 5, pick: 0.25, metal: 0, decay: 1.25, damp: 0.3 }),
+    // Drums and bells
+    pl("Steel Drum", { level: 0.39, body: 6, pick: 0.45, decay: 4 }),
+    pl("Bright Pan", { level: 0.33, body: 6, pick: 0.75, metal: 0.6, decay: 5, room: 0.3 }),
+    pl("Church Bell", { level: 0.18, body: 7, pick: 0.6, metal: 1, decay: 12, room: 0.6 }),
+    pl("Tiny Bell", { level: 0.38, body: 7, pick: 0.8, metal: 0.8, decay: 5, bright: 0.5 }),
+    pl("Chime", { level: 0.20, body: 7, pick: 0.5, metal: 0.55, decay: 10, room: 0.5 }),
+    pl("Gong-ish", { level: 0.18, body: 7, pick: 0.2, metal: 1, decay: 12, damp: 0, room: 0.5 }),
+  ],
+};

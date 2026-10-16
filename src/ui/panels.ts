@@ -8,6 +8,7 @@ import { chordName, noteName, scaleById, scaleDegree } from "../engine/music";
 import { decodeFile, listSamples, putSample, sampleLabel } from "./samples";
 import { CHIP_WAVES, SFX_GROUPS, WT_FRAMES, WT_SIZE } from "../engine/instruments3";
 import { WOB_RATES } from "../engine/instruments2";
+import { PLUCK_BODIES } from "../engine/instruments4";
 import { allPresets, applyPreset, deleteUserPreset, presetPosition, saveUserPreset, userPresets, USER_MARK, type PresetEntry } from "./presets";
 import { getParam } from "../engine/params";
 import { RECIPES, genBase, mutateParams, pickSound, soundKey, soundRoles, type SoundRef } from "../engine/sounds";
@@ -215,6 +216,20 @@ export function buildPanel(app: App, track: Track): HTMLElement {
         ctl("tremRate", "Rate"), ctl("tremDepth", "Depth"),
         h("div", { class: "tn-char" }, ctl("bark", "★ Bark", "l")),
         ctl("keyOff", "Key-off"), ctl("tone", "Tone", "l"), ctl("level", "Level")),
+      keyboard(app, track),
+    );
+  } else if (track.kind === "pluck") {
+    // Pluck: carved light wood with inlaid labels; the bodies as inlaid tiles, then the knob row.
+    const bodyNow = Math.round(track.params.body ?? 0);
+    body = h("div", { class: "panel-body pluck" },
+      h("div", { class: "pk-face" },
+        h("div", { class: "pk-bodies", role: "radiogroup", "aria-label": "Body" }, PLUCK_BODIES.map((name, i) => h("button", {
+          class: "pk-body" + (i === bodyNow ? " on" : ""), "data-nav": `body-${i}`, "aria-pressed": String(i === bodyNow),
+          onclick: () => { app.edit("Body", () => (track.params.body = i)); previewSound(app, track); app.screens.edit.render(); },
+        }, name))),
+        h("div", { class: "pk-knobs" },
+          h("div", { class: "pk-char" }, ctl("pick", "★ Pick", "l"), ctl("metal", "★ Wood ↔ Metal", "l"), ctl("damp", "★ Damp", "l")),
+          ctl("decay", "Decay"), ctl("room", "Room"), ctl("level", "Level"))),
       keyboard(app, track),
     );
   } else if (track.kind === "acid") {

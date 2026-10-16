@@ -10,7 +10,7 @@ export const MAX_BARS = 8;
 export const MAX_TRACKS = 8;
 export const MAX_SCENES = 32;
 
-export type InstrumentKind = "drums" | "acid" | "poly" | "lead" | "analog" | "wobble" | "pad" | "chip" | "fm" | "wave" | "sampler" | "epiano";
+export type InstrumentKind = "drums" | "acid" | "poly" | "lead" | "analog" | "wobble" | "pad" | "chip" | "fm" | "wave" | "sampler" | "epiano" | "pluck";
 
 export interface Note {
   id: number;

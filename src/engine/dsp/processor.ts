@@ -6,7 +6,7 @@ import { makeFx, type Fx } from "./fx-dsp";
 import { FX_SLOTS, type InstrumentKind } from "../model";
 import { LeadDSP, PadDSP, WobbleDSP } from "./instruments2-dsp";
 import { ThumpLabDSP } from "./thumplab-dsp";
-import { TineDSP } from "./instruments4-dsp";
+import { PluckDSP, TineDSP } from "./instruments4-dsp";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "./instruments3-dsp";
 import { Toolkit } from "./toolkit-dsp";
 import { hasToolkit } from "../toolkit";
@@ -81,6 +81,7 @@ class RbInstrument extends AudioWorkletProcessor {
     else if (o.kind === "fm") this.dsp = new FmDSP(o.params, sampleRate);
     else if (o.kind === "wave") { const w = new WavetableDSP(o.params, sampleRate); if (o.mips) w.setMips(o.mips); this.dsp = w; }
     else if (o.kind === "epiano") this.dsp = new TineDSP(o.params, sampleRate);
+    else if (o.kind === "pluck") this.dsp = new PluckDSP(o.params, sampleRate);
     else if (o.kind === "sampler") { const s = new SamplerDSP(o.params, sampleRate); if (o.samples) s.setSamples(o.samples, o.rates ?? []); this.dsp = s; }
     else this.dsp = new PolyDSP(o.params, sampleRate);
     this.base = o.params;

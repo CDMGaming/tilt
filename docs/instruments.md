@@ -420,6 +420,11 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** C.
 - **Theme:** carved light wood, inlaid labels.
 - **Presets:** 28.
+- **Status: built** (kind `pluck`). Eight bodies: Guitar, Nylon, Harp, Bass (Karplus-Strong, tuned for the
+  loop filter's delay) and Kalimba, Marimba, Steel drum, Bell (six decaying partials). Pick: pluck position,
+  brightness, noise (mallet click for bars). Wood ↔ Metal: partial ratios and how long the highs ring
+  (strings: a stiffness allpass). Damp: darker, shorter, palm-mute on release. Decay is the time to -60 dB.
+  28 presets, level-matched.
 
 ### Anthem: supersaw lead
 - **Idea:** the huge festival lead.
