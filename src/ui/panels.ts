@@ -21,7 +21,7 @@ import { trackColor } from "./theme";
 import { control, type ControlHost } from "./knob";
 
 /** Instruments rebuilt in the overhaul (docs/instruments.md): their own panel only, no MORE page. */
-const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums", "poly", "lead", "wobble", "pad", "chip", "fm"]);
+const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums", "poly", "lead", "wobble", "pad", "chip", "fm", "wave"]);
 /** Chordette: the category its sound list shows (null: the current sound's). */
 let chordetteCat: string | null = null;
 /** Kitbox: the channel whose More drawer is open (per session). */
@@ -175,14 +175,12 @@ export function buildPanel(app: App, track: Track): HTMLElement {
       keyboard(app, track),
     );
   } else if (track.kind === "wave") {
+    // Morph: the Warp pad in the centre (X = position along the table, Y = Warp), controls around it.
     body = h("div", { class: "panel-body morph" },
-      h("div", { class: "knob-row" },
-        wavetableView(app, track),
-        h("div", { class: "section-title small" }, "Table"), ctl("table", "Table"), ctl("pos", "POSITION", "l"), ctl("envAmt", "Pos env"), ctl("envDecay", "Env decay"), ctl("lfoAmt", "Pos LFO"), ctl("lfoRate", "LFO rate")),
-      h("div", { class: "knob-row" },
-        h("div", { class: "section-title small" }, "Voice"), ctl("unison", "Voices"), ctl("detune", "Detune", "s"),
-        h("div", { class: "section-title small" }, "Filter"), ctl("cutoff", "Cutoff"), ctl("reso", "Reso", "s"),
-        h("div", { class: "section-title small" }, "Amp"), ctl("attack", "A", "s"), ctl("decay", "D", "s"), ctl("sustain", "S", "s"), ctl("release", "R", "s"), ctl("level", "Level", "s")),
+      h("div", { class: "mo-face" },
+        h("div", { class: "mo-side" }, wavetableView(app, track), ctl("table", "Table"), ctl("lfoAmt", "Motion"), ctl("lfoRate", "Motion speed")),
+        h("div", { class: "mo-pad" }, xyPad(app, track, host)),
+        h("div", { class: "mo-side" }, ctl("cutoff", "Cutoff"), ctl("attack", "Attack"), ctl("release", "Release"), ctl("level", "Level"))),
       keyboard(app, track),
     );
   } else if (track.kind === "sampler") {
@@ -300,6 +298,12 @@ function morePage(app: App, track: Track, ctl: Ctl): HTMLElement {
 
 /** XY: the synth's two most expressive parameters on one pad (mouse, touch, a pad's right stick; moves record as automation). */
 function xyPage(app: App, track: Track, host: ControlHost): HTMLElement {
+  return h("div", { class: "panel-body xy-page" }, xyPad(app, track, host),
+    h("p", { class: "note" }, "While recording, moves are written into the clip as automation for both parameters."));
+}
+
+/** An XY pad for the instrument's two pad parameters (XY_PARAMS), with a readout under it. */
+function xyPad(app: App, track: Track, host: ControlHost): HTMLElement {
   const [xId, yId] = XY_PARAMS[track.kind]!;
   const xp = paramDef(track.kind, xId)!, yp = paramDef(track.kind, yId)!;
   const dot = h("div", { class: "xy-dot" });
@@ -333,8 +337,7 @@ function xyPage(app: App, track: Track, host: ControlHost): HTMLElement {
     pad.addEventListener("pointercancel", up);
   });
   requestAnimationFrame(draw);
-  return h("div", { class: "panel-body xy-page" }, pad, readout,
-    h("p", { class: "note" }, "While recording, moves are written into the clip as automation for both parameters."));
+  return h("div", { class: "xy-wrap" }, pad, readout);
 }
 
 /** Pixel's screen: two cycles of the chosen wave, drawn in chunky pixels. */

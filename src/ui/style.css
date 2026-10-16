@@ -1345,3 +1345,18 @@ body.phone .panel-body.razor .knob.fader { width: 38px; }
 .panel-body.glint .knob-val { stroke: #e3c271; }
 .panel-body.glint .knob-track { stroke: #ffffff18; }
 .panel-body.glint .switch { background: #0d3533; border-color: #c9a24a88; color: #e8d39b; }
+
+/* Morph: oxidised copper, a verdigris Warp pad in the centre. */
+.panel-body.morph { padding: 0; overflow: hidden; border-top-color: #b8733a; }
+.mo-face { display: flex; gap: 16px; align-items: center; justify-content: center; flex-wrap: wrap; padding: 12px 16px;
+  background: radial-gradient(circle at 30% 20%, #4a9b8a33, transparent 40%), radial-gradient(circle at 80% 80%, #3f8c7a33, transparent 45%), linear-gradient(135deg, #8a4f26, #5e341a 60%, #7a4520); }
+.mo-side { display: grid; grid-template-columns: repeat(2, auto); gap: 6px 10px; justify-items: center; align-items: end; }
+.mo-side .wt-view { grid-column: 1 / -1; margin: 0; border-color: #2e6b5f; }
+.mo-pad { width: min(320px, 90vw); }
+.mo-pad .xy-pad { height: 190px; background: radial-gradient(circle at 50% 50%, #5fb8a3, #2e7a6a 70%, #1f5a4e); border: 2px solid #c98a52; box-shadow: inset 0 0 20px #0006; }
+.mo-pad .xy-readout { color: #f1d9c4; }
+.panel-body.morph .knob-label { color: #f6dcc4; opacity: 1; font-weight: 700; }
+.panel-body.morph .knob-value { color: #e6c3a3; }
+.panel-body.morph .knob-val { stroke: #6fd3bc; }
+.panel.kind-wave .panel-body.morph { --cap-fill: #c98a52; --cap-edge: #5e341a; --knob-dot: #1f3d36; }
+.panel-body.morph .switch { background: #5e341a; color: #f6dcc4; border-color: #c98a52; }

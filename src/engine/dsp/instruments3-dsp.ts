@@ -211,7 +211,18 @@ export class WavetableDSP implements InstrumentDSP {
   mips: Float32Array[] | null = null;
   constructor(public params: Record<string, number>, private sr: number) {}
 
-  setMips(m: Float32Array[]) { this.mips = m; }
+  /** Per-frame gain so every frame of every table plays at the same loudness (position sweeps don't pump). */
+  private frameGain = new Float32Array(WT_FRAMES).fill(1);
+
+  setMips(m: Float32Array[]) {
+    this.mips = m;
+    const t = m[0];
+    for (let f = 0; f < WT_FRAMES; f++) {
+      let e = 0;
+      for (let i = 0; i < WT_SIZE; i++) e += t[f * WT_SIZE + i] ** 2;
+      this.frameGain[f] = Math.min(8, 0.5 / Math.max(1e-4, Math.sqrt(e / WT_SIZE)));
+    }
+  }
 
   noteOn(pitch: number, vel: number) {
     const v = claim(this.voices, 8, pitch, () => ({ pitch, held: true, age: 0, amp: new ADSR(), vel: 1, ph: [Math.random(), Math.random(), Math.random()], t: 0, f: [new SVF(), new SVF()] }), ++this.counter);
@@ -237,13 +248,16 @@ export class WavetableDSP implements InstrumentDSP {
   render(L: Float32Array, R: Float32Array, i0: number, i1: number) {
     if (!this.mips) return;
     const p = this.params, sr = this.sr;
-    const pos0 = p.pos ?? 0.2, envAmt = p.envAmt ?? 0.4, envDecay = p.envDecay ?? 0.8;
+    // Warp (the pad's Y): phase distortion of the table (the cycle's first half squeezed, the rest
+    // stretched), a nudge along the table, and more filter resonance.
+    const warp = p.warp ?? 0.2, knee = 0.5 - warp * 0.42;
+    const pos0 = (p.pos ?? 0.2) + warp * 0.15, envAmt = p.envAmt ?? 0.4, envDecay = p.envDecay ?? 0.8;
     const lfoAmt = (p.lfoAmt ?? 0.15) * 0.5, lfoRate = p.lfoRate ?? 0.5;
     const n = Math.round(p.unison ?? 1) + 1;
     const det = (p.detune ?? 0.25) * 0.012;
     const a = p.attack ?? 0.01, d = p.decay ?? 0.6, s = p.sustain ?? 0.7, r = p.release ?? 0.6;
-    const res = p.reso ?? 0.15;
-    const level = ((p.level ?? 0.55) * 0.55) / Math.sqrt(n);
+    const res = Math.min(0.95, (p.reso ?? 0.15) + warp * 0.3);
+    const level = ((p.level ?? 0.55) * 1.4) / Math.sqrt(n);
     for (let i = i0; i < i1; i++) {
       this.lfo = (this.lfo + lfoRate / sr) % 1;
       const lfo = Math.sin(TAU * this.lfo) * lfoAmt;
@@ -254,12 +268,14 @@ export class WavetableDSP implements InstrumentDSP {
         const pos = Math.max(0, Math.min(1, pos0 + envAmt * Math.exp(-v.t / envDecay) + lfo)) * (WT_FRAMES - 1);
         const f = mtof(v.pitch) * voiceMod.pitch;
         const env = v.amp.next(a, d, s, r, sr) * velGain(v.vel);
+        const fi = Math.min(WT_FRAMES - 2, Math.floor(pos)), fg = this.frameGain[fi] + (this.frameGain[fi + 1] - this.frameGain[fi]) * (pos - fi);
         let vl = 0, vr = 0;
         for (let u = 0; u < n; u++) {
           const off = n === 1 ? 0 : (u / (n - 1)) * 2 - 1;
           const fu = f * (1 + off * det);
           v.ph[u] = (v.ph[u] + fu / sr) % 1;
-          const x = this.read(pos, v.ph[u], fu);
+          const ph = v.ph[u], pd = warp > 0.005 ? (ph < knee ? (ph / knee) * 0.5 : 0.5 + ((ph - knee) / (1 - knee)) * 0.5) : ph;
+          const x = this.read(pos, pd, fu * (warp > 0.005 ? 0.5 / knee : 1)) * fg;
           vl += x * panL(off * 0.8); vr += x * panR(off * 0.8);
         }
         l += v.f[0].lp(vl, this.cut, res, sr) * env;

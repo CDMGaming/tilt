@@ -323,6 +323,10 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** J, the pad in the centre with controls around it.
 - **Theme:** oxidised copper, a verdigris pad.
 - **Presets:** 24.
+- **Status: built.** Warp: phase distortion (the cycle's first half squeezed), a nudge along the table and
+  more resonance. Every frame of every table is now loudness-normalised, so sweeping Position no longer
+  pumps the level. The tables got names (Basic, Soft, Scan, Bright, Digital, Vowel, Glitch). 24 presets
+  (6 leads, 6 pads, 4 basses, 6 arps / plucks, 2 FX), level-matched. The pad is on the panel itself.
 
 ### Grab: sampler
 - **Idea:** your own sounds and found sounds, in a boombox.

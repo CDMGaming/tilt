@@ -27,7 +27,7 @@ export const TONE_PARAM: Partial<Record<InstrumentKind, { id: string; label: str
 
 /** The XY pad (X, Y): only where the pad is the instrument's idea (Morph's Warp pad; Vox later). */
 export const XY_PARAMS: Partial<Record<InstrumentKind, [string, string]>> = {
-  wave: ["pos", "cutoff"],
+  wave: ["pos", "warp"],
 };
 
 export const FILTER_TYPES = ["Off", "LP12", "LP24", "HP", "BP", "Notch"];

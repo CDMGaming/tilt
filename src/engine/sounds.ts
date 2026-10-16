@@ -57,8 +57,10 @@ const TAGS: Partial<Record<InstrumentKind, Record<string, Role[]>>> = {
     "Soft Pad": ["pad"], "Glass Pad": ["pad"], "Frost": ["pad"], "Breath Pad": ["pad"],
   },
   wave: {
-    "Sweep Pluck": ["pluck"], "Slow Scan": ["pad"], "Digital Bass": ["bass"], "Wide Pad": ["pad"], "Vowel Keys": ["keys"],
-    "Glitch Stab": ["fx", "pluck"],
+    "Slow Scan": ["pad"], "Wide Pad": ["pad"], "Warp Pad": ["pad"], "Choir Morph": ["pad"], "Digital Haze": ["pad"], "Evolving": ["pad"],
+    "Digital Bass": ["bass"], "Warp Bass": ["bass"], "Growl Table": ["bass"], "Sub Morph": ["bass"],
+    "Sweep Pluck": ["pluck", "arp"], "Vowel Keys": ["keys"], "Glitch Stab": ["fx", "pluck"], "Warp Arp": ["arp", "pluck"], "Bell Table": ["keys", "pluck"],
+    "Digital Pluck": ["pluck", "arp"], "Scanner": ["fx"], "Warp Riser": ["fx"],
   },
 };
 
@@ -139,9 +141,10 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
     knob("indexDecay", 0.22), knob("indexSus", 0.18, 0, 0.6), knob("decay", 0.15), knob("release", 0.12),
   ],
   wave: [
-    pick("table", 0.5, range(0, 6)), knob("pos", 0.3), knob("envAmt", 0.25), knob("envDecay", 0.22), knob("lfoAmt", 0.2, 0, 0.7),
-    knob("lfoRate", 0.22), knob("detune", 0.2), knob("cutoff", 0.18, 0.3, 1), knob("reso", 0.15, 0, 0.7),
+    pick("table", 0.4, range(0, 6)), knob("pos", 0.3), knob("warp", 0.25), knob("envAmt", 0.25), knob("envDecay", 0.22),
+    knob("lfoAmt", 0.2, 0, 0.7), knob("lfoRate", 0.22), knob("detune", 0.2), knob("cutoff", 0.18, 0.3, 1), knob("reso", 0.15, 0, 0.6),
   ],
+
 };
 
 /** Roughly normal, -1..1 (three uniforms). */

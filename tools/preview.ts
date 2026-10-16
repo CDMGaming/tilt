@@ -8,7 +8,8 @@ import { expandPitch } from "../src/engine/timeline.ts";
 import { AcidDSP, DrumsDSP, PolyDSP, type InstrumentDSP } from "../src/engine/dsp/instruments-dsp.ts";
 import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.ts";
 import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
-import { ChipDSP, FmDSP } from "../src/engine/dsp/instruments3-dsp.ts";
+import { ChipDSP, FmDSP, WavetableDSP } from "../src/engine/dsp/instruments3-dsp.ts";
+import { buildMips, parseWav } from "../src/engine/wavetable.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
 import { hasToolkit } from "../src/engine/toolkit.ts";
@@ -59,7 +60,11 @@ function phrase(params: Record<string, number>): Ev[] {
     const line: [number, number, number][] = [[0, 72, 1.5], [2, 76, 1.5], [4, 79, 3.5], [8, 84, 1.5], [10, 79, 1.5], [12, 76, 3.5], [16, 72, 7.5], [24, 48, 6]];
     return line.map(([st, pitch, l]) => ({ t: st * step, len: l * step, pitch, vel: 100 }));
   }
-  if (kind === "lead") {
+  if (kind === "wave" && (params.attack ?? 0) > 0.3) {
+    // A slow pad: hold a chord for two bars so it can open up.
+    return [60, 63, 67].map((pitch) => ({ t: 0, len: 30 * step, pitch, vel: 100 }));
+  }
+  if (kind === "lead" || kind === "wave") {
     // A lead line: short notes, then a slide (overlapping notes) and a long held note.
     const line: [number, number, number][] = [[0, 72, 2], [2, 75, 2], [4, 79, 1], [5, 77, 1], [6, 75, 2.5], [8, 72, 2], [10, 70, 1], [11, 72, 5], [16, 79, 2.5], [18, 84, 6], [24, 82, 2], [26, 79, 6]];
     return line.map(([st, pitch, l]) => ({ t: st * step, len: l * step, pitch, vel: 100 }));
@@ -76,8 +81,16 @@ const kitSounds = kind === "drums" ? KIT_SAMPLES.map((name) => {
   return x;
 }) : [];
 
+const mipCache: Float32Array[][] = [];
+
 function dspFor(params: Record<string, number>, clock: { bpm: number; zero: number }): InstrumentDSP {
   switch (kind) {
+    case "wave": {
+      const w = new WavetableDSP(params, SR), t = Math.round(params.table ?? 0);
+      mipCache[t] ??= buildMips(parseWav(Deno.readFileSync(new URL(`../public/wavetables/wavetable0${t + 1}.wav`, import.meta.url)).buffer).data);
+      w.setMips(mipCache[t]);
+      return w;
+    }
     case "drums": { const d = new DrumsDSP(params, kitSounds, SR); d.samplesRate = KIT_RATE; return d; }
     case "acid": return new AcidDSP(params, SR, clock);
     case "lead": return new LeadDSP(params, SR);

@@ -139,43 +139,68 @@ export const FM: InstrumentDef = {
 
 // ---------- wavetable synth: "Morph" (factory tables from the CHOMPI firmware, MIT) ----------
 
-export const TABLE_NAMES = ["Table 1", "Table 2", "Table 3", "Table 4", "Table 5", "Table 6", "Table 7"];
+export const TABLE_NAMES = ["Basic", "Soft", "Scan", "Bright", "Digital", "Vowel", "Glitch"];
 export const WT_FRAMES = 33;
 export const WT_SIZE = 2048;
 export const WT_LEVELS = 9; // mip levels: 1024 harmonics, 512, ... 4
 
+const mo = (name: string, params: Record<string, number>) => ({ name, params });
+
 export const WAVE: InstrumentDef = {
   kind: "wave",
   name: "Morph",
-  role: "Wavetable synth: sweep through 33 waveforms",
+  role: "Sweep through waveforms; Warp bends them on a big pad",
   group: "harmony",
   params: [
-    { id: "table", label: "Table", min: 0, max: 6, def: 0, options: TABLE_NAMES },
     { id: "pos", label: "Position", min: 0, max: 1, def: 0.2 },
+    { id: "warp", label: "Warp", min: 0, max: 1, def: 0.2 },
+    { id: "table", label: "Table", min: 0, max: 6, def: 0, options: TABLE_NAMES },
+    { id: "lfoAmt", label: "Motion", min: 0, max: 1, def: 0.15 },
+    { id: "lfoRate", label: "Motion speed", min: 0.05, max: 10, def: 0.5, curve: "exp", unit: "Hz" },
+    { id: "cutoff", label: "Cutoff", min: 100, max: 16000, def: 9000, curve: "exp", unit: "Hz" },
+    { id: "attack", label: "Attack", min: 0.001, max: 3, def: 0.01, curve: "exp", unit: "s" },
+    { id: "release", label: "Release", min: 0.01, max: 5, def: 0.6, curve: "exp", unit: "s" },
+    { id: "level", label: "Level", min: 0, max: 1, def: 0.55 },
+    // Hidden voicing:
     { id: "envAmt", label: "Pos env", min: -1, max: 1, def: 0.4 },
     { id: "envDecay", label: "Env decay", min: 0.05, max: 4, def: 0.8, curve: "exp", unit: "s" },
-    { id: "lfoAmt", label: "Pos LFO", min: 0, max: 1, def: 0.15 },
-    { id: "lfoRate", label: "LFO rate", min: 0.05, max: 10, def: 0.5, curve: "exp", unit: "Hz" },
     { id: "unison", label: "Voices", min: 0, max: 2, def: 1, options: ["1", "2", "3"] },
     { id: "detune", label: "Detune", min: 0, max: 1, def: 0.25 },
-    { id: "cutoff", label: "Cutoff", min: 100, max: 16000, def: 9000, curve: "exp", unit: "Hz" },
     { id: "reso", label: "Reso", min: 0, max: 1, def: 0.15 },
-    { id: "attack", label: "A", min: 0.001, max: 3, def: 0.01, curve: "exp", unit: "s" },
-    { id: "decay", label: "D", min: 0.02, max: 4, def: 0.6, curve: "exp", unit: "s" },
-    { id: "sustain", label: "S", min: 0, max: 1, def: 0.7 },
-    { id: "release", label: "R", min: 0.01, max: 5, def: 0.6, curve: "exp", unit: "s" },
-    { id: "level", label: "Level", min: 0, max: 1, def: 0.55 },
+    { id: "decay", label: "Decay", min: 0.02, max: 4, def: 0.6, curve: "exp", unit: "s" },
+    { id: "sustain", label: "Sustain", min: 0, max: 1, def: 0.7 },
   ],
-  macros: ["pos", "envAmt", "lfoAmt", "lfoRate", "detune", "cutoff", "release", "level"],
+  macros: ["warp", "pos", "lfoAmt", "lfoRate", "table", "cutoff", "release", "level"],
   presets: [
-    { name: "Morph Lead", params: {} },
-    { name: "Sweep Pluck", params: { pos: 0, envAmt: 0.9, envDecay: 0.25, decay: 0.3, sustain: 0.2, lfoAmt: 0 } },
-    { name: "Slow Scan", params: { table: 2, pos: 0.1, envAmt: 0, lfoAmt: 0.6, lfoRate: 0.15, attack: 0.4, release: 1.5 } },
-    { name: "Digital Bass", params: { table: 4, pos: 0.5, envAmt: -0.4, envDecay: 0.3, unison: 0, cutoff: 3000, sustain: 0.8, release: 0.1 } },
-    { name: "Wide Pad", params: { table: 1, pos: 0.4, unison: 2, detune: 0.6, attack: 0.8, release: 2.5, lfoAmt: 0.3, lfoRate: 0.2, level: 0.85 } },
-    { name: "Vowel Keys", params: { table: 5, pos: 0.3, envAmt: 0.5, envDecay: 0.6, decay: 0.8, sustain: 0.4, level: 0.95 } },
-    { name: "Glitch Stab", params: { table: 6, pos: 0.8, envAmt: -0.8, envDecay: 0.1, decay: 0.15, sustain: 0, release: 0.1 } },
-    { name: "Bright Saws", params: { table: 3, pos: 0.6, unison: 2, detune: 0.4, cutoff: 12000 } },
+    // Leads
+    mo("Morph Lead", { level: 0.34,}),
+    mo("Bright Saws", { level: 0.40, table: 3, pos: 0.6, unison: 2, detune: 0.4, cutoff: 12000, warp: 0.1 }),
+    mo("Warp Lead", { level: 0.38, table: 3, pos: 0.3, warp: 0.7, envAmt: 0.2, unison: 1, detune: 0.2, cutoff: 7000 }),
+    mo("Vowel Lead", { level: 0.59, table: 5, pos: 0.4, warp: 0.3, lfoAmt: 0.35, lfoRate: 4.5, sustain: 0.9 }),
+    mo("Glass Lead", { level: 0.31, table: 1, pos: 0.8, warp: 0.45, unison: 0, cutoff: 10000, sustain: 0.85, "ifx:type": 13, "ifx:a": 0.4, "ifx:b": 0.3 }),
+    mo("Scan Solo", { level: 0.39, table: 2, pos: 0.2, envAmt: 0.6, envDecay: 1.5, warp: 0.25, unison: 1, sustain: 0.9 }),
+    // Pads
+    mo("Slow Scan", { level: 0.23, table: 2, pos: 0.1, envAmt: 0, lfoAmt: 0.6, lfoRate: 0.15, attack: 0.4, release: 1.5 }),
+    mo("Wide Pad", { level: 0.22, table: 1, pos: 0.4, unison: 2, detune: 0.6, attack: 0.8, release: 2.5, lfoAmt: 0.3, lfoRate: 0.2 }),
+    mo("Warp Pad", { level: 0.16, table: 0, pos: 0.5, warp: 0.55, unison: 2, detune: 0.5, attack: 1, release: 2.5, lfoAmt: 0.25, lfoRate: 0.1, cutoff: 5000 }),
+    mo("Choir Morph", { level: 0.26, table: 5, pos: 0.6, envAmt: 0, lfoAmt: 0.45, lfoRate: 0.25, unison: 2, detune: 0.35, attack: 0.7, release: 2, cutoff: 4500 }),
+    mo("Digital Haze", { level: 0.22, table: 4, pos: 0.3, warp: 0.35, lfoAmt: 0.5, lfoRate: 0.08, unison: 2, detune: 0.7, attack: 1.5, release: 3, cutoff: 3500 }),
+    mo("Evolving", { level: 0.26, table: 2, pos: 0, envAmt: 1, envDecay: 4, lfoAmt: 0.2, lfoRate: 0.3, unison: 2, attack: 0.6, release: 3 }),
+    // Basses
+    mo("Digital Bass", { level: 0.53, table: 4, pos: 0.5, envAmt: -0.4, envDecay: 0.3, unison: 0, cutoff: 3000, sustain: 0.8, release: 0.1 }),
+    mo("Warp Bass", { level: 0.41, table: 3, pos: 0.2, warp: 0.6, envAmt: 0.3, envDecay: 0.2, unison: 0, cutoff: 1800, reso: 0.3, sustain: 0.8, release: 0.08 }),
+    mo("Growl Table", { level: 0.39, table: 6, pos: 0.4, warp: 0.4, lfoAmt: 0.5, lfoRate: 4, unison: 1, detune: 0.15, cutoff: 2500, sustain: 0.9, release: 0.1 }),
+    mo("Sub Morph", { level: 0.42, table: 1, pos: 0.05, warp: 0, unison: 0, cutoff: 900, sustain: 1, release: 0.1 }),
+    // Arps and plucks
+    mo("Sweep Pluck", { level: 0.64, pos: 0, envAmt: 0.9, envDecay: 0.25, decay: 0.3, sustain: 0.2, lfoAmt: 0 }),
+    mo("Vowel Keys", { level: 0.84, table: 5, pos: 0.3, envAmt: 0.5, envDecay: 0.6, decay: 0.8, sustain: 0.4 }),
+    mo("Glitch Stab", { level: 0.94, table: 6, pos: 0.8, envAmt: -0.8, envDecay: 0.1, decay: 0.15, sustain: 0, release: 0.1 }),
+    mo("Warp Arp", { level: 0.99, table: 3, pos: 0.1, warp: 0.5, envAmt: 0.7, envDecay: 0.12, decay: 0.18, sustain: 0, release: 0.12, lfoAmt: 0 }),
+    mo("Bell Table", { level: 0.33, table: 1, pos: 0.9, warp: 0.65, envAmt: -0.5, envDecay: 0.5, decay: 1.2, sustain: 0, release: 1, lfoAmt: 0 }),
+    mo("Digital Pluck", { level: 0.58, table: 4, pos: 0.7, envAmt: -0.7, envDecay: 0.15, decay: 0.25, sustain: 0, release: 0.15, lfoAmt: 0 }),
+    // FX
+    mo("Scanner", { level: 0.39, table: 2, pos: 0.5, lfoAmt: 1, lfoRate: 6, warp: 0.4, sustain: 1 }),
+    mo("Warp Riser", { level: 0.17, table: 3, pos: 0, envAmt: 1, envDecay: 4, warp: 0.8, attack: 2, sustain: 1, release: 1, unison: 2, detune: 0.5 }),
   ],
 };
 

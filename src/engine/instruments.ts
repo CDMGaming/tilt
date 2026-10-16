@@ -308,7 +308,7 @@ export function toUnit(p: ParamDef, v: number): number {
 
 export function formatParam(p: ParamDef, v: number): string {
   if (p.options) return p.options[Math.round(v - p.min)] ?? String(v);
-  if (p.unit === "Hz") return v >= 1000 ? (v / 1000).toFixed(1) + "k" : Math.round(v) + "";
+  if (p.unit === "Hz") return v >= 1000 ? (v / 1000).toFixed(1) + "k" : v < 10 ? v.toFixed(v < 1 ? 2 : 1) : Math.round(v) + "";
   if (p.unit === "s") return v < 1 ? Math.round(v * 1000) + "ms" : v.toFixed(2) + "s";
   if (p.unit === "st") return (v > 0 ? "+" : "") + Math.round(v);
   if (p.unit === "ct") return Math.round(v) + "c";
