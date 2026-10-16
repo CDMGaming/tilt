@@ -1,6 +1,6 @@
 // DSP for the Phase 4 instruments (new ones). Runs in the AudioWorklet.
 
-import { ADSR, OnePole, SVF, TAU, mtof, voiceMod } from "./units";
+import { ADSR, OnePole, SVF, TAU, blep, mtof, voiceMod } from "./units";
 import { velGain, type InstrumentDSP } from "./instruments-dsp";
 import { claim } from "./instruments3-dsp";
 import { Reverb } from "./fx-dsp";
@@ -384,20 +384,28 @@ export class AnthemDSP implements InstrumentDSP {
     if (this.bl.length < n) { this.bl = new Float32Array(n); this.br = new Float32Array(n); this.il = new Float32Array(n); this.ir = new Float32Array(n); }
     const bl = this.bl, br = this.br;
     bl.fill(0, 0, n); br.fill(0, 0, n);
+    // Per block: each saw's detune ratio and pan gains (the stack's shape only changes with Twist).
+    const ratio = new Float64Array(count), gl = new Float64Array(count), gr = new Float64Array(count);
+    for (let k = 0; k < count; k++) {
+      const off = count === 1 ? 0 : (k / (count - 1)) * 2 - 1; // -1..1 across the stack
+      ratio[k] = Math.pow(2, (off * det * (0.6 + 0.4 * Math.abs(off))) / 12);
+      gl[k] = panL(off * spread); gr[k] = panR(off * spread);
+    }
     for (const v of this.voices) {
       if (!v.amp.active) continue;
+      const gliding = glide > 0.005 && v.from !== v.pitch;
+      let f0 = mtof(v.pitch) * voiceMod.pitch;
       for (let i = 0; i < n; i++) {
-        const g = glide > 0.005 ? Math.exp(-v.t / glide) : 0;
-        const pitch = v.pitch + (v.from - v.pitch) * g;
-        const f0 = mtof(pitch) * voiceMod.pitch;
+        if (gliding) f0 = mtof(v.pitch + (v.from - v.pitch) * Math.exp(-v.t / glide)) * voiceMod.pitch;
         const env = v.amp.next(a, d, s, r, sr) * velGain(v.vel);
         let l = 0, rr = 0;
+        const inc = f0 / sr;
         for (let k = 0; k < count; k++) {
-          const off = count === 1 ? 0 : (k / (count - 1)) * 2 - 1; // -1..1 across the stack
-          const fk = f0 * Math.pow(2, (off * det * (0.6 + 0.4 * Math.abs(off))) / 12);
-          v.ph[k] += fk / sr; if (v.ph[k] >= 1) v.ph[k] -= 1;
-          const x = 2 * v.ph[k] - 1;
-          l += x * panL(off * spread); rr += x * panR(off * spread);
+          let ph = v.ph[k] + inc * ratio[k];
+          if (ph >= 1) ph -= 1;
+          v.ph[k] = ph;
+          const x = 2 * ph - 1 - blep(ph, inc * ratio[k]); // band-limited: no aliasing grit up high
+          l += x * gl[k]; rr += x * gr[k];
         }
         v.sub += (f0 * 0.5) / sr; if (v.sub >= 1) v.sub -= 1;
         const sub = Math.sin(TAU * v.sub) * bottom * 1.2;

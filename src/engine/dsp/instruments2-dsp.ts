@@ -1,7 +1,7 @@
 // DSP for the Phase 2 instruments: Razor (lead), Thump Lab (analog drums),
 // Wobbler (wobble bass), Haze (lo-fi pad). Runs in the AudioWorklet.
 
-import { ADSR, Ladder, OnePole, Osc, SVF, TAU, mtof, smooth, voiceMod } from "./units";
+import { ADSR, Ladder, OnePole, Osc, SVF, TAU, blep, mtof, smooth, voiceMod } from "./units";
 import { velGain, type Clock, type InstrumentDSP } from "./instruments-dsp";
 import { Reverb } from "./fx-dsp";
 import { DRUM_BASE_NOTE } from "../instruments";
@@ -83,12 +83,18 @@ export class LeadDSP implements InstrumentDSP {
       for (let v = 0; v < n; v++) {
         const off = n === 1 ? 0 : (v / (n - 1)) * 2 - 1; // -1..1 across the unison stack
         const fm = f0 * (1 + off * det);
-        this.master[v] += fm / sr;
-        this.slave[v] += (fm * ratio) / sr;
-        if (this.master[v] >= 1) { this.master[v] -= 1; this.slave[v] = this.master[v] * ratio; } // hard sync
-        this.slave[v] -= Math.floor(this.slave[v]);
-        const ph = this.slave[v];
-        const x = square ? (ph < voiceMod.pw ? 1 : -1) : 2 * ph - 1;
+        // Two half-steps per sample, averaged: the sync resets alias far less (the slave's own wraps are band-limited too).
+        const dm = fm / sr / 2, ds = (fm * ratio) / sr / 2;
+        let x = 0;
+        for (let h = 0; h < 2; h++) {
+          this.master[v] += dm;
+          this.slave[v] += ds;
+          if (this.master[v] >= 1) { this.master[v] -= 1; this.slave[v] = this.master[v] * ratio; } // hard sync
+          this.slave[v] -= Math.floor(this.slave[v]);
+          const ph = this.slave[v];
+          x += square ? (ph < voiceMod.pw ? 1 : -1) + blep(ph, ds) - blep((ph + 1 - voiceMod.pw) % 1, ds) : 2 * ph - 1 - blep(ph, ds);
+        }
+        x *= 0.5;
         const pan = off * spread;
         l += x * panL(pan); r += x * panR(pan);
       }
