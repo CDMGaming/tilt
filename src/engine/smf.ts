@@ -13,6 +13,7 @@ const GM_ANALOG = [36, 38, 39, 42, 46, 45, 50, 37]; // kick, snare, clap, hats, 
 function gmDrum(track: Track, pitch: number): number {
   const part = pitch - DRUM_BASE_NOTE;
   if (track.kind === "analog") return GM_ANALOG[part] ?? pitch;
+  if (track.kind === "chop") return 36 + part; // slices: no General MIDI meaning
   if (track.kind === "garage") return [36, 38, 37, 42, 46, 48, 45, 49][part] ?? pitch;
   if (track.kind === "boom") return [55, 57, 52, 49][part] ?? pitch; // splash, crash, chinese, crash: one-shot hits
   const smp = Math.round(track.params[`p${part}smp`] ?? part);

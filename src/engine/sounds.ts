@@ -13,12 +13,12 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 
 /** Instruments the dice may pick (the sampler is for sounds you bring). */
-export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "garage", "acid", "wobble", "patch", "poly", "piano", "epiano", "organ", "pluck", "pad", "vox", "fm", "wave", "lead", "anthem", "chip", "boom"];
+export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "garage", "chop", "acid", "wobble", "patch", "poly", "piano", "epiano", "organ", "pluck", "pad", "vox", "fm", "wave", "lead", "anthem", "chip", "boom"];
 
 // Role tags per preset, by name. A preset not listed gets its instrument's default.
 const DEFAULT_ROLE: Record<InstrumentKind, Role[]> = {
   drums: ["drums"], analog: ["drums"], acid: ["bass"], wobble: ["bass"], poly: ["keys"], pad: ["pad"],
-  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"], epiano: ["keys"], pluck: ["pluck"], organ: ["keys"], anthem: ["lead"], patch: ["bass"], vox: ["pad"], boom: ["fx"], piano: ["keys"], garage: ["drums"],
+  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"], epiano: ["keys"], pluck: ["pluck"], organ: ["keys"], anthem: ["lead"], patch: ["bass"], vox: ["pad"], boom: ["fx"], piano: ["keys"], garage: ["drums"], chop: ["drums"],
 };
 const TAGS: Partial<Record<InstrumentKind, Record<string, Role[]>>> = {
   piano: { "Short Keys": ["keys", "pluck"], "Lullaby": ["keys", "pad"], "Night Felt": ["keys", "pad"], "Echo Keys": ["keys", "arp"] },
@@ -164,7 +164,8 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
   wave: [
     pick("table", 0.4, range(0, 6)), knob("pos", 0.3), knob("warp", 0.25), knob("envAmt", 0.25), knob("envDecay", 0.22),
     knob("lfoAmt", 0.2, 0, 0.7), knob("lfoRate", 0.22), knob("detune", 0.2), knob("cutoff", 0.18, 0.3, 1), knob("reso", 0.15, 0, 0.6),
-  ],  garage: [pick("kit", 0.25, [0, 1, 2, 3]), knob("room", 0.22), knob("smash", 0.22), knob("tune", 0.1), knob("damp", 0.2), pick("cymbal", 0.2, [0, 1])],
+  ],  chop: [pick("loop", 0.3, Array.from({ length: 12 }, (_, i) => i)), knob("roll", 0.15, 0, 0.7), knob("warp", 0.2), knob("tune", 0.1), knob("decay", 0.15), knob("filter", 0.15, 0.4, 1)],
+  garage: [pick("kit", 0.25, [0, 1, 2, 3]), knob("room", 0.22), knob("smash", 0.22), knob("tune", 0.1), knob("damp", 0.2), pick("cymbal", 0.2, [0, 1])],
   piano: [knob("character", 0.2), knob("release", 0.15), knob("low", 0.1), knob("mid", 0.1), knob("high", 0.12), knob("room", 0.2, 0, 0.8), knob("width", 0.2)],
   boom: [knob("rise", 0.25), knob("impact", 0.25), knob("tune", 0.1), knob("length", 0.2)],
   vox: [

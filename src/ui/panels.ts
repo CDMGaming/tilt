@@ -8,7 +8,8 @@ import { chordName, noteName, scaleById, scaleDegree } from "../engine/music";
 import { decodeFile, listSamples, putSample, sampleLabel } from "./samples";
 import { CHIP_WAVES, SFX_GROUPS, WT_FRAMES, WT_SIZE } from "../engine/instruments3";
 import { WOB_RATES } from "../engine/instruments2";
-import { DRAWBAR_FEET, GARAGE_KITS, PIANO_CATS, PLUCK_BODIES, PW_JACKS, VIB_CHORUS } from "../engine/instruments4";
+import { CHOP_LOOPS, DRAWBAR_FEET, GARAGE_KITS, PIANO_CATS, PLUCK_BODIES, PW_JACKS, VIB_CHORUS, sampleSetRefs } from "../engine/instruments4";
+import { computeSlices } from "../engine/slices";
 import { allPresets, applyPreset, deleteUserPreset, presetPosition, saveUserPreset, userPresets, USER_MARK, type PresetEntry } from "./presets";
 import { getParam } from "../engine/params";
 import { RECIPES, genBase, mutateParams, pickSound, soundKey, soundRoles, type SoundRef } from "../engine/sounds";
@@ -339,6 +340,32 @@ export function buildPanel(app: App, track: Track): HTMLElement {
             h("div", { class: "gr-char" }, ctl("room", "★ Room", "l"), ctl("smash", "★ Smash", "l")),
             ctl("tune", "Tune"), ctl("damp", "Damp"), ctl("level", "Level")))),
     );
+  } else if (track.kind === "chop") {
+    // Chop: an orange panel, the loop's waveform with its slice lines, 16 pads under it.
+    const part = Math.min(app.ed.drumPart, 15), own = track.samples?.[0]?.startsWith("user:");
+    const loopName = own ? track.sampleNames?.[0] || "Your loop" : CHOP_LOOPS[Math.round(track.params.loop ?? 0)]?.name ?? "";
+    const wave = chopWaveView(app, track, part);
+    // Drop an audio file on the waveform: your own loop.
+    wave.addEventListener("dragover", (e) => { e.preventDefault(); wave.classList.add("drop-target"); });
+    wave.addEventListener("dragleave", () => wave.classList.remove("drop-target"));
+    wave.addEventListener("drop", (e) => {
+      e.preventDefault(); wave.classList.remove("drop-target");
+      const f = e.dataTransfer?.files?.[0];
+      if (f) void loadOwnLoop(app, track, f);
+    });
+    body = h("div", { class: "panel-body chop" },
+      h("div", { class: "ch-face" },
+        h("div", { class: "ch-top" },
+          h("button", { class: "ch-loop", "data-nav": "loop", title: "Choose a loop (or drop your own on the waveform)", onclick: (e: Event) => chopLoopMenu(app, track, e.currentTarget as HTMLElement) },
+            h("span", { class: "ch-loop-small" }, "LOOP"), h("span", { class: "ch-loop-big" }, loopName + " ▾")),
+          wave),
+        h("div", { class: "ch-row" },
+          h("div", { class: "pads ch-pads" }, Array.from({ length: 16 }, (_, i) => pad(app, track, i))),
+          h("div", { class: "ch-knobs" },
+            ctl(`m${part}`, `Marker ${part + 1}`),
+            h("div", { class: "ch-char" }, ctl("roll", "★ Repeat-roll", "l"), ctl("warp", "★ Warp", "l")),
+            ctl("tune", "Tune"), ctl("decay", "Decay"), ctl("level", "Level")))),
+    );
   } else if (track.kind === "acid") {
     // Squelch: one row of big knobs (Bite and Gnaw are the character controls), the arp under a lid.
     const arpOn = (track.params.arpOn ?? 0) >= 0.5;
@@ -473,6 +500,67 @@ function patchBay(app: App, track: Track, ctl: (id: string, label?: string, size
     }
   });
   return bay;
+}
+
+/** Chop: the loop's waveform, its slice lines (the selected slice lit). */
+function chopWaveView(app: App, track: Track, sel: number): HTMLElement {
+  const cv = h("canvas", { class: "ch-wave", width: 640, height: 90 });
+  const ref = sampleSetRefs(track)?.[0];
+  const draw = async () => {
+    const s = ref ? await app.engine.sample(ref) : null;
+    const g = cv.getContext("2d")!;
+    g.clearRect(0, 0, cv.width, cv.height);
+    if (!s?.data.length) return;
+    const d = s.data, mid = cv.height / 2, starts = computeSlices(d, s.rate, 16, Math.round(track.params.sliceMode ?? 0) === 1);
+    const pos = (i: number) => {
+      const seg = (starts[i + 1] ?? d.length) - starts[i];
+      return ((starts[i] + (track.params[`m${i}`] ?? 0) * seg) / d.length) * cv.width;
+    };
+    g.fillStyle = "#ff8a1f22";
+    g.fillRect(pos(sel), 0, (sel < 15 ? pos(sel + 1) : cv.width) - pos(sel), cv.height);
+    g.strokeStyle = "#ffd2a1";
+    g.beginPath();
+    for (let x = 0; x < cv.width; x++) {
+      let pk = 0;
+      for (let i = Math.floor((x / cv.width) * d.length); i < Math.floor(((x + 1) / cv.width) * d.length); i++) pk = Math.max(pk, Math.abs(d[i]));
+      g.moveTo(x + 0.5, mid - pk * mid * 0.95); g.lineTo(x + 0.5, mid + pk * mid * 0.95);
+    }
+    g.stroke();
+    for (let i = 0; i < 16; i++) {
+      g.fillStyle = i === sel ? "#ff8a1f" : "#ff8a1f88";
+      g.fillRect(pos(i), 0, 2, cv.height);
+      g.font = "10px monospace";
+      g.fillText(String(i + 1), pos(i) + 3, 11);
+    }
+  };
+  requestAnimationFrame(() => void draw());
+  return cv;
+}
+
+function chopLoopMenu(app: App, track: Track, el: HTMLElement) {
+  const r = el.getBoundingClientRect();
+  const pick = (i: number) => {
+    app.edit("Loop", () => { track.params.loop = i; track.params.loopBpm = CHOP_LOOPS[i].bpm; delete track.samples; delete track.sampleNames; });
+    setTimeout(() => app.engine.preview(track.id, 36, 110, 0.4), 300);
+    app.screens.edit.render();
+  };
+  app.overlays.menu("Loops", () => [
+    ...CHOP_LOOPS.map((l, i) => ({ label: l.name, hint: `${l.bpm} bpm`, checked: !track.samples?.[0] && Math.round(track.params.loop ?? 0) === i, keepOpen: true, run: () => pick(i) })),
+    { label: "Your own loop…", hint: "WAV, MP3…", run: async () => { const f = await pickFile(); if (f) await loadOwnLoop(app, track, f); } },
+  ], { x: r.left, y: r.bottom + 4 });
+}
+
+/** Your own loop: stored in the browser like a sampler sound; its tempo is guessed from its length. */
+async function loadOwnLoop(app: App, track: Track, file: File) {
+  try {
+    const s = await decodeFile(app.engine.ctx, file);
+    const id = await putSample(s.name, s.data, s.rate);
+    app.edit("Load loop", () => { track.samples = [`user:${id}`]; track.sampleNames = [s.name]; track.params.loopBpm = 0; });
+    app.overlays.toast(`Loaded "${s.name}" (${(s.data.length / s.rate).toFixed(1)} s): 16 slices`);
+    app.screens.edit.render();
+  } catch (e) {
+    app.overlays.toast(`Couldn't read that file: ${e}`, 4000, { error: true });
+  }
 }
 
 /** Pixel's screen: two cycles of the chosen wave, drawn in chunky pixels. */

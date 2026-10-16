@@ -6,7 +6,7 @@ import { makeFx, type Fx } from "./fx-dsp";
 import { FX_SLOTS, type InstrumentKind } from "../model";
 import { LeadDSP, PadDSP, WobbleDSP } from "./instruments2-dsp";
 import { ThumpLabDSP } from "./thumplab-dsp";
-import { AnthemDSP, BoomDSP, GarageDSP, OrganDSP, PatchworkDSP, PianoDSP, PluckDSP, TineDSP, VoxDSP } from "./instruments4-dsp";
+import { AnthemDSP, BoomDSP, ChopDSP, GarageDSP, OrganDSP, PatchworkDSP, PianoDSP, PluckDSP, TineDSP, VoxDSP } from "./instruments4-dsp";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "./instruments3-dsp";
 import { Toolkit } from "./toolkit-dsp";
 import { hasToolkit } from "../toolkit";
@@ -89,6 +89,7 @@ class RbInstrument extends AudioWorkletProcessor {
     else if (o.kind === "patch") this.dsp = new PatchworkDSP(o.params, sampleRate);
     else if (o.kind === "vox") this.dsp = new VoxDSP(o.params, sampleRate);
     else if (o.kind === "boom") this.dsp = new BoomDSP(o.params, sampleRate, this.clock);
+    else if (o.kind === "chop") { const d = new ChopDSP(o.params, sampleRate, this.clock); if (o.samples) d.setSamples(o.samples, o.rates ?? []); this.dsp = d; }
     else if (o.kind === "garage") { const d = new GarageDSP(o.params, sampleRate); if (o.samples) d.setSamples(o.samples, o.rates ?? []); this.dsp = d; }
     else if (o.kind === "piano") { const d = new PianoDSP(o.params, sampleRate); if (o.samples) d.setSamples(o.samples, o.rates ?? []); this.dsp = d; }
     else if (o.kind === "sampler") { const s = new SamplerDSP(o.params, sampleRate); if (o.samples) s.setSamples(o.samples, o.rates ?? []); this.dsp = s; }

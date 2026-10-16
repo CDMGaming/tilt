@@ -510,6 +510,12 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** L.
 - **Theme:** an orange MPC-ish panel with a dark waveform.
 - **Presets:** 24 loops / kits.
+- **Status: built** (kind `chop`, 16 pads). Twelve built-in loops are ours: original two-bar patterns rendered on
+  Garage's CC0 kit and Kitbox's synthesised kits by tools/make-loops.ts (3.3 MB, loaded on first use), no
+  downloaded breakbeats. Drop your own audio on the waveform (stored like Grab's sounds; its tempo is guessed
+  from its length). Slices from onsets (or even), each start nudged by its Marker. Warp: tape below halfway,
+  granular above (grain size grows). Repeat-roll: a held pad retriggers at 1/8, 1/16 or 1/32 with the pitch
+  climbing. 24 presets (two per loop), level-matched.
 
 ### Boom: one-shot FX and stabs
 - **Idea:** risers, impacts, sweeps and chord stabs that follow the song's key.

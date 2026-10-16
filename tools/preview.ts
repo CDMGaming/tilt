@@ -10,7 +10,7 @@ import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.t
 import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "../src/engine/dsp/instruments3-dsp.ts";
 import { buildMips, parseWav } from "../src/engine/wavetable.ts";
-import { AnthemDSP, BoomDSP, GarageDSP, OrganDSP, PatchworkDSP, PianoDSP, PluckDSP, TineDSP, VoxDSP } from "../src/engine/dsp/instruments4-dsp.ts";
+import { AnthemDSP, BoomDSP, ChopDSP, GarageDSP, OrganDSP, PatchworkDSP, PianoDSP, PluckDSP, TineDSP, VoxDSP } from "../src/engine/dsp/instruments4-dsp.ts";
 import { sampleSetRefs } from "../src/engine/instruments4.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
@@ -40,6 +40,11 @@ function phrase(params: Record<string, number>): Ev[] {
       [26, 39, 1, 0], [27, 41, 2.2, 1], [29, 43, 1, 0], [30, 46, 1, 0],
     ];
     return line.map(([s, pitch, l, acc]) => ({ t: s * step, len: l * step * 0.6, pitch, vel: acc ? 120 : 90 }));
+  }
+  if (kind === "chop") {
+    // The slices in order on 16ths (the break, re-played), then a shuffled bar.
+    return [...Array.from({ length: 16 }, (_, i) => ({ t: i * step, len: step * 0.9, pitch: 36 + i, vel: 100 })),
+      ...[0, 0, 4, 2, 8, 0, 12, 6, 0, 3, 4, 2, 10, 0, 12, 14].map((sl, i) => ({ t: (16 + i) * step, len: step * 0.9, pitch: 36 + sl, vel: 100 }))];
   }
   if (kind === "sampler") {
     // Each pad once, then a little pattern on the first four.
@@ -146,6 +151,11 @@ function dspFor(params: Record<string, number>, clock: { bpm: number; zero: numb
     case "anthem": return new AnthemDSP(params, SR);
     case "patch": return new PatchworkDSP(params, SR);
     case "vox": return new VoxDSP(params, SR);
+    case "chop": {
+      const d = new ChopDSP(params, SR, { bpm: 120, zero: 0 }), refs = sampleSetRefs({ kind: "chop", params } as never) ?? [];
+      d.setSamples(refs.map((r) => readWav16(new URL(`../public/${r.slice(6)}.wav`, import.meta.url))), refs.map(() => 32000));
+      return d;
+    }
     case "garage": {
       const d = new GarageDSP(params, SR), refs = sampleSetRefs({ kind: "garage", params } as never) ?? [];
       d.setSamples(refs.map((r) => readWav16(new URL(`../public/${r.slice(6)}.wav`, import.meta.url))), refs.map(() => 32000));

@@ -422,6 +422,10 @@ const pn = (name: string, cat: string, params: Record<string, number>) => ({ nam
 /** The sample files an instrument plays from (loaded on first use), or null if it has none. */
 export function sampleSetRefs(t: Track): string[] | null {
   if (t.kind === "piano") return PIANO_NOTES.flatMap((n) => [`asset:piano/${n}-soft`, `asset:piano/${n}-hard`]);
+  if (t.kind === "chop") {
+    const own = t.samples?.[0];
+    return [own?.startsWith("user:") ? own : `asset:loops/${CHOP_LOOPS[Math.round(t.params.loop ?? 0)]?.file ?? "funk-break"}`];
+  }
   if (t.kind === "garage") {
     // Each part's soft and hard sound; the Kit picks the snare (and its rim).
     const kit = Math.round(t.params.kit ?? 0);
@@ -539,5 +543,57 @@ export const GARAGE: InstrumentDef = {
     gk("Soft Brushes-ish", { level: 0.69, kit: 3, room: 0.4, damp: 0.5, smash: 0, p3level: 0.35 }),
     gk("Hip Hop Kit", { level: 0.46, kit: 2, room: 0.2, smash: 0.7, damp: 0.5, tune: -2 }),
     gk("Punk", { level: 0.34, kit: 1, room: 0.35, smash: 0.9, tune: 1, damp: 0.15 }),
+  ],
+};
+
+// ---------- loop slicer: "Chop" (built-in loops in public/loops, or your own) ----------
+
+/** The built-in loops: original patterns rendered on Garage / Kitbox kits by tools/make-loops.ts (CC0). */
+export const CHOP_LOOPS = [
+  { name: "Funk Break", file: "funk-break", bpm: 96 }, { name: "Boom Bap", file: "boom-bap", bpm: 90 },
+  { name: "Jungle", file: "jungle", bpm: 170 }, { name: "Shuffle", file: "shuffle", bpm: 110 },
+  { name: "Rock", file: "rock", bpm: 120 }, { name: "Half-time", file: "half-time", bpm: 140 },
+  { name: "Brushy", file: "brushy", bpm: 85 }, { name: "Disco", file: "disco", bpm: 118 },
+  { name: "Breakbeat", file: "breakbeat", bpm: 130 }, { name: "Latin", file: "latin", bpm: 105 },
+  { name: "Electro Break", file: "electro-break", bpm: 125 }, { name: "Lo-fi Break", file: "lofi-break", bpm: 80 },
+];
+/** A preset on a loop: its tempo goes with it (Warp follows the song's tempo from there). */
+const ck = (name: string, loop: number, params: Record<string, number> = {}) => ({ name, params: { loop, loopBpm: CHOP_LOOPS[loop].bpm, ...params } });
+
+export const CHOP: InstrumentDef = {
+  kind: "chop",
+  name: "Chop",
+  role: "Cut a breakbeat into 16 slices on pads",
+  group: "drums",
+  drumParts: 16,
+  partNames: Array.from({ length: 16 }, (_, i) => `Slice ${i + 1}`),
+  params: [
+    { id: "loop", label: "Loop", min: 0, max: CHOP_LOOPS.length - 1, def: 0, options: CHOP_LOOPS.map((l) => l.name) },
+    { id: "roll", label: "Repeat-roll", min: 0, max: 1, def: 0 },
+    { id: "warp", label: "Warp", min: 0, max: 1, def: 0.2 },
+    { id: "tune", label: "Slice tune", min: -12, max: 12, def: 0, unit: "st" },
+    { id: "decay", label: "Slice decay", min: 0.03, max: 4, def: 1.5, curve: "exp", unit: "s" },
+    { id: "level", label: "Level", min: 0, max: 1, def: 0.75 },
+    // Hidden voicing:
+    { id: "sliceMode", label: "Slices", min: 0, max: 1, def: 0, options: ["Onsets", "Even"] },
+    { id: "filter", label: "Filter", min: 300, max: 18000, def: 18000, curve: "exp", unit: "Hz" },
+    { id: "loopBpm", label: "Loop tempo", min: 0, max: 240, def: 96 },
+    // Markers: each slice start nudged by up to half its length.
+    ...Array.from({ length: 16 }, (_, i) => ({ id: `m${i}`, label: `Marker ${i + 1}`, min: -0.5, max: 0.5, def: 0 })),
+  ],
+  macros: ["warp", "roll", "loop", "tune", "decay", "filter", "sliceMode", "level"],
+  presets: [
+    ck("Funk Break", 0, { level: 0.50 }), ck("Funk Rolls", 0, { level: 0.50, roll: 0.6 }),
+    ck("Boom Bap", 1, { level: 0.45 }), ck("Dusty Bap", 1, { level: 0.42, filter: 3500, tune: -2 }),
+    ck("Jungle", 2, { level: 0.40 }), ck("Jungle Granular", 2, { level: 0.46, warp: 0.75 }),
+    ck("Shuffle", 3, { level: 0.43 }), ck("Short Shuffle", 3, { level: 0.68, decay: 0.15 }),
+    ck("Rock", 4, { level: 0.38 }), ck("Rock Even", 4, { level: 0.34, sliceMode: 1 }),
+    ck("Half-time", 5, { level: 0.38 }), ck("Half-time Pitched", 5, { level: 0.45, tune: -5, warp: 0.7 }),
+    ck("Brushy", 6, { level: 0.61 }), ck("Brushy Soft", 6, { level: 0.66, filter: 5000, decay: 0.6 }),
+    ck("Disco", 7, { level: 0.58 }), ck("Disco Even", 7, { level: 0.51, sliceMode: 1, roll: 0.3 }),
+    ck("Breakbeat", 8, { level: 0.40 }), ck("Break Stutter", 8, { level: 0.27, roll: 0.95 }),
+    ck("Latin", 9, { level: 0.62 }), ck("Latin High", 9, { level: 0.67, tune: 3 }),
+    ck("Electro Break", 10, { level: 0.38 }), ck("Electro Grains", 10, { level: 0.44, warp: 0.95 }),
+    ck("Lo-fi Break", 11, { level: 0.57 }), ck("Lo-fi Muffled", 11, { level: 0.56, filter: 2000, tune: -1 }),
   ],
 };

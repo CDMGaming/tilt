@@ -9,7 +9,7 @@ import { AcidDSP, DrumsDSP, PolyDSP, type InstrumentDSP } from "../src/engine/ds
 import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.ts";
 import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "../src/engine/dsp/instruments3-dsp.ts";
-import { AnthemDSP, BoomDSP, GarageDSP, OrganDSP, PatchworkDSP, PianoDSP, PluckDSP, TineDSP, VoxDSP } from "../src/engine/dsp/instruments4-dsp.ts";
+import { AnthemDSP, BoomDSP, ChopDSP, GarageDSP, OrganDSP, PatchworkDSP, PianoDSP, PluckDSP, TineDSP, VoxDSP } from "../src/engine/dsp/instruments4-dsp.ts";
 import { sampleSetRefs } from "../src/engine/instruments4.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
@@ -49,6 +49,11 @@ function dsp(kind: InstrumentKind, params: Record<string, number>, preset: numbe
     case "anthem": return new AnthemDSP(params, SR);
     case "patch": return new PatchworkDSP(params, SR);
     case "vox": return new VoxDSP(params, SR);
+    case "chop": {
+      const d = new ChopDSP(params, SR, { bpm: 120, zero: 0 }), refs = sampleSetRefs({ kind: "chop", params } as never) ?? [];
+      d.setSamples(refs.map((r) => wav16(new URL(`../public/${r.slice(6)}.wav`, import.meta.url))), refs.map(() => 32000));
+      return d;
+    }
     case "garage": {
       const d = new GarageDSP(params, SR), refs = sampleSetRefs({ kind: "garage", params } as never) ?? [];
       d.setSamples(refs.map((r) => wav16(new URL(`../public/${r.slice(6)}.wav`, import.meta.url))), refs.map(() => 32000));

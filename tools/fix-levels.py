@@ -3,13 +3,13 @@
 import json, re, sys
 
 peaks = json.load(open(sys.argv[1], encoding="utf-8-sig"))
-CAP = {"drums": 0.9, "analog": 0.9, "boom": 0.9, "garage": 0.9}  # every drum part at once is extreme; synths: 0.7 on a 4-note chord
+CAP = {"drums": 0.9, "analog": 0.9, "boom": 0.9, "garage": 0.9, "chop": 0.9}  # every drum part at once is extreme; synths: 0.7 on a 4-note chord
 DEFS = {
     "drums": ("src/engine/instruments.ts", "DRUMS"), "acid": ("src/engine/instruments.ts", "ACID"), "poly": ("src/engine/instruments.ts", "POLY"),
     "lead": ("src/engine/instruments2.ts", "LEAD"), "analog": ("src/engine/instruments2.ts", "ANALOG"), "wobble": ("src/engine/instruments2.ts", "WOBBLE"),
     "pad": ("src/engine/instruments2.ts", "PAD"), "chip": ("src/engine/instruments3.ts", "CHIP"), "fm": ("src/engine/instruments3.ts", "FM"),
     "wave": ("src/engine/instruments3.ts", "WAVE"), "sampler": ("src/engine/instruments3.ts", "SAMPLER"), "epiano": ("src/engine/instruments4.ts", "TINE"),
-    "pluck": ("src/engine/instruments4.ts", "PLUCK"), "organ": ("src/engine/instruments4.ts", "ORGAN"), "anthem": ("src/engine/instruments4.ts", "ANTHEM"), "patch": ("src/engine/instruments4.ts", "PATCHWORK"), "vox": ("src/engine/instruments4.ts", "VOX"), "boom": ("src/engine/instruments4.ts", "BOOM"), "piano": ("src/engine/instruments4.ts", "PARLOR"), "garage": ("src/engine/instruments4.ts", "GARAGE"),
+    "pluck": ("src/engine/instruments4.ts", "PLUCK"), "organ": ("src/engine/instruments4.ts", "ORGAN"), "anthem": ("src/engine/instruments4.ts", "ANTHEM"), "patch": ("src/engine/instruments4.ts", "PATCHWORK"), "vox": ("src/engine/instruments4.ts", "VOX"), "boom": ("src/engine/instruments4.ts", "BOOM"), "piano": ("src/engine/instruments4.ts", "PARLOR"), "garage": ("src/engine/instruments4.ts", "GARAGE"), "chop": ("src/engine/instruments4.ts", "CHOP"),
 }
 files = {}
 changed = 0

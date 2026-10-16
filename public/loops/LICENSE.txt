@@ -1,0 +1,3 @@
+Breakbeat loops for Chop: original patterns rendered by tools/make-loops.ts for TILT,
+played on Garage's kit (CC0 samples from VCSL and VSCO 2 CE, see public/garage/LICENSE.txt)
+and Kitbox's synthesised kits (CC0). Released under CC0 1.0 (public domain dedication).

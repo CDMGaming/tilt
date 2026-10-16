@@ -4,6 +4,7 @@ import { ADSR, Ladder, OnePole, SVF, TAU, blep, mtof, smooth, voiceMod } from ".
 import { velGain, type InstrumentDSP } from "./instruments-dsp";
 import { claim } from "./instruments3-dsp";
 import { Reverb } from "./fx-dsp";
+import { computeSlices } from "../slices";
 
 const panL = (p: number) => Math.cos(((p + 1) * Math.PI) / 4);
 const panR = (p: number) => Math.sin(((p + 1) * Math.PI) / 4);
@@ -946,5 +947,118 @@ export class GarageDSP implements InstrumentDSP {
       L[i0 + i] += l * level;
       R[i0 + i] += r * level;
     }
+  }
+}
+
+// ---------------------------------------------------------------- Chop: loop slicer
+
+interface SliceVoice { slice: number; pitch: number; held: boolean; src: number; end: number; amp: number; decK: number; g: number[]; gs: number; semis: number; nextRoll: number; rolls: number; vel: number; t: number; f: OnePole }
+
+/**
+ * Chop: a breakbeat cut into 16 slices on pads. Slices come from the loop's onsets (or even), each start
+ * nudgeable with its marker. Warp (character): below halfway the loop is played like tape (faster or slower
+ * with the song's tempo, so the pitch moves); above, it's granular (pitch kept, grains bigger as Warp rises).
+ * Repeat-roll (character): a held pad retriggers at 1/8 -> 1/32 with its pitch climbing.
+ */
+export class ChopDSP implements InstrumentDSP {
+  private voices: SliceVoice[] = [];
+  private loop: Float32Array = new Float32Array(0);
+  private rate = 32000;
+  private starts: number[] = Array(16).fill(0);
+  private lastEven = -1;
+  constructor(public params: Record<string, number>, private sr: number, private clock: { bpm: number; zero: number }) {}
+
+  setSamples(s: Float32Array[], rates: number[]) {
+    this.loop = s[0] ?? new Float32Array(0);
+    this.rate = rates[0] ?? 32000;
+    this.lastEven = -1;
+  }
+
+  /** The loop's own tempo: a built-in loop's, else a guess (2 bars, or 1 or 4 if that lands nearer 70-180). */
+  private loopBpm(): number {
+    const b = this.params.loopBpm ?? 0;
+    if (b > 0) return b;
+    const secs = this.loop.length / this.rate;
+    for (const beats of [8, 4, 16]) { const bpm = (beats * 60) / secs; if (bpm >= 70 && bpm <= 180) return bpm; }
+    return this.clock.bpm;
+  }
+
+  private slicesNow() {
+    const even = Math.round(this.params.sliceMode ?? 0) === 1 ? 1 : 0;
+    if (even !== this.lastEven) { this.starts = computeSlices(this.loop, this.rate, 16, !!even); this.lastEven = even; }
+    return this.starts;
+  }
+
+  noteOn(pitch: number, vel: number, t = 0) {
+    const slice = pitch - 36;
+    if (slice < 0 || slice > 15 || !this.loop.length) return;
+    this.trigger(slice, pitch, vel / 127, 0, t);
+  }
+
+  private trigger(slice: number, pitch: number, v01: number, rolls: number, t: number) {
+    const p = this.params, starts = this.slicesNow(), len = this.loop.length;
+    const segLen = (starts[slice + 1] ?? len) - starts[slice];
+    const start = Math.max(0, Math.min(len - 1, starts[slice] + (p[`m${slice}`] ?? 0) * segLen));
+    const end = slice < 15 ? Math.max(start + 1, starts[slice + 1] + (p[`m${slice + 1}`] ?? 0) * ((starts[slice + 2] ?? len) - starts[slice + 1])) : len;
+    for (const v of this.voices) if (v.slice === slice) v.amp = Math.min(v.amp, 0.999); // fade the old one
+    const roll = p.roll ?? 0;
+    this.voices.push({
+      slice, pitch, held: true, src: start, end, amp: 1, decK: Math.exp(-4.6 / ((p.decay ?? 1) * this.sr)), g: [0, 0.5], gs: 0,
+      semis: (p.tune ?? 0) + rolls * roll * 1.5, nextRoll: t + this.rollStep(), rolls, vel: velGain(v01), t: 0, f: new OnePole(),
+    });
+    if (this.voices.length > 12) this.voices.shift();
+  }
+
+  private rollStep() { return (60 / this.clock.bpm) * [0.5, 0.25, 0.125][Math.min(2, Math.floor((this.params.roll ?? 0) * 3))]; }
+
+  noteOff(pitch: number) { for (const v of this.voices) if (v.pitch === pitch) v.held = false; }
+  allOff() { for (const v of this.voices) { v.held = false; v.amp = 0; } }
+
+  render(L: Float32Array, R: Float32Array, i0: number, i1: number, t0 = 0) {
+    const p = this.params, sr = this.sr, data = this.loop;
+    if (!data.length) return;
+    const warp = p.warp ?? 0.2, roll = p.roll ?? 0, level = (p.level ?? 0.75) * 2;
+    const ratio = this.clock.bpm / this.loopBpm(), srcRate = this.rate / sr;
+    const granular = warp >= 0.5, gsize = Math.round((0.02 + (warp - 0.5) * 2 * 0.08) * this.rate);
+    const cut = p.filter ?? 18000;
+    // Repeat-roll: a held pad fires again on the roll clock.
+    if (roll > 0.01) {
+      const now = t0 + (i1 - i0) / sr;
+      for (const v of [...this.voices]) {
+        if (v.held && now >= v.nextRoll) {
+          v.held = false; // this one stops rolling; the new hit (still held) carries on
+          this.trigger(v.slice, v.pitch, 0.8, v.rolls + 1, now);
+        }
+      }
+    }
+    const read = (x: number) => { const k = x | 0; if (k < 0 || k + 1 >= data.length) return 0; return data[k] + (data[k + 1] - data[k]) * (x - k); };
+    for (const v of this.voices) {
+      if (v.amp < 1e-4) continue;
+      const pitchRate = Math.pow(2, v.semis / 12);
+      for (let i = i0; i < i1; i++) {
+        if (v.src >= v.end) { v.amp *= 0.995; if (v.amp < 1e-4) break; }
+        let x: number;
+        if (!granular) {
+          x = read(v.src);
+          v.src += srcRate * ratio * pitchRate;
+        } else {
+          // Two overlapping Hann-windowed grains at the original pitch; the source moves at the tempo ratio.
+          x = 0;
+          for (let gI = 0; gI < 2; gI++) {
+            const ph = v.g[gI];
+            const w = 0.5 - 0.5 * Math.cos(2 * Math.PI * ph);
+            x += read(v.src - gsize * 0.5 + ph * gsize * pitchRate) * w;
+            v.g[gI] = ph + 1 / Math.max(1, gsize / srcRate);
+            if (v.g[gI] >= 1) v.g[gI] -= 1;
+          }
+          v.src += srcRate * ratio;
+        }
+        x = v.f.lp(x, cut, sr) * v.amp * v.vel;
+        L[i] += x * level; R[i] += x * level;
+        v.amp *= v.decK;
+        v.t += 1 / sr;
+      }
+    }
+    this.voices = this.voices.filter((v) => v.amp >= 1e-4);
   }
 }

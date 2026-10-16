@@ -57,6 +57,7 @@
   --inst-boom: #ff6a3d;    /* Boom: hot orange */
   --inst-piano: #e8dcc2;   /* Parlor: ivory */
   --inst-garage: #b08850;  /* Garage: oiled oak */
+  --inst-chop: #ff8a1f;    /* Chop: MPC orange */
   --inst-patch: #f2b134;   /* Patchwork: amber (an orange-gold, not the DMD yellow) */
 
   /* ---- shape ---- */
@@ -210,7 +211,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .chip[class*="kind-"] { color: var(--kc); box-shadow: inset 2px 0 0 var(--kc); }
 .kind-drums { --kc: var(--inst-drums); } .kind-analog { --kc: var(--inst-analog); } .kind-acid { --kc: var(--inst-acid); }
 .kind-wobble { --kc: var(--inst-wobble); } .kind-poly { --kc: var(--inst-poly); } .kind-pad { --kc: var(--inst-pad); } .kind-lead { --kc: var(--inst-lead); }
-.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); } .kind-epiano { --kc: var(--inst-epiano); } .kind-pluck { --kc: var(--inst-pluck); } .kind-organ { --kc: var(--inst-organ); } .kind-anthem { --kc: var(--inst-anthem); } .kind-patch { --kc: var(--inst-patch); } .kind-vox { --kc: var(--inst-vox); } .kind-boom { --kc: var(--inst-boom); } .kind-piano { --kc: var(--inst-piano); } .kind-garage { --kc: var(--inst-garage); }
+.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); } .kind-epiano { --kc: var(--inst-epiano); } .kind-pluck { --kc: var(--inst-pluck); } .kind-organ { --kc: var(--inst-organ); } .kind-anthem { --kc: var(--inst-anthem); } .kind-patch { --kc: var(--inst-patch); } .kind-vox { --kc: var(--inst-vox); } .kind-boom { --kc: var(--inst-boom); } .kind-piano { --kc: var(--inst-piano); } .kind-garage { --kc: var(--inst-garage); } .kind-chop { --kc: var(--inst-chop); }
 .dice-actions { display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap; justify-content: center; }
 .roll-btn { font-size: 28px; font-weight: 900; padding: 16px 36px; border-radius: 16px; background: var(--raise); border: 2px solid var(--accent); display: flex; flex-direction: column; align-items: center; }
 .roll-btn small, .go-btn small { font-size: 11px; color: var(--dim); font-weight: 400; }
@@ -1574,3 +1575,26 @@ body.phone .gb-master { flex-direction: row; border-left: none; }
 .panel.kind-garage .panel-body.garage { --cap-fill: #c9a24a; --cap-edge: #6b5222; --knob-dot: #2a1a0a; }
 .panel-body.garage .knob-val { stroke: #3a2510; }
 .panel-body.garage .knob-track { stroke: #0000002a; }
+
+/* Chop: an orange sampler panel with a dark waveform. */
+.panel-body.chop { padding: 10px; border-top-color: #ff8a1f; background: #161310; }
+.ch-face { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 8px;
+  background: linear-gradient(180deg, #ff9a3a, #e8761a); box-shadow: inset 0 2px 0 #ffffff55, 0 3px 6px #000a; color: #1b0f05; }
+.ch-top { display: flex; gap: 10px; align-items: stretch; }
+.ch-loop { display: flex; flex-direction: column; justify-content: center; min-width: 120px; padding: 6px 10px; border-radius: 6px; background: #1b1714; border: 1px solid #000; color: #ffd2a1; text-align: left; }
+.ch-loop-small { font: 700 9px var(--font-mono); letter-spacing: .2em; opacity: .7; }
+.ch-loop-big { font: 700 14px var(--font-mono); }
+.ch-wave { flex: 1; min-width: 0; width: 100%; height: 90px; border-radius: 6px; background: #1b1714; box-shadow: inset 0 2px 6px #000; }
+.ch-wave.drop-target { outline: 2px dashed #fff; }
+.ch-row { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.ch-pads { grid-template-columns: repeat(4, 52px); grid-template-rows: repeat(4, 40px); gap: 5px; }
+.ch-pads .pad { background: linear-gradient(180deg, #e9e3da, #c9c1b5); color: #2a2018; border: 1px solid #8a7d6b; box-shadow: inset 0 -2px 0 #0002; padding: 2px 4px; }
+.ch-pads .pad.selected { background: linear-gradient(180deg, #fff, #ffd2a1); box-shadow: 0 0 0 2px #1b0f05; }
+.ch-pads .pad-label { display: none; }
+.ch-knobs { display: flex; gap: 6px 12px; align-items: flex-end; flex-wrap: wrap; }
+.ch-char { display: flex; gap: 8px; padding: 4px 8px 2px; border-radius: 8px; background: #0000001f; box-shadow: inset 0 1px 3px #0004; }
+.panel-body.chop .knob-label { color: #1b0f05; opacity: 1; font-weight: 800; }
+.panel-body.chop .knob-value { color: #3a2410; }
+.panel.kind-chop .panel-body.chop { --cap-fill: #1b1714; --cap-edge: #000; --knob-dot: #ff8a1f; }
+.panel-body.chop .knob-val { stroke: #1b0f05; }
+.panel-body.chop .knob-track { stroke: #0000002a; }
