@@ -282,6 +282,10 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** H, a handheld console with a pixel screen showing the wave and buttons.
 - **Theme:** off-white plastic, a green-grey pixel screen, purple and pink buttons.
 - **Presets:** 28 (leads, arps, bass, jingles, coin / jump / laser FX).
+- **Status: built.** Jump! sets how many notes of the (hidden) jump pattern the arpeggio uses (octave,
+  fifth, major, minor, sus, power); Run! is a pitch run into each note (direction hidden), longer and with
+  vibrato as it grows; Glitch is bit crush plus random pitch steps and duty flips on the jump clock. The
+  pixel screen draws the chosen wave; wave buttons pick it. 28 presets, level-matched.
 
 ### Glint: FM bells
 - **Idea:** glassy, metallic FM tones (bells, mallets, tines).

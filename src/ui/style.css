@@ -1302,3 +1302,28 @@ body.phone .panel-body.razor .knob.fader { width: 38px; }
 .panel-body.haze .hz-group.char { --fader-fill: #ffd9ec; }
 .panel-body.haze .knob-label { color: #fff; opacity: .95; font-weight: 600; text-shadow: 0 1px 4px #0005; }
 .panel-body.haze .knob-value { color: #ffffffcc; }
+
+/* Pixel: a handheld console in off-white plastic, a green-grey pixel screen, purple and pink buttons. */
+.panel-body.pixel { padding: 0; overflow: hidden; border-top-color: #c8c3b8; }
+.px-console { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; padding: 12px 16px;
+  background: linear-gradient(180deg, #e9e5dc, #d6d1c5); color: #3b3550; box-shadow: inset 0 1px 0 #fff, inset 0 -3px 0 #0001; }
+.px-screen-wrap { padding: 10px 12px 6px; border-radius: 10px 10px 26px 10px; background: #6f6a7e; box-shadow: inset 0 2px 4px #0006; }
+.px-screen { width: 180px; padding: 6px; background: #9bbc0f; background: linear-gradient(#a5c21a, #8bac0f); border-radius: 3px; box-shadow: inset 0 0 0 2px #306230; }
+.px-wave { width: 100%; height: 48px; image-rendering: pixelated; shape-rendering: crispEdges; }
+.px-wave rect { fill: #0f380f; }
+.px-name { font: 700 11px var(--font-mono); color: #0f380f; letter-spacing: .08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.px-brand { margin-top: 4px; font: italic 900 13px var(--font-display); color: #d9d3ff; letter-spacing: .12em; }
+.px-brand span { font-size: 9px; margin-left: 6px; opacity: .8; }
+.px-controls { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 260px; }
+.px-waves { display: flex; gap: 8px; flex-wrap: wrap; }
+.px-btn { min-width: 46px; padding: 6px 8px; border-radius: 999px; border: none; font: 800 11px var(--font-display); color: #fff;
+  background: radial-gradient(circle at 35% 30%, #b58cff, #7a4fd6); box-shadow: 0 3px 0 #4b2f8a, inset 0 1px 0 #fff6; }
+.px-btn.on { background: radial-gradient(circle at 35% 30%, #ff9cd0, #e04a9b); box-shadow: 0 1px 0 #8a2a5d, inset 0 1px 0 #fff6; transform: translateY(2px); }
+.px-knobs { display: flex; gap: 6px 10px; flex-wrap: wrap; align-items: flex-end; }
+.px-char { display: flex; gap: 6px; padding: 4px 8px 2px; border-radius: 10px; background: #0000000f; box-shadow: inset 0 1px 2px #0002; }
+.panel-body.pixel .knob-label { color: #3b3550; opacity: 1; font-weight: 800; }
+.panel-body.pixel .px-char .knob-label { color: #c2337f; }
+.panel-body.pixel .knob-value { color: #5c5670; }
+.panel.kind-chip .panel-body.pixel { --cap-fill: #7a4fd6; --cap-edge: #4b2f8a; --knob-dot: #fff; }
+.panel-body.pixel .knob-val { stroke: #e04a9b; }
+.panel-body.pixel .knob-track { stroke: #0000001f; }

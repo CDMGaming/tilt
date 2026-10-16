@@ -7,7 +7,7 @@ import { FX_TYPES } from "../engine/params";
 import type { Track } from "../engine/model";
 import { chordName, noteName, scaleById, scaleDegree } from "../engine/music";
 import { decodeFile, listSamples, putSample, sampleLabel } from "./samples";
-import { SFX, WT_FRAMES, WT_SIZE } from "../engine/instruments3";
+import { CHIP_WAVES, SFX, WT_FRAMES, WT_SIZE } from "../engine/instruments3";
 import { WOB_RATES } from "../engine/instruments2";
 import { allPresets, applyPreset, deleteUserPreset, presetPosition, saveUserPreset, userPresets, USER_MARK, type PresetEntry } from "./presets";
 import { getParam } from "../engine/params";
@@ -21,7 +21,7 @@ import { trackColor } from "./theme";
 import { control, type ControlHost } from "./knob";
 
 /** Instruments rebuilt in the overhaul (docs/instruments.md): their own panel only, no MORE page. */
-const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums", "poly", "lead", "wobble", "pad"]);
+const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums", "poly", "lead", "wobble", "pad", "chip"]);
 /** Chordette: the category its sound list shows (null: the current sound's). */
 let chordetteCat: string | null = null;
 /** Kitbox: the channel whose More drawer is open (per session). */
@@ -146,14 +146,21 @@ export function buildPanel(app: App, track: Track): HTMLElement {
       keyboard(app, track),
     );
   } else if (track.kind === "chip") {
+    // Pixel: a handheld console. A pixel screen shows the wave, wave buttons under it, then the knobs.
+    const wave = Math.round(track.params.wave ?? 0);
     body = h("div", { class: "panel-body pixel" },
-      h("div", { class: "knob-row" },
-        h("div", { class: "section-title small" }, "Osc"), ctl("wave", "Wave"),
-        h("div", { class: "section-title small" }, "Jump"), ctl("jump", "Jump"), ctl("jumpRate", "Rate", "l"),
-        h("div", { class: "section-title small" }, "Pitch"), ctl("sweep", "Sweep"), ctl("sweepTime", "Time"), ctl("vibDepth", "Vibrato"), ctl("vibRate", "Vib rate")),
-      h("div", { class: "knob-row" },
-        h("div", { class: "section-title small" }, "Env"), ctl("attack", "A", "s"), ctl("decay", "D", "s"), ctl("sustain", "S", "s"), ctl("release", "R", "s"),
-        h("div", { class: "section-title small" }, "Out"), ctl("crush", "CRUSH", "l"), ctl("level", "Level", "s")),
+      h("div", { class: "px-console" },
+        h("div", { class: "px-screen-wrap" },
+          h("div", { class: "px-screen" }, pixelWave(wave), h("div", { class: "px-name" }, track.preset.replace(/^[★✦]\s*/, "").toUpperCase())),
+          h("div", { class: "px-brand" }, "PIXEL", h("span", null, "8-BIT"))),
+        h("div", { class: "px-controls" },
+          h("div", { class: "px-waves" }, CHIP_WAVES.map((w, i) => h("button", {
+            class: "px-btn" + (i === wave ? " on" : ""), "data-nav": `wave-${i}`, "aria-pressed": String(i === wave), title: w,
+            onclick: () => { app.edit("Wave", () => (track.params.wave = i)); previewSound(app, track); app.screens.edit.render(); },
+          }, ["50%", "25%", "12%", "TRI", "NOISE"][i]))),
+          h("div", { class: "px-knobs" },
+            h("div", { class: "px-char" }, ctl("jump", "★ Jump!", "l"), ctl("run", "★ Run!", "l"), ctl("glitch", "★ Glitch", "l")),
+            ctl("jumpRate", "Jump speed"), ctl("attack", "Attack"), ctl("decay", "Decay"), ctl("level", "Level")))),
       keyboard(app, track),
     );
   } else if (track.kind === "fm") {
@@ -327,6 +334,32 @@ function xyPage(app: App, track: Track, host: ControlHost): HTMLElement {
   requestAnimationFrame(draw);
   return h("div", { class: "panel-body xy-page" }, pad, readout,
     h("p", { class: "note" }, "While recording, moves are written into the clip as automation for both parameters."));
+}
+
+/** Pixel's screen: two cycles of the chosen wave, drawn in chunky pixels. */
+function pixelWave(wave: number): SVGSVGElement {
+  const NS = "http://www.w3.org/2000/svg", W = 64, H = 20;
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("class", "px-wave");
+  const duty = [0.5, 0.25, 0.125][wave] ?? 0.5;
+  let seed = 7, prev = -1;
+  for (let x = 0; x < W; x++) {
+    const ph = (x / 32) % 1;
+    let y: number;
+    if (wave <= 2) y = ph < duty ? 1 : -1;
+    else if (wave === 3) y = Math.round((1 - 4 * Math.abs(ph - 0.5)) * 4) / 4;
+    else { seed = (seed * 1103515245 + 12345) & 0x7fffffff; y = (seed % 9) / 4 - 1; }
+    const py = Math.round((1 - y) * (H - 4) / 2) + 1;
+    // A vertical edge where the level jumps, so a pulse reads as a pulse.
+    const top = prev < 0 ? py : Math.min(py, prev), bottom = prev < 0 ? py : Math.max(py, prev);
+    const r = document.createElementNS(NS, "rect");
+    r.setAttribute("x", String(x)); r.setAttribute("y", String(top));
+    r.setAttribute("width", "1"); r.setAttribute("height", String(bottom - top + 2));
+    svg.append(r);
+    prev = py;
+  }
+  return svg;
 }
 
 /** Load a kit: its eight sounds go to the eight channels; the rest of the settings stay. */

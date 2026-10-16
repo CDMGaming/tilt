@@ -44,8 +44,11 @@ const TAGS: Partial<Record<InstrumentKind, Record<string, Role[]>>> = {
     "Music Box Dust": ["keys", "pluck"], "Bit Fog": ["pad", "fx"], "Wind": ["fx", "pad"], "Vinyl Room": ["fx", "pad"], "Rain Glass": ["fx", "pad"],
   },
   chip: {
-    "Major Jump": ["arp"], "Minor Jump": ["arp"], "Octave Bounce": ["arp"], "Power Up": ["fx"], "Laser Blip": ["fx"],
-    "Tri Bass": ["bass"], "Noise Snare": ["fx"],
+    "Major Jump": ["arp"], "Minor Jump": ["arp"], "Octave Bounce": ["arp"], "Big Run Up": ["arp"], "Sus Sparkle": ["arp", "pluck"],
+    "Power Chord": ["arp", "lead"], "Glitch Arp": ["arp", "fx"],
+    "Tri Bass": ["bass"], "Pulse Bass": ["bass"], "Octave Bass": ["bass", "arp"], "Drop Bass": ["bass"],
+    "Level Clear": ["fx", "arp"], "Game Over": ["fx"], "Fanfare Bit": ["fx", "arp"],
+    "Coin": ["fx"], "Jump": ["fx"], "Power Up": ["fx"], "Laser Blip": ["fx"], "Noise Snare": ["fx"], "Explosion": ["fx"], "Hit": ["fx"], "Teleport": ["fx"],
   },
   fm: { "Marimba": ["pluck", "keys"], "Metal Clang": ["fx"], "FM Bass": ["bass"], "Soft Pad": ["pad"], "Wind Chime": ["pluck", "fx"] },
   wave: {
@@ -122,8 +125,9 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
     knob("reso", 0.12, 0, 0.6), knob("attack", 0.06), knob("release", 0.06),
   ],
   chip: [
-    pick("wave", 0.2, [0, 1, 2, 3]), knob("jumpRate", 0.18), knob("vibDepth", 0.15, 0, 0.5), knob("vibRate", 0.18),
-    knob("decay", 0.18), knob("sustain", 0.18), knob("crush", 0.22, 0, 0.8), knob("sweepTime", 0.15),
+    pick("wave", 0.2, [0, 1, 2, 3]), knob("jump", 0.2), pick("jumpType", 0.3, [0, 1, 2, 3, 4, 5]), knob("jumpRate", 0.18),
+    knob("run", 0.18, 0, 0.8), knob("glitch", 0.2, 0, 0.8), knob("vibDepth", 0.15, 0, 0.5), knob("vibRate", 0.18),
+    knob("decay", 0.18), knob("sustain", 0.18), knob("sweepTime", 0.15),
   ],
   fm: [
     pick("ratioC", 0.15, [1, 2]), pick("ratioM", 0.35, range(0, 14)), knob("index", 0.18, 0.05, 0.8), knob("indexDecay", 0.22),

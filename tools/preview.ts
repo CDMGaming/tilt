@@ -54,6 +54,11 @@ function phrase(params: Record<string, number>): Ev[] {
     const track = { kind: "poly", params } as unknown as Track, song = { key: 0, scale: "minor" } as unknown as Song;
     return [[48, 0], [44, 16]].flatMap(([root, s]) => expandPitch(song, track, root).map((pitch) => ({ t: s * step, len: 14 * step, pitch, vel: 100 })));
   }
+  if (kind === "chip") {
+    // A short tune: separate notes, a held note (jumps and runs need time), a low note.
+    const line: [number, number, number][] = [[0, 72, 1.5], [2, 76, 1.5], [4, 79, 3.5], [8, 84, 1.5], [10, 79, 1.5], [12, 76, 3.5], [16, 72, 7.5], [24, 48, 6]];
+    return line.map(([st, pitch, l]) => ({ t: st * step, len: l * step, pitch, vel: 100 }));
+  }
   if (kind === "lead") {
     // A lead line: short notes, then a slide (overlapping notes) and a long held note.
     const line: [number, number, number][] = [[0, 72, 2], [2, 75, 2], [4, 79, 1], [5, 77, 1], [6, 75, 2.5], [8, 72, 2], [10, 70, 1], [11, 72, 5], [16, 79, 2.5], [18, 84, 6], [24, 82, 2], [26, 79, 6]];

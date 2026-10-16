@@ -5,41 +5,70 @@ import type { InstrumentDef, ParamDef } from "./instruments";
 // ---------- 8-bit chip synth: "Pixel" ----------
 
 export const CHIP_WAVES = ["Square", "Pulse 25", "Pulse 12", "Triangle", "Noise"];
-export const JUMPS = ["Off", "Octave", "Major", "Minor", "Power", "Sus4"];
-export const JUMP_STEPS: number[][] = [[0], [0, 12], [0, 4, 7], [0, 3, 7], [0, 7, 12], [0, 5, 7]];
+/** Jump! patterns (hidden voicing): Jump! itself sets how many of the notes are used. */
+export const JUMP_TYPES = ["Octave", "Fifth", "Major", "Minor", "Sus", "Power"];
+export const JUMP_STEPS: number[][] = [[0, 12, 24, 36], [0, 7, 12, 19, 24], [0, 4, 7, 12, 16, 19, 24], [0, 3, 7, 12, 15, 19, 24], [0, 5, 7, 12, 17, 19], [0, 7, 12, 19, 24]];
+
+const px = (name: string, params: Record<string, number>) => ({ name, params });
 
 export const CHIP: InstrumentDef = {
   kind: "chip",
   name: "Pixel",
-  role: "8-bit chip synth: pulse, triangle, noise, jump arps",
+  role: "8-bit game sounds: pulses, jumps, runs and glitches",
   group: "lead",
   params: [
     { id: "wave", label: "Wave", min: 0, max: 4, def: 0, options: CHIP_WAVES },
-    { id: "jump", label: "Jump", min: 0, max: 5, def: 0, options: JUMPS },
-    { id: "jumpRate", label: "Jump rate", min: 6, max: 60, def: 24, curve: "exp", unit: "Hz" },
-    { id: "sweep", label: "Sweep", min: -24, max: 24, def: 0, unit: "st" },
-    { id: "sweepTime", label: "Sweep time", min: 0.01, max: 1, def: 0.08, curve: "exp", unit: "s" },
+    { id: "jump", label: "Jump!", min: 0, max: 1, def: 0 },
+    { id: "jumpRate", label: "Jump speed", min: 6, max: 60, def: 24, curve: "exp", unit: "Hz" },
+    { id: "run", label: "Run!", min: 0, max: 1, def: 0 },
+    { id: "glitch", label: "Glitch", min: 0, max: 1, def: 0.15 },
+    { id: "attack", label: "Attack", min: 0.001, max: 1, def: 0.002, curve: "exp", unit: "s" },
+    { id: "decay", label: "Decay", min: 0.02, max: 2, def: 0.3, curve: "exp", unit: "s" },
+    { id: "level", label: "Level", min: 0, max: 1, def: 0.55 },
+    // Hidden voicing:
+    { id: "jumpType", label: "Jump type", min: 0, max: 5, def: 2, options: JUMP_TYPES },
+    { id: "runDir", label: "Run direction", min: 0, max: 1, def: 0, options: ["Down into", "Up into"] },
+    { id: "sweepTime", label: "Run time", min: 0.01, max: 1, def: 0.08, curve: "exp", unit: "s" },
     { id: "vibDepth", label: "Vibrato", min: 0, max: 1, def: 0 },
     { id: "vibRate", label: "Vib rate", min: 2, max: 12, def: 6, curve: "exp", unit: "Hz" },
-    { id: "attack", label: "A", min: 0.001, max: 1, def: 0.002, curve: "exp", unit: "s" },
-    { id: "decay", label: "D", min: 0.02, max: 2, def: 0.3, curve: "exp", unit: "s" },
-    { id: "sustain", label: "S", min: 0, max: 1, def: 0.6 },
-    { id: "release", label: "R", min: 0.01, max: 2, def: 0.12, curve: "exp", unit: "s" },
-    { id: "crush", label: "Crush", min: 0, max: 1, def: 0.3 },
-    { id: "level", label: "Level", min: 0, max: 1, def: 0.55 },
+    { id: "sustain", label: "Sustain", min: 0, max: 1, def: 0.6 },
+    { id: "release", label: "Release", min: 0.01, max: 2, def: 0.12, curve: "exp", unit: "s" },
   ],
-  macros: ["wave", "jump", "jumpRate", "sweep", "vibDepth", "decay", "crush", "level"],
+  macros: ["jump", "jumpRate", "run", "glitch", "wave", "decay", "attack", "level"],
   presets: [
-    { name: "Hero Square", params: {} },
-    { name: "Thin Pulse", params: { wave: 2, decay: 0.15, sustain: 0.3 } },
-    { name: "Major Jump", params: { jump: 2, jumpRate: 30 } },
-    { name: "Minor Jump", params: { jump: 3, jumpRate: 22, wave: 1 } },
-    { name: "Power Up", params: { sweep: -12, sweepTime: 0.15, wave: 1, decay: 0.4, sustain: 0 } },
-    { name: "Laser Blip", params: { sweep: 24, sweepTime: 0.05, decay: 0.08, sustain: 0, release: 0.05 } },
-    { name: "Tri Bass", params: { wave: 3, sustain: 1, decay: 0.5, crush: 0.5 } },
-    { name: "Noise Snare", params: { wave: 4, decay: 0.12, sustain: 0, release: 0.05 } },
-    { name: "Vibrato Lead", params: { wave: 1, vibDepth: 0.4, vibRate: 6.5, sustain: 0.8 } },
-    { name: "Octave Bounce", params: { jump: 1, jumpRate: 12, wave: 0 } },
+    // Leads
+    px("Hero Square", { level: 0.39,}),
+    px("Thin Pulse", { level: 0.59, wave: 2, decay: 0.15, sustain: 0.3 }),
+    px("Vibrato Lead", { level: 0.32, wave: 1, vibDepth: 0.4, vibRate: 6.5, sustain: 0.8 }),
+    px("Slide Lead", { level: 0.32, wave: 1, run: 0.3, runDir: 0, sweepTime: 0.06, sustain: 0.8, vibDepth: 0.2 }),
+    px("Hollow Hero", { level: 0.36, wave: 2, sustain: 0.7, vibDepth: 0.25, glitch: 0.05 }),
+    px("Final Boss", { level: 0.30, wave: 0, run: 0.2, glitch: 0.55, sustain: 0.9, vibDepth: 0.3 }),
+    // Arps
+    px("Major Jump", { level: 0.39, jump: 0.35, jumpType: 2, jumpRate: 30 }),
+    px("Minor Jump", { level: 0.38, jump: 0.35, jumpType: 3, jumpRate: 22, wave: 1 }),
+    px("Octave Bounce", { level: 0.39, jump: 0.4, jumpType: 0, jumpRate: 12 }),
+    px("Big Run Up", { level: 0.39, jump: 1, jumpType: 2, jumpRate: 40, wave: 1 }),
+    px("Sus Sparkle", { level: 0.40, jump: 0.7, jumpType: 4, jumpRate: 34, wave: 2, decay: 0.5, sustain: 0.4 }),
+    px("Power Chord", { level: 0.30, jump: 0.45, jumpType: 5, jumpRate: 50, wave: 0, sustain: 0.9 }),
+    px("Glitch Arp", { level: 0.39, jump: 0.6, jumpType: 3, jumpRate: 26, glitch: 0.6 }),
+    // Bass
+    px("Tri Bass", { level: 0.48, wave: 3, sustain: 1, decay: 0.5, glitch: 0.4 }),
+    px("Pulse Bass", { level: 0.32, wave: 1, sustain: 0.8, decay: 0.3, glitch: 0.1 }),
+    px("Octave Bass", { level: 0.48, wave: 3, jump: 0.35, jumpType: 0, jumpRate: 16, sustain: 1 }),
+    px("Drop Bass", { level: 0.32, wave: 0, run: 0.5, runDir: 1, sweepTime: 0.05, sustain: 0.8 }),
+    // Jingles
+    px("Level Clear", { level: 0.36, jump: 0.8, jumpType: 2, jumpRate: 18, wave: 1, decay: 0.8, sustain: 0.5 }),
+    px("Game Over", { level: 0.35, jump: 0.6, jumpType: 3, jumpRate: 9, wave: 2, run: 0.2, runDir: 1, decay: 1.2, sustain: 0.3 }),
+    px("Fanfare Bit", { level: 0.30, jump: 0.5, jumpType: 5, jumpRate: 14, wave: 0, sustain: 0.9 }),
+    // FX
+    px("Coin", { level: 0.61, jump: 0.35, jumpType: 1, jumpRate: 14, wave: 1, decay: 0.35, sustain: 0, release: 0.05 }),
+    px("Jump", { level: 0.71, run: 0.55, runDir: 0, sweepTime: 0.12, wave: 1, decay: 0.25, sustain: 0, release: 0.05 }),
+    px("Power Up", { level: 0.56, run: 0.5, runDir: 0, sweepTime: 0.15, wave: 1, decay: 0.4, sustain: 0, jump: 0.5, jumpType: 2, jumpRate: 40 }),
+    px("Laser Blip", { level: 1.00, run: 1, runDir: 1, sweepTime: 0.05, decay: 0.08, sustain: 0, release: 0.05 }),
+    px("Noise Snare", { level: 0.99, wave: 4, decay: 0.12, sustain: 0, release: 0.05 }),
+    px("Explosion", { level: 0.42, wave: 4, run: 0.6, runDir: 1, sweepTime: 0.4, decay: 0.9, sustain: 0, glitch: 0.5 }),
+    px("Hit", { level: 1.00, wave: 4, run: 0.4, runDir: 1, sweepTime: 0.05, decay: 0.06, sustain: 0, release: 0.03, glitch: 0.3 }),
+    px("Teleport", { level: 0.48, run: 0.8, runDir: 0, sweepTime: 0.3, jump: 0.8, jumpType: 0, jumpRate: 50, glitch: 0.3, decay: 0.6, sustain: 0 }),
   ],
 };
 

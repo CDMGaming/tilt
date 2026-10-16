@@ -29,7 +29,7 @@ function claim<V extends BaseVoice>(voices: V[], max: number, pitch: number, mak
 
 // ---------------------------------------------------------------- Pixel: 8-bit chip
 
-interface ChipVoice extends BaseVoice { vel: number; ph: number; t: number; lfsr: number; noiseOut: number; noiseAcc: number; pan: number }
+interface ChipVoice extends BaseVoice { vel: number; ph: number; t: number; lfsr: number; noiseOut: number; noiseAcc: number; pan: number; step: number; gPitch: number; gDuty: number }
 
 export class ChipDSP implements InstrumentDSP {
   private voices: ChipVoice[] = [];
@@ -37,35 +37,51 @@ export class ChipDSP implements InstrumentDSP {
   constructor(public params: Record<string, number>, private sr: number) {}
 
   noteOn(pitch: number, vel: number) {
-    const v = claim(this.voices, 6, pitch, () => ({ pitch, held: true, age: 0, amp: new ADSR(), vel: 1, ph: 0, t: 0, lfsr: 1, noiseOut: 1, noiseAcc: 0, pan: 0 }), ++this.counter);
-    v.vel = vel / 127; v.t = 0; v.ph = 0;
+    const v = claim(this.voices, 6, pitch, () => ({ pitch, held: true, age: 0, amp: new ADSR(), vel: 1, ph: 0, t: 0, lfsr: 1, noiseOut: 1, noiseAcc: 0, pan: 0, step: -1, gPitch: 0, gDuty: -1 }), ++this.counter);
+    v.vel = vel / 127; v.t = 0; v.ph = 0; v.step = -1;
     v.pan = ((this.counter % 3) - 1) * 0.25;
     v.amp.gate(true);
   }
   noteOff(pitch: number) { for (const v of this.voices) if (v.pitch === pitch && v.held) { v.held = false; v.amp.gate(false); } }
   allOff() { for (const v of this.voices) { v.held = false; v.amp.gate(false); } }
 
+  /**
+   * Pixel's character controls: Jump! (how many notes of the jump pattern the arpeggio uses),
+   * Run! (a pitch run into each note, longer and with vibrato as it grows) and Glitch (bit crush,
+   * random pitch steps and duty cycling on the jump clock).
+   */
   render(L: Float32Array, R: Float32Array, i0: number, i1: number) {
     const p = this.params, sr = this.sr;
     const wave = Math.round(p.wave ?? 0);
-    const steps = JUMP_STEPS[Math.round(p.jump ?? 0)] ?? [0];
-    const jumpRate = p.jumpRate ?? 24, sweep = p.sweep ?? 0, sweepT = p.sweepTime ?? 0.08;
-    const vibD = (p.vibDepth ?? 0) * 0.6, vibR = p.vibRate ?? 6;
+    const pattern = JUMP_STEPS[Math.round(p.jumpType ?? 2)] ?? [0, 12];
+    const jump = p.jump ?? 0, run = p.run ?? 0, glitch = p.glitch ?? 0.15;
+    const count = jump < 0.02 ? 1 : Math.min(pattern.length, 2 + Math.round(jump * (pattern.length - 2)));
+    const jumpRate = p.jumpRate ?? 24;
+    const sweep = run * 24 * (Math.round(p.runDir ?? 0) === 1 ? 1 : -1), sweepT = (p.sweepTime ?? 0.08) * (0.5 + run);
+    const vibD = ((p.vibDepth ?? 0) + run * 0.2) * 0.6, vibR = p.vibRate ?? 6;
     const a = p.attack ?? 0.002, d = p.decay ?? 0.3, s = p.sustain ?? 0.6, r = p.release ?? 0.12;
-    const crush = p.crush ?? 0.3, levels = Math.pow(2, 8 - crush * 5);
-    const level = (p.level ?? 0.55) * 0.3;
-    // Pulse width from the toolkit scales the chosen duty (0.5 = as chosen).
-    const duty = Math.max(0.03, Math.min(0.97, (wave === 1 ? 0.25 : wave === 2 ? 0.125 : 0.5) * (voiceMod.pw / 0.5)));
+    const levels = Math.pow(2, 8 - glitch * 5);
+    const level = (p.level ?? 0.55) * 1.2;
+    const DUTIES = [0.5, 0.25, 0.125];
     for (let i = i0; i < i1; i++) {
       let l = 0, rr = 0;
       for (const v of this.voices) {
         if (!v.amp.active) continue;
-        // Jump: cycle chord tones at a fixed rate (the classic chip arpeggio); sweep: slide in from an offset.
-        const jumpSemis = steps[Math.floor(v.t * jumpRate) % steps.length];
+        // Jump: cycle pattern notes at a fixed rate (the classic chip arpeggio); Run: slide in from an offset.
+        const stepN = Math.floor(v.t * jumpRate);
+        if (stepN !== v.step) { // a new jump step: Glitch may throw a random pitch or duty at it
+          v.step = stepN;
+          v.gPitch = glitch > 0.05 && Math.random() < glitch * 0.45 ? (Math.floor(Math.random() * 5) - 2) * Math.round(1 + glitch * 5) : 0;
+          v.gDuty = glitch > 0.3 && Math.random() < glitch * 0.5 ? Math.floor(Math.random() * 3) : -1;
+        }
+        const jumpSemis = pattern[stepN % count];
         const sweepSemis = sweep * Math.exp(-v.t / sweepT);
         const vib = vibD * Math.sin(TAU * vibR * Math.max(0, v.t - 0.15));
-        const f = mtof(v.pitch + jumpSemis + sweepSemis + vib) * voiceMod.pitch;
+        const f = mtof(v.pitch + jumpSemis + sweepSemis + vib + v.gPitch) * voiceMod.pitch;
         const dt = Math.min(0.5, f / sr);
+        const duty0 = v.gDuty >= 0 ? DUTIES[v.gDuty] : wave === 1 ? 0.25 : wave === 2 ? 0.125 : 0.5;
+        // Pulse width from the toolkit scales the chosen duty (0.5 = as chosen).
+        const duty = Math.max(0.03, Math.min(0.97, duty0 * (voiceMod.pw / 0.5)));
         let x: number;
         if (wave <= 2) {
           x = (v.ph < duty ? 1 : -1) + blep(v.ph, dt) - blep((v.ph + 1 - duty) % 1, dt);
@@ -91,7 +107,7 @@ export class ChipDSP implements InstrumentDSP {
         const y = x * env * velGain(v.vel);
         l += y * panL(v.pan); rr += y * panR(v.pan);
       }
-      if (crush > 0.01) { l = Math.round(l * levels) / levels; rr = Math.round(rr * levels) / levels; }
+      if (glitch > 0.01) { l = Math.round(l * levels) / levels; rr = Math.round(rr * levels) / levels; }
       L[i] += l * level;
       R[i] += rr * level;
     }
