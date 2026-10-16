@@ -14,7 +14,8 @@ import { dmdText } from "./dmd";
 import { shareSongDialog } from "./sharesong";
 
 export function bindTopbar(app: App, el: HTMLElement) {
-  const timerEl = h("div", { class: "timer" });
+  // Phones: tap the timer to pause it (not in game mode).
+  const timerEl = h("div", { class: "timer", onclick: () => app.togglePauseTimer() });
   const render = () => {
     const s = app.song;
     if (!s) { el.replaceChildren(); el.classList.add("hidden"); return; }
@@ -28,6 +29,8 @@ export function bindTopbar(app: App, el: HTMLElement) {
         dmdText("TILT", { height: 17, slant: 7, unlit: false })),
       h("div", { class: "dmd-wrap" },
         display(),
+        app.canPauseTimer ? h("button", { class: "dmd-pause" + (app.timer.paused ? " on" : ""), onclick: () => app.togglePauseTimer(),
+          title: app.timer.paused ? "Resume the timer" : "Pause the timer", "aria-label": app.timer.paused ? "Resume the timer" : "Pause the timer" }, app.timer.paused ? "▶" : "❚❚") : "",
         h("button", { class: "dmd-bulb", onclick: () => app.stuck?.(), disabled: app.locked || none, title: "Stuck? Ideas for this scene (phrase grid)", "aria-label": "Stuck?" }, "💡")),
       screenSwitch(),
       h("div", { class: "transport" },
@@ -82,6 +85,8 @@ export function bindTopbar(app: App, el: HTMLElement) {
   const timerCell = h("div", { class: "dmd-timer" });
   const infoCell = h("div", { class: "dmd-info" });
   const msgCell = h("div", { class: "dmd-msg" });
+  /** The last 10 seconds: a big countdown over the display's lines. */
+  const countCell = h("div", { class: "dmd-count", "aria-live": "polite" });
 
   /**
    * Messages scroll across the display like a pinball machine's: in from the right, through,
@@ -125,7 +130,7 @@ export function bindTopbar(app: App, el: HTMLElement) {
       // The tutorial: which step, then the instruction (scrolling when it's longer than the display).
       const c = app.coach, art = dmdText(c.text, { height: narrow ? 9 : 11 });
       const box = h("div", { class: "dmd-line dmd-scroll" }, art);
-      infoCell.replaceChildren(h("div", { class: "dmd-line" }, dmdText(`FIRST SONG ${c.step}/${c.total}`, { height: narrow ? 9 : 11 })), box, msgCell);
+      infoCell.replaceChildren(h("div", { class: "dmd-line" }, dmdText(`FIRST SONG ${c.step}/${c.total}`, { height: narrow ? 9 : 11 })), box, msgCell, countCell);
       requestAnimationFrame(() => {
         const boxW = box.clientWidth, textW = parseFloat(art.style.width) || 0;
         if (textW > boxW) art.animate([{ transform: `translateX(${boxW * 0.6}px)` }, { transform: `translateX(${-textW}px)` }], { duration: ((textW + boxW * 0.6) / 90) * 1000, iterations: Infinity });
@@ -135,7 +140,7 @@ export function bindTopbar(app: App, el: HTMLElement) {
     infoCell.replaceChildren(
       h("div", { class: "dmd-line" }, dmdText(line1, { height: narrow ? 9 : 11 })),
       h("div", { class: "dmd-line" + (app.locked ? " locked" : "") }, dmdText(line2, { height: narrow ? 9 : 11 })),
-      msgCell);
+      msgCell, countCell);
     // A click while the display says STUCK? opens the ideas; otherwise the song settings.
     const click = () => (showing && /stuck/i.test(showing) && !app.locked ? app.stuck?.() : songSettings(app));
     return h("button", { class: "dmd-display", onclick: click, title: `${s.title}: key, scale, tempo, swing (click to change)` }, timerCell, infoCell);
@@ -201,7 +206,12 @@ export function bindTopbar(app: App, el: HTMLElement) {
 
   const updateTimer = () => {
     const t = app.timer, left = app.timeLeft();
-    const state = t.done ? " done" : t.running && left < 60 ? " hurry" : "";
+    // Last minute: amber. Last 10 seconds: flashing, with a big countdown on the display.
+    const final = t.running && !t.paused && left > 0 && left <= 10;
+    const state = t.done ? " done" : t.paused ? " paused" : final ? " final" : t.running && left <= 60 ? " hurry" : "";
+    infoCell.classList.toggle("counting", final);
+    if (final) countCell.replaceChildren(dmdText(String(Math.ceil(left)), { height: 24 }));
+    else countCell.replaceChildren();
     if (!isPhone()) {
       timerCell.className = "dmd-timer" + state;
       timerCell.replaceChildren(t.running || t.done

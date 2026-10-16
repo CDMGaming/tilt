@@ -592,7 +592,7 @@ export class Push1Surface {
     };
     const t = this.track();
     const scene = app.song.scenes.find((s) => s.id === this.sceneId());
-    const timer = app.timer.running ? `T ${fmtTime(app.timeLeft())}` : app.timer.done ? "TIME UP" : "no timer";
+    const timer = app.timer.running ? `${app.timer.paused ? "P" : "T"} ${fmtTime(app.timeLeft())}` : app.timer.done ? "TIME UP" : "no timer";
     const state = app.recording ? "REC" : app.engine.playing ? "PLAY" : "STOP";
     const head = this.page === "Mixer" ? "MIXER" : t ? `${INSTRUMENTS[t.kind].name}` : "";
     const bars = t?.clips[this.sceneId()]?.bars ?? 1;

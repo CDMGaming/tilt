@@ -1,5 +1,5 @@
 // Dialogs: instrument picker, song settings (tempo/tap/swing/key/scale),
-// WAV export, settings, the time-up flow and the system menu.
+// WAV export, settings and the system menu (time's up: timeup.ts).
 
 import { defaultRelayUrl } from "./app";
 import { autoArrange, canArrange } from "../engine/arranger";
@@ -18,13 +18,11 @@ import { lastInput } from "./lastinput";
 import { dmdText } from "./dmd";
 
 declare const __BUILD__: string;
-import { challengeStatus } from "../engine/challenges";
 import { phraseGridDialog } from "./phrasegrid";
 import { exportMidi } from "../engine/smf";
 import { zip } from "../engine/zip";
 import { stepper } from "./overlay";
 import { GEN_SHARES } from "./sounds";
-import { tiltFlash } from "./tilt";
 
 const KINDS: InstrumentKind[] = ALL_KINDS;
 
@@ -149,9 +147,9 @@ export function exportDialog(app: App, then?: () => void) {
 // ------------------------------------------------------------ settings
 
 /**
- * Game mode: the pinball side of TILT. Off (the default) it's a quick-start DAW: a timer
- * just stops playback and says TIME. On: challenge cards, editing locks at zero, the TILT
- * flash and buzz, then SONG COMPLETE with one EXTRA BALL.
+ * Game mode: the pinball side of TILT. Off (the default) it's a quick-start DAW: the timer
+ * pauses, and at zero says TIME with unlimited extra balls. On: challenge cards, no pausing,
+ * editing locks at zero, the TILT flash and buzz, then SONG COMPLETE with one EXTRA BALL.
  */
 export function gameModeDialog(app: App, onChange?: () => void) {
   const st = app.settings;
@@ -161,10 +159,12 @@ export function gameModeDialog(app: App, onChange?: () => void) {
     h("p", { class: "note" }, "With game mode on:"),
     h("ul", { class: "note game-list" },
       h("li", null, "Challenge cards: dealt on the setup screen, shown in the top bar."),
-      h("li", null, "When the timer hits zero, editing locks: TILT flashes with a buzz, then SONG COMPLETE."),
-      h("li", null, "EXTRA BALL: two more minutes, once per session."),
+      h("li", null, "No pausing the timer: the clock is the game."),
+      h("li", null, "At zero, editing locks: TILT flashes with a buzz, then SONG COMPLETE with your challenge results. Editing stays locked until you choose what's next."),
+      h("li", null, "EXTRA BALL: five more minutes, once per session."),
     ),
-    h("p", { class: "note" }, "Off (the default), the timer just stops playback and the display says TIME. Nothing locks."),
+    h("p", { class: "note" }, "Off (the default), the timer can be paused, and at zero the display says TIME and the same card comes up, with as many extra balls as you like. Nothing locks."),
+    h("p", { class: "note" }, "Either way, at zero the bar that's playing finishes and fades out, and the song is kept as a timed take (Songs → the song → Versions)."),
     st.gameMode ? stepper("cards", "Challenge cards", app.dice.cards ? String(app.dice.cards) : "Off", (d) => {
       app.dice.cards = Math.max(0, Math.min(3, app.dice.cards + d));
       app.saveDice();
@@ -238,6 +238,14 @@ export function settingsDialog(app: App) {
       toggle("lock", "Scale lock", st.scaleLock, () => { st.scaleLock = !st.scaleLock; app.saveSettings(); rerender(); app.refresh(); }),
       toggle("rq", "Quantize while recording", st.recQuantize, () => { st.recQuantize = !st.recQuantize; app.saveSettings(); rerender(); }),
       toggle("ci", "Count-in (1 bar) before recording", st.countIn, () => { st.countIn = !st.countIn; app.saveSettings(); rerender(); }),
+      h("div", { class: "section-title" }, "Timer"),
+      toggle("tick", "Soft tick in the last 10 seconds", !!st.timerTick, () => { st.timerTick = !st.timerTick; app.saveSettings(); rerender(); }),
+      stepper("after-save", "After Save as-is", { "": "Ask", library: "Go to my songs", stay: "Stay here" }[st.afterTimedSave ?? ""], (d) => {
+        const o: ("" | "library" | "stay")[] = ["", "library", "stay"];
+        st.afterTimedSave = o[(o.indexOf(st.afterTimedSave ?? "") + d + 3) % 3];
+        app.saveSettings();
+        rerender();
+      }),
       toggle("gas", "Show the phrase grid right after START", st.gridAtStart, () => { st.gridAtStart = !st.gridAtStart; app.saveSettings(); rerender(); }),
       h("div", { class: "section-title" }, "Sounds"),
       stepper("genshare", "Generated sounds", st.genShare ? `${Math.round(st.genShare * 100)}% of rolls` : "Off: curated only", (d) => {
@@ -269,40 +277,6 @@ function midiMonitor(app: App) {
       h("button", { class: "row-btn primary", "data-nav": "done", onclick: () => { clearTimeout(timer); close(); } }, "Done"),
     );
   }, { wide: true, onClose: () => clearTimeout(timer) });
-}
-
-// ------------------------------------------------------------ time's up
-
-/** The clock ran out: TILT flashes (with a buzz), then the song is complete. */
-export function timeUpDialog(app: App) {
-  app.engine.stop();
-  app.overlays.closeAll();
-  tiltFlash(app, () => songCompleteDialog(app));
-}
-
-function songCompleteDialog(app: App) {
-  const arrange = canArrange(app.song);
-  app.overlays.dialog("SONG COMPLETE", (close) => h("div", { class: "form" },
-    h("p", { class: "note big" }, "Editing is locked. Finish it:"),
-    ...challengeStatus(app.song).map((c) => h("p", { class: "note" }, `${c.met ? "✅" : "⬜"} ${c.text}`)),
-    arrange ? h("button", {
-      class: "row-btn primary", "data-nav": "finish",
-      onclick: () => {
-        close();
-        app.history.push(app.song, "Auto-arrange");
-        autoArrange(app.song);
-        app.changed();
-        app.songMode = "song";
-        app.show("song");
-        exportDialog(app);
-      },
-    }, "Auto-arrange into a full song, then export") : null,
-    h("button", { class: "row-btn" + (arrange ? "" : " primary"), "data-nav": "export", onclick: () => { close(); exportDialog(app); } }, "Export WAV as it is"),
-    h("button", { class: "row-btn", "data-nav": "listen", onclick: () => { close(); app.songMode = "song"; app.show("song"); app.engine.play({ kind: "song", fromIndex: 0 }); app.renderHeader(); } }, "Just listen (stays locked)"),
-    // One extra ball per session: two more minutes on the clock.
-    !app.extraBallUsed ? h("button", { class: "row-btn extra-ball", "data-nav": "extra", onclick: () => { close(); app.extraBall(); } }, "EXTRA BALL", h("span", { class: "note" }, " +2 minutes, once")) : null,
-    h("button", { class: "row-btn", "data-nav": "unlock", onclick: () => { close(); app.unlock(); } }, "Unlock and keep going"),
-  ));
 }
 
 // ------------------------------------------------------------ system menu
@@ -454,8 +428,9 @@ const CONTROLS: Record<ControlsTab, { label: string; rows: [string, string][] }>
     ["Slot ▾ → ? A role, any instrument", "Ask a slot for a role (say, any pad): NUDGE picks the instrument"],
     ["✦ sounds", "Generated from an instrument's recipe (Settings → Sounds sets how often). Saved in the song; ★ Save keeps one for every song"],
     ["Setups ▾ / Save setup…", "Save the held fields under a name; loading one brings them back held"],
-    ["Timer", "Off, 5, 10, 15 or 20 minutes. At zero playback stops and the display says TIME"],
-    ["Game mode…", "Challenge cards, lock at zero, extra ball, the TILT flash (off by default)"],
+    ["Timer", "Off, 5, 10, 15 or 20 minutes. ❚❚ next to the display pauses it (phones: tap the timer). 1 MINUTE: it turns amber; the last 10 seconds flash and count down (Settings → Timer: a soft tick)"],
+    ["Time's up", "The bar finishes and fades, the song is kept as a timed take, then a card: Play it back, Save as-is, EXTRA BALL (+5 min), Keep working"],
+    ["Game mode…", "Challenge cards, no pausing, editing locked at zero until you choose, one extra ball, the TILT flash (off by default)"],
   ] },
   midi: { label: "MIDI", rows: [
     ["Keyboard / pads", "Play the instrument you're on; held notes light its keys and pads"],

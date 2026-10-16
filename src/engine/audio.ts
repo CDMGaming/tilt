@@ -394,6 +394,7 @@ export class AudioEngine {
     if (this.playing) this.stop();
     if (this.ctx.state !== "running") void this.ctx.resume();
     this.mode = mode;
+    this.ending = false;
     const now = this.ctx.currentTime + 0.06;
     const first = firstInstance(this.song, mode, now);
     if (!first) return now;
@@ -413,8 +414,10 @@ export class AudioEngine {
     return start;
   }
 
-  stop() {
+  /** `quiet`: the master was faded out (finishBar): it comes back up only once the voices' tails are gone. */
+  stop(quiet = false) {
     if (!this.playing) return;
+    this.ending = false;
     this.onTransport?.("stop", this.ctx.currentTime);
     this.playing = false;
     // External tracks: all notes off now and again once the notes already queued ahead have gone out.
@@ -430,7 +433,10 @@ export class AudioEngine {
     }
     this.instances = [];
     this.master.fade.gain.cancelScheduledValues(0);
-    this.master.fade.gain.setTargetAtTime(1, this.ctx.currentTime, 0.02);
+    if (quiet) {
+      this.master.fade.gain.setValueAtTime(0.0001, this.ctx.currentTime);
+      this.master.fade.gain.setTargetAtTime(1, this.ctx.currentTime + 1.5, 0.05);
+    } else this.master.fade.gain.setTargetAtTime(1, this.ctx.currentTime, 0.02);
     this.sync(this.song);
   }
 
@@ -448,6 +454,31 @@ export class AudioEngine {
   }
 
   get playMode(): PlayMode { return this.mode; }
+
+  /** finishBar is running: nothing plays after the current bar. */
+  private ending = false;
+
+  /**
+   * Time's up: let the bar that's playing finish, fade out over `fade` seconds, then stop.
+   * Resolves once it's quiet (at once when nothing is playing).
+   */
+  finishBar(fade = 1): Promise<void> {
+    if (!this.playing) return Promise.resolve();
+    const cur = this.currentInstance(this.scheduledUntil) ?? this.instances[this.instances.length - 1];
+    if (!cur) { this.stop(); return Promise.resolve(); }
+    cur.ticks = barCut(cur.ticks, (this.scheduledUntil - cur.startTime) / cur.secPerTick);
+    this.instances = [cur];
+    this.ending = true;
+    const end = Math.max(this.ctx.currentTime, cur.startTime + cur.ticks * cur.secPerTick);
+    const g = this.master.fade.gain;
+    g.cancelScheduledValues(end);
+    g.setTargetAtTime(0.0001, end, fade / 5);
+    const wait = (end + fade - this.ctx.currentTime + this.latency) * 1000;
+    return new Promise((resolve) => setTimeout(() => {
+      if (this.playing && this.ending) this.stop(true);
+      resolve();
+    }, Math.max(0, wait)));
+  }
 
   private currentInstance(t: number): SceneInstance | undefined {
     return this.instances.find((i) => t >= i.startTime && t < i.startTime + i.ticks * i.secPerTick);
@@ -477,7 +508,7 @@ export class AudioEngine {
     // Extend the instance list to cover the window.
     let last = this.instances[this.instances.length - 1];
     while (last && last.startTime + last.ticks * last.secPerTick < until) {
-      const next = nextInstance(this.song, this.mode, last);
+      const next = this.ending ? null : nextInstance(this.song, this.mode, last);
       if (!next) break;
       this.globalStart.set(next, (this.globalStart.get(last) ?? 0) + last.ticks);
       this.instances.push(next);
@@ -512,7 +543,7 @@ export class AudioEngine {
     // Drop finished instances (keep one for position lookups) and detect song end.
     while (this.instances.length > 1 && this.instances[0].startTime + this.instances[0].ticks * this.instances[0].secPerTick < now - 0.5) this.instances.shift();
     const tail = this.instances[this.instances.length - 1];
-    if (tail && !nextInstance(this.song, this.mode, tail) && now > tail.startTime + tail.ticks * tail.secPerTick + 0.1) {
+    if (tail && !this.ending && !nextInstance(this.song, this.mode, tail) && now > tail.startTime + tail.ticks * tail.secPerTick + 0.1) {
       this.stop();
       this.onEnded?.();
     }

@@ -95,6 +95,7 @@ export class Online {
     this.timers.push(fast, setInterval(ping, 4000) as unknown as number);
     // The host keeps everyone's loop on its beat.
     this.timers.push(setInterval(() => this.sendAnchor(), 1000) as unknown as number);
+    this.timers.push(setInterval(() => this.sendTimer(), 2000) as unknown as number);
   }
 
   private pong(m: Msg) {
@@ -110,6 +111,13 @@ export class Online {
     if (!this.isHost || !eng.playing) return;
     const tick = eng.globalTickAt(eng.heardTime(performance.now()));
     if (tick !== null) this.send({ t: "anchor", s: this.serverNow(), tick, sceneId: this.app.couch?.sceneId });
+  }
+
+  /** Host: the countdown, so every guest's display shows the same clock. */
+  sendTimer() {
+    if (!this.isHost) return;
+    const t = this.app.timer;
+    this.send({ t: "timer", left: this.app.timeLeft(), total: t.total, running: t.running, paused: t.paused, done: t.done });
   }
 
   private anchor(m: Msg) {
@@ -213,6 +221,9 @@ export class Online {
       case "roster": if (from === this.hostId) this.applyRoster(m.seats as RosterSeat[], m.conductor as string); return;
       case "anchor": if (from === this.hostId) this.anchor(m); return;
       case "transport": this.applyTransport(m); return;
+      case "timer": if (from === this.hostId) app.applyRemoteTimer(m as never); return;
+      case "timeup": if (from === this.hostId) app.onRemoteTimeUp?.(!!m.game); return;
+      case "timeup-choice": if (from === this.hostId) app.onRemoteChoice?.(m.choice as never); return;
     }
     if (!c) return;
     const seat = this.seatOfPeer(from);

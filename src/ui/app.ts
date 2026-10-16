@@ -92,6 +92,10 @@ export interface Settings {
   relayUrl: string; // the online server ("" = this computer, port 8787)
   clockOut: string; // MIDI output id to send clock to ("" = off)
   outputDevice: string;
+  /** A soft tick each second of the timer's last 10 seconds. */
+  timerTick?: boolean;
+  /** After "Save as-is" on the time's-up card: open Songs, or stay ("" = ask the first time). */
+  afterTimedSave?: "" | "library" | "stay";
 }
 
 import { STORE_PREFIX } from "./storage";
@@ -163,7 +167,11 @@ export class App {
   settings: Settings = { notePreview: true, scaleLock: true, fold: false, countIn: true, gridAtStart: false, recQuantize: true, padLayout: "auto", outputDevice: "", transport: {}, midiSync: "auto", clockOut: "", netName: "", relayUrl: "", gameMode: false, genShare: 0.4 };
   /** The setup screen: the current result, what's held, the lineup spec, the timer (remembered between sessions). */
   dice: DiceState = loadDice();
-  timer = { total: 0, endsAt: 0, running: false, done: false };
+  /**
+   * The countdown. `total`: seconds on the clock so far (extra balls add to it); `left` holds the
+   * seconds remaining while `paused`. `done`: it ran out (the display says TIME / 0:00).
+   */
+  timer = { total: 0, endsAt: 0, running: false, done: false, paused: false, left: 0 };
   locked = false;
   recording = false;
   shortcutOpen = false;
@@ -651,7 +659,10 @@ export class App {
 
   /** On the editor: loop the clip's scene. On the song screen: loop the scene under the cursor, or play the song. */
   songMode: "scene" | "song" = "scene";
+  /** The next play starts the whole song from its first step (the time's-up card's Play it back). */
+  playFromTopOnce = false;
   playMode() {
+    if (this.playFromTopOnce) { this.playFromTopOnce = false; this.songMode = "song"; return { kind: "song" as const, fromIndex: 0 }; }
     if (this.songMode === "song") {
       // From the chip under the cursor, or the first step that plays the scene you're on.
       if (this.screenName === "song" && this.songCur.row === -2 && this.songCur.col >= 0) return { kind: "song" as const, fromIndex: Math.min(this.songCur.col, songChain(this.song).length - 1) };
@@ -779,7 +790,7 @@ export class App {
     this.screens[this.screenName]?.render();
   }
 
-  private finishRecording() {
+  finishRecording() {
     // Notes still held when recording stops get one grid step.
     for (const [pitch] of this.scratch.recPending) this.recordNote(pitch, 0, false, performance.now());
     this.scratch.recPending.clear();
@@ -1085,44 +1096,94 @@ export class App {
 
   // ------------------------------------------------------------ timer
 
-  /** EXTRA BALL (once per session, from the song-complete screen): two more minutes, unlocked. */
-  extraBallUsed = false;
+  /** EXTRA BALLs taken this session (game mode allows one; without game mode there's no limit). */
+  extraBalls = 0;
+  get extraBallLeft(): boolean { return !this.settings.gameMode || this.extraBalls === 0; }
+  /** EXTRA BALL: five more minutes on the clock, unlocked. */
   extraBall() {
-    if (this.extraBallUsed) return;
-    this.extraBallUsed = true;
-    this.startTimer(2);
+    if (!this.extraBallLeft) return;
+    this.extraBalls++;
+    const total = this.timer.total + 300;
+    this.startTimer(5);
+    this.timer.total = total;
     this.renderHeader();
-    this.overlays.toast("EXTRA BALL: 2 more minutes", 1500);
+    this.overlays.toast("EXTRA BALL: 5 more minutes", 1500);
   }
 
   startTimer(minutes: number) {
-    this.timer = { total: minutes * 60, endsAt: minutes ? performance.now() + minutes * 60000 : 0, running: minutes > 0, done: false };
+    this.timer = { total: minutes * 60, endsAt: minutes ? performance.now() + minutes * 60000 : 0, running: minutes > 0, done: false, paused: false, left: 0 };
+    this.warned = minutes <= 1;
+    this.lastTick = 0;
     this.locked = false;
   }
 
+  /** The clock is off: FREE PLAY on the display. */
+  stopTimer() {
+    this.timer = { ...this.timer, running: false, done: false, paused: false };
+    this.renderHeader();
+  }
+
   timeLeft(): number {
-    return this.timer.running ? Math.max(0, (this.timer.endsAt - performance.now()) / 1000) : 0;
+    const t = this.timer;
+    if (!t.running) return 0;
+    return t.paused ? t.left : Math.max(0, (t.endsAt - performance.now()) / 1000);
+  }
+
+  /** Pause / resume the countdown (not in game mode: there the clock is the game). */
+  get canPauseTimer(): boolean { return this.timer.running && !this.settings.gameMode && !this.isGuest; }
+  togglePauseTimer() {
+    const t = this.timer;
+    if (!this.canPauseTimer) return;
+    if (t.paused) { t.endsAt = performance.now() + t.left * 1000; t.paused = false; }
+    else { t.left = this.timeLeft(); t.paused = true; }
+    this.renderHeader();
+    this.overlays.toast(t.paused ? "TIMER PAUSED" : "TIMER RUNNING", 1200);
+    this.onTimerChanged?.();
+  }
+
+  /** An online guest: the host's clock rules (its time-up arrives as a message). */
+  get isGuest(): boolean { return !!this.couch?.online && !this.couch.online.isHost; }
+
+  /** Online guests: the host's timer, as it sends it. */
+  applyRemoteTimer(m: { left: number; total: number; running: boolean; paused: boolean; done: boolean }) {
+    const t = this.timer;
+    const was = `${t.running}${t.paused}${t.done}`;
+    this.timer = { total: m.total, endsAt: performance.now() + m.left * 1000, running: m.running, done: m.done, paused: m.paused, left: m.left };
+    if (`${m.running}${m.paused}${m.done}` !== was) this.renderHeader();
   }
 
   onTimeUp?: () => void;
+  /** The timer was started, paused, extended or switched off (online: the host tells the guests). */
+  onTimerChanged?: () => void;
+  /** Online guests: the host's time ran out / the host chose on the card. */
+  onRemoteTimeUp?: (game: boolean) => void;
+  onRemoteChoice?: (choice: "playback" | "save" | "extra" | "keep") => void;
+  /** The 1 MINUTE warning has shown for this run of the clock. */
+  private warned = false;
+  /** The last second that ticked (last 10 seconds). */
+  private lastTick = 0;
 
   private tickTimer() {
-    if (!this.timer.running) return;
-    if (performance.now() >= this.timer.endsAt) {
-      this.timer.running = false;
-      this.timer.done = true;
-      if (this.recording) { this.finishRecording(); this.recording = false; }
-      if (this.settings.gameMode) {
-        this.locked = true;
-        this.renderHeader();
-        this.onTimeUp?.();
-        return;
-      }
-      // Plain timer: playback stops and the display says TIME; you keep working.
-      this.stopLocal();
+    const t = this.timer;
+    if (!t.running || t.paused) return;
+    const left = this.timeLeft();
+    if (!this.warned && left <= 60 && left > 0) {
+      this.warned = true;
+      this.overlays.toast("1 MINUTE", 2500);
       this.renderHeader();
-      this.overlays.toast("TIME", 3000);
     }
+    const sec = Math.ceil(left);
+    if (sec <= 10 && sec > 0 && sec !== this.lastTick) {
+      this.lastTick = sec;
+      if (this.settings.timerTick) softTick(this.engine.ctx, sec <= 3);
+    }
+    if (left > 0 || this.isGuest) return;
+    t.running = false;
+    t.done = true;
+    if (this.recording) { this.finishRecording(); this.recording = false; }
+    if (this.settings.gameMode) this.locked = true;
+    this.renderHeader();
+    this.onTimeUp?.();
   }
 
   unlock() {
@@ -1178,4 +1239,19 @@ export const STEP_GRIDS = [
 export function defaultRelayUrl(): string {
   if (import.meta.env.DEV) return `ws://${location.hostname || "localhost"}:8787`;
   return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/relay`;
+}
+
+/** The last seconds' tick: a short, quiet blip (a little higher for 3, 2, 1). Made here, no sound files. */
+function softTick(ctx: AudioContext, last: boolean) {
+  try {
+    const t = ctx.currentTime + 0.005, o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = "sine";
+    o.frequency.value = last ? 1760 : 1320;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.06, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+    o.connect(g).connect(ctx.destination);
+    o.start(t);
+    o.stop(t + 0.08);
+  } catch { /* no audio */ }
 }

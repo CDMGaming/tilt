@@ -47,8 +47,10 @@ Editing: piano roll with out-of-key rows hatched, scale lock (default on), 1/8, 
 range select, copy/cut/paste, transpose, quantize, step input, real-time recording with quantize and latency
 compensation, note preview.
 
-DICE: key, scale, tempo, swing, lineup and presets, each lockable, with a share code. TIMER: 10/20/30 minutes. At zero,
-editing locks and it offers auto-arrange + export.
+DICE: key, scale, tempo, swing, lineup and presets, each lockable, with a share code. TIMER: off or 5/10/15/20 minutes,
+pausable (not in game mode). Amber at 1:00, a flashing countdown for the last 10 s. At zero the bar finishes and
+fades out, the song is kept as a timed take (its Versions in Songs), and a card offers Play it back, Save as-is,
+EXTRA BALL (+5 min) and Keep working. Game mode locks editing until you choose and allows one extra ball.
 
 WAV export: full mix or one track, 16/24-bit, 44.1/48 kHz, tail 0-5 s.
 
