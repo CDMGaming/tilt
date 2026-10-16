@@ -127,6 +127,7 @@ export class AudioEngine {
         this.post(tn, { t: "params", params });
       }
       const audible = !t.mute && (!soloing || t.solo) ? 1 : 0;
+      if (t.kind === "midi") this.syncCCs(t);
       tn.gain.gain.setTargetAtTime(audible, this.ctx.currentTime, 0.01);
       tn.sendGain.gain.setTargetAtTime(audible, this.ctx.currentTime, 0.01);
     }
@@ -254,6 +255,7 @@ export class AudioEngine {
     const pitches = expandPitch(this.song, t, pitch);
     this.liveChords.set(`${trackId}:${pitch}`, pitches);
     for (const p of pitches) this.post(tn, { t: "live", type: "on", pitch: p, vel });
+    if (t.kind === "midi" && this.sends(t)) for (const p of pitches) this.midiOut(t, [0x90, p, vel], null);
   }
 
   noteOff(trackId: number, pitch: number) {
@@ -262,6 +264,8 @@ export class AudioEngine {
     const pitches = this.liveChords.get(key) ?? [pitch];
     this.liveChords.delete(key);
     if (tn) for (const p of pitches) this.post(tn, { t: "live", type: "off", pitch: p, vel: 0 });
+    const t = this.song.tracks.find((x) => x.id === trackId);
+    if (t?.kind === "midi") for (const p of pitches) this.midiOut(t, [0x80, p, 0], null);
   }
 
   /** Short preview note (piano-roll note preview, pad taps). */
@@ -284,6 +288,44 @@ export class AudioEngine {
   private globalStart = new WeakMap<SceneInstance, number>();
   /** Called each scheduler pass with the context times of 24-per-beat MIDI clock pulses. */
   onClockOut: ((ctxTimes: number[]) => void) | null = null;
+  /** External tracks: send MIDI bytes for `track` (status byte without channel) at context time `ctxTime` (null: now). */
+  onMidiOut: ((track: Track, data: number[], ctxTime: number | null) => void) | null = null;
+  /** Last knob values seen per External track ("trackId:cc"), so only knob turns go out (automation sends its own). */
+  private ccKnob = new Map<string, number>();
+
+  private sends(t: Track): boolean {
+    const soloing = this.song.tracks.some((x) => x.solo);
+    return !t.mute && (!soloing || t.solo);
+  }
+
+  private midiOut(t: Track, data: number[], ctxTime: number | null) {
+    if (!this.onMidiOut || !t.midiPort) return;
+    const ch = Math.max(0, Math.min(15, Math.round(t.params.channel ?? 1) - 1));
+    this.onMidiOut(t, [data[0] | ch, ...data.slice(1).map((v) => Math.max(0, Math.min(127, Math.round(v))))], ctxTime);
+  }
+
+  /** Scheduled notes and CC automation of an External track, as MIDI. */
+  private scheduleMidi(t: Track, evs: TimedEvent[]) {
+    const on = this.sends(t);
+    for (const e of evs) {
+      if (e.type === "on" && on) this.midiOut(t, [0x90, e.pitch, Math.max(1, e.vel)], e.time);
+      else if (e.type === "off") this.midiOut(t, [0x80, e.pitch, 0], e.time);
+      else if (e.type === "param" && on && e.key && /^cc[0-7]$/.test(e.key)) {
+        const num = Math.round(t.params[`ccn${e.key.slice(2)}`] ?? 0);
+        this.midiOut(t, [0xb0, num, e.value ?? 0], e.time);
+      }
+    }
+  }
+
+  /** Knob turns on an External track go straight out as CCs (the first look only remembers the values). */
+  private syncCCs(t: Track) {
+    for (let i = 0; i < 8; i++) {
+      const key = `${t.id}:cc${i}`, v = Math.round(t.params[`cc${i}`] ?? 0), was = this.ccKnob.get(key);
+      this.ccKnob.set(key, v);
+      if (was !== undefined && was !== v && this.sends(t)) this.midiOut(t, [0xb0, Math.round(t.params[`ccn${i}`] ?? 0), v], null);
+    }
+  }
+
   /** Called when playback starts (with the context time of beat 1) and stops. */
   onTransport: ((what: "start" | "stop", ctxTime: number) => void) | null = null;
 
@@ -375,6 +417,11 @@ export class AudioEngine {
     if (!this.playing) return;
     this.onTransport?.("stop", this.ctx.currentTime);
     this.playing = false;
+    // External tracks: all notes off now and again once the notes already queued ahead have gone out.
+    for (const t of this.song.tracks) if (t.kind === "midi") {
+      this.midiOut(t, [0xb0, 123, 0], null);
+      this.midiOut(t, [0xb0, 123, 0], this.scheduledUntil + 0.01);
+    }
     clearInterval(this.timer);
     for (const tn of this.tracks.values()) {
       this.post(tn, { t: "stop" });
@@ -458,6 +505,8 @@ export class AudioEngine {
     for (const [id, evs] of byTrack) {
       const tn = this.tracks.get(id);
       if (tn) this.post(tn, { t: "events", events: evs });
+      const t = this.song.tracks.find((x) => x.id === id);
+      if (t?.kind === "midi") this.scheduleMidi(t, evs);
     }
     this.scheduledUntil = until;
     // Drop finished instances (keep one for position lookups) and detect song end.

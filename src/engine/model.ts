@@ -10,7 +10,7 @@ export const MAX_BARS = 8;
 export const MAX_TRACKS = 8;
 export const MAX_SCENES = 32;
 
-export type InstrumentKind = "drums" | "acid" | "poly" | "lead" | "analog" | "wobble" | "pad" | "chip" | "fm" | "wave" | "sampler" | "epiano" | "pluck" | "organ" | "anthem" | "patch" | "vox" | "boom" | "piano" | "garage" | "chop";
+export type InstrumentKind = "drums" | "acid" | "poly" | "lead" | "analog" | "wobble" | "pad" | "chip" | "fm" | "wave" | "sampler" | "epiano" | "pluck" | "organ" | "anthem" | "patch" | "vox" | "boom" | "piano" | "garage" | "chop" | "midi";
 
 export interface Note {
   id: number;
@@ -66,6 +66,9 @@ export interface Track {
   color: number; // shade of the instrument's colour: 0 = first of its kind, 1 = second… (see assignShades)
   /** Length of new notes on this track, in ticks (missing: the grid step). */
   noteLen?: number;
+  /** External tracks: the MIDI output's name ("" or missing: none), and a label per CC knob. */
+  midiPort?: string;
+  ccLabels?: string[];
 }
 
 export interface Scene {

@@ -8,7 +8,7 @@ import { chordName, noteName, scaleById, scaleDegree } from "../engine/music";
 import { decodeFile, listSamples, putSample, sampleLabel } from "./samples";
 import { CHIP_WAVES, SFX_GROUPS, WT_FRAMES, WT_SIZE } from "../engine/instruments3";
 import { WOB_RATES } from "../engine/instruments2";
-import { CHOP_LOOPS, DRAWBAR_FEET, GARAGE_KITS, PIANO_CATS, PLUCK_BODIES, PW_JACKS, VIB_CHORUS, sampleSetRefs } from "../engine/instruments4";
+import { CHOP_LOOPS, DRAWBAR_FEET, ccLabel, GARAGE_KITS, PIANO_CATS, PLUCK_BODIES, PW_JACKS, VIB_CHORUS, sampleSetRefs } from "../engine/instruments4";
 import { computeSlices } from "../engine/slices";
 import { allPresets, applyPreset, deleteUserPreset, presetPosition, saveUserPreset, userPresets, USER_MARK, type PresetEntry } from "./presets";
 import { getParam } from "../engine/params";
@@ -339,6 +339,41 @@ export function buildPanel(app: App, track: Track): HTMLElement {
           h("div", { class: "gr-knobs" },
             h("div", { class: "gr-char" }, ctl("room", "★ Room", "l"), ctl("smash", "★ Smash", "l")),
             ctl("tune", "Tune"), ctl("damp", "Damp"), ctl("level", "Level")))),
+    );
+  } else if (track.kind === "midi") {
+    // External: no sound of its own. A port and channel, then eight CC knobs with their numbers and labels.
+    const outs = app.midi.outputs().map((o) => o.name ?? "").filter(Boolean);
+    const port = track.midiPort ?? "";
+    if (port && !outs.includes(port)) outs.push(port);
+    const portSel = h("select", { class: "ex-port", "data-nav": "port", "aria-label": "MIDI output",
+      onchange: (e: Event) => { const v = (e.target as HTMLSelectElement).value; app.edit("MIDI output", () => (track.midiPort = v)); },
+    }, h("option", { value: "" }, "None"), outs.map((n) => h("option", { value: n, selected: n === port ? "" : null }, n + (app.midi.outputs().some((o) => o.name === n) ? "" : " (disconnected)"))));
+    const cols = Array.from({ length: 8 }, (_, i) => {
+      const num = Math.round(track.params[`ccn${i}`] ?? 0);
+      return h("div", { class: "ex-cc" },
+        ctl(`cc${i}`, ccLabel(track, i)),
+        h("label", { class: "ex-num" }, "CC", h("input", { type: "number", min: "0", max: "119", value: String(num), "data-nav": `ccn${i}`, "aria-label": `CC number for knob ${i + 1}`,
+          onchange: (e: Event) => {
+            const v = Math.max(0, Math.min(119, Math.round(Number((e.target as HTMLInputElement).value) || 0)));
+            app.edit("CC number", () => (track.params[`ccn${i}`] = v)); app.screens.edit.render();
+          } })),
+        h("input", { class: "ex-label", type: "text", maxlength: "12", placeholder: ccLabel({ params: track.params }, i), value: track.ccLabels?.[i] ?? "", "data-nav": `ccl${i}`, "aria-label": `Label for knob ${i + 1}`,
+          onchange: (e: Event) => {
+            const v = (e.target as HTMLInputElement).value.trim().slice(0, 12);
+            app.edit("CC label", () => { const l = (track.ccLabels ?? []).slice(); while (l.length < 8) l.push(""); l[i] = v; track.ccLabels = l.some(Boolean) ? l : undefined; });
+            app.screens.edit.render();
+          } }));
+    });
+    body = h("div", { class: "panel-body external" },
+      h("div", { class: "ex-top" },
+        h("div", { class: "ex-field" }, h("span", { class: "ex-cap" }, "OUTPUT"), portSel),
+        h("div", { class: "ex-field" }, ctl("channel", "Channel")),
+        h("p", { class: "ex-hint" }, !app.midi.access ? "MIDI is off: this browser has no Web MIDI or permission was refused."
+          : !port ? "Pick the MIDI output of the synth or plugin this track plays."
+          : "Notes, the knobs below and their automation go out on this port. TILT itself stays silent for this track (and in exports).")),
+      h("div", { class: "ex-ccs" }, cols),
+      keyboard(app, track),
+      h("p", { class: "note" }, "To play a plugin in your DAW, connect them with a virtual MIDI cable (loopMIDI on Windows, the IAC driver on a Mac) and arm the plugin's track for that input."),
     );
   } else if (track.kind === "chop") {
     // Chop: an orange panel, the loop's waveform with its slice lines, 16 pads under it.

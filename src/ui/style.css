@@ -58,6 +58,7 @@
   --inst-piano: #e8dcc2;   /* Parlor: ivory */
   --inst-garage: #b08850;  /* Garage: oiled oak */
   --inst-chop: #ff8a1f;    /* Chop: MPC orange */
+  --inst-midi: #9aa4b2;    /* External: cable grey */
   --inst-patch: #f2b134;   /* Patchwork: amber (an orange-gold, not the DMD yellow) */
 
   /* ---- shape ---- */
@@ -211,7 +212,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .chip[class*="kind-"] { color: var(--kc); box-shadow: inset 2px 0 0 var(--kc); }
 .kind-drums { --kc: var(--inst-drums); } .kind-analog { --kc: var(--inst-analog); } .kind-acid { --kc: var(--inst-acid); }
 .kind-wobble { --kc: var(--inst-wobble); } .kind-poly { --kc: var(--inst-poly); } .kind-pad { --kc: var(--inst-pad); } .kind-lead { --kc: var(--inst-lead); }
-.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); } .kind-epiano { --kc: var(--inst-epiano); } .kind-pluck { --kc: var(--inst-pluck); } .kind-organ { --kc: var(--inst-organ); } .kind-anthem { --kc: var(--inst-anthem); } .kind-patch { --kc: var(--inst-patch); } .kind-vox { --kc: var(--inst-vox); } .kind-boom { --kc: var(--inst-boom); } .kind-piano { --kc: var(--inst-piano); } .kind-garage { --kc: var(--inst-garage); } .kind-chop { --kc: var(--inst-chop); }
+.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); } .kind-epiano { --kc: var(--inst-epiano); } .kind-pluck { --kc: var(--inst-pluck); } .kind-organ { --kc: var(--inst-organ); } .kind-anthem { --kc: var(--inst-anthem); } .kind-patch { --kc: var(--inst-patch); } .kind-vox { --kc: var(--inst-vox); } .kind-boom { --kc: var(--inst-boom); } .kind-piano { --kc: var(--inst-piano); } .kind-garage { --kc: var(--inst-garage); } .kind-chop { --kc: var(--inst-chop); } .kind-midi { --kc: var(--inst-midi); }
 .dice-actions { display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap; justify-content: center; }
 .roll-btn { font-size: 28px; font-weight: 900; padding: 16px 36px; border-radius: 16px; background: var(--raise); border: 2px solid var(--accent); display: flex; flex-direction: column; align-items: center; }
 .roll-btn small, .go-btn small { font-size: 11px; color: var(--dim); font-weight: 400; }
@@ -1598,3 +1599,17 @@ body.phone .gb-master { flex-direction: row; border-left: none; }
 .panel.kind-chop .panel-body.chop { --cap-fill: #1b1714; --cap-edge: #000; --knob-dot: #ff8a1f; }
 .panel-body.chop .knob-val { stroke: #1b0f05; }
 .panel-body.chop .knob-track { stroke: #0000002a; }
+
+/* ---- External: plain grey rack panel, a cable's worth of colour */
+.panel-body.external { padding: 10px; border-top-color: var(--inst-midi); background: #15171a; }
+.external .ex-top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-bottom: 10px; }
+.external .ex-field { display: flex; align-items: center; gap: 8px; }
+.external .ex-cap { font-size: 11px; letter-spacing: 0.12em; font-weight: 700; color: #9aa4b2; }
+.external .ex-port { min-width: 180px; max-width: 100%; padding: 5px 8px; background: #0d0f11; color: #e6e9ee; border: 1px solid #3a4048; border-radius: 4px; font: inherit; }
+.external .ex-hint { flex: 1 1 220px; margin: 0; font-size: 12px; color: #9aa4b2; }
+.external .ex-ccs { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; margin-bottom: 10px; }
+.external .ex-cc { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 2px; background: #1c1f23; border: 1px solid #2a2f35; border-radius: 6px; min-width: 0; }
+.external .ex-num { display: flex; align-items: center; gap: 3px; font-size: 10px; color: #7d8794; }
+.external .ex-num input { width: 42px; padding: 2px 3px; background: #0d0f11; color: #e6e9ee; border: 1px solid #3a4048; border-radius: 3px; font: inherit; font-size: 11px; }
+.external .ex-label { width: 100%; max-width: 86px; box-sizing: border-box; padding: 2px 4px; background: #0d0f11; color: #e6e9ee; border: 1px solid #3a4048; border-radius: 3px; font-size: 11px; text-align: center; }
+@media (max-width: 640px) { .external .ex-ccs { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

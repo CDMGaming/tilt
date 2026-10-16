@@ -18,7 +18,7 @@ export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "garage", "chop"
 // Role tags per preset, by name. A preset not listed gets its instrument's default.
 const DEFAULT_ROLE: Record<InstrumentKind, Role[]> = {
   drums: ["drums"], analog: ["drums"], acid: ["bass"], wobble: ["bass"], poly: ["keys"], pad: ["pad"],
-  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"], epiano: ["keys"], pluck: ["pluck"], organ: ["keys"], anthem: ["lead"], patch: ["bass"], vox: ["pad"], boom: ["fx"], piano: ["keys"], garage: ["drums"], chop: ["drums"],
+  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"], epiano: ["keys"], pluck: ["pluck"], organ: ["keys"], anthem: ["lead"], patch: ["bass"], vox: ["pad"], boom: ["fx"], piano: ["keys"], garage: ["drums"], chop: ["drums"], midi: ["keys"],
 };
 const TAGS: Partial<Record<InstrumentKind, Record<string, Role[]>>> = {
   piano: { "Short Keys": ["keys", "pluck"], "Lullaby": ["keys", "pad"], "Night Felt": ["keys", "pad"], "Echo Keys": ["keys", "arp"] },

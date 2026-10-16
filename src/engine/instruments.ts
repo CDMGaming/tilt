@@ -4,7 +4,7 @@
 import type { InstrumentKind } from "./model";
 import { ANALOG, LEAD, PAD, WOBBLE } from "./instruments2";
 import { CHIP, FM, SAMPLER, WAVE } from "./instruments3";
-import { ANTHEM, BOOM, CHOP, GARAGE, ORGAN, PARLOR, PATCHWORK, PLUCK, TINE, VOX } from "./instruments4";
+import { ANTHEM, BOOM, CHOP, EXTERNAL, GARAGE, ORGAN, PARLOR, PATCHWORK, PLUCK, TINE, VOX } from "./instruments4";
 import { isToolkitKey, toolkitParams } from "./toolkit";
 
 export interface ParamDef {
@@ -267,11 +267,11 @@ export const POLY: InstrumentDef = {
 
 export const INSTRUMENTS: Record<InstrumentKind, InstrumentDef> = {
   drums: DRUMS, acid: ACID, poly: POLY, lead: LEAD, analog: ANALOG, wobble: WOBBLE, pad: PAD,
-  chip: CHIP, fm: FM, wave: WAVE, sampler: SAMPLER, epiano: TINE, pluck: PLUCK, organ: ORGAN, anthem: ANTHEM, patch: PATCHWORK, vox: VOX, boom: BOOM, piano: PARLOR, garage: GARAGE, chop: CHOP,
+  chip: CHIP, fm: FM, wave: WAVE, sampler: SAMPLER, epiano: TINE, pluck: PLUCK, organ: ORGAN, anthem: ANTHEM, patch: PATCHWORK, vox: VOX, boom: BOOM, piano: PARLOR, garage: GARAGE, chop: CHOP, midi: EXTERNAL,
 };
 
 /** Every instrument, in picker order. */
-export const ALL_KINDS: InstrumentKind[] = ["drums", "analog", "garage", "chop", "acid", "wobble", "patch", "poly", "piano", "epiano", "organ", "pluck", "pad", "vox", "fm", "wave", "lead", "anthem", "chip", "boom", "sampler"];
+export const ALL_KINDS: InstrumentKind[] = ["drums", "analog", "garage", "chop", "acid", "wobble", "patch", "poly", "piano", "epiano", "organ", "pluck", "pad", "vox", "fm", "wave", "lead", "anthem", "chip", "boom", "sampler", "midi"];
 
 export const isDrumKind = (k: InstrumentKind) => !!INSTRUMENTS[k].drumParts;
 export const drumCount = (k: InstrumentKind) => INSTRUMENTS[k].drumParts ?? 0;
@@ -299,7 +299,7 @@ export function fromUnit(p: ParamDef, u: number): number {
   if (p.options) return Math.round(p.min + u * (p.max - p.min));
   if (p.curve === "exp" && p.min > 0) return p.min * Math.pow(p.max / p.min, u);
   const v = p.min + u * (p.max - p.min);
-  return p.unit === "st" ? Math.round(v) : v;
+  return p.unit === "st" || p.unit === "int" ? Math.round(v) : v;
 }
 
 export function toUnit(p: ParamDef, v: number): number {
@@ -313,6 +313,7 @@ export function formatParam(p: ParamDef, v: number): string {
   if (p.unit === "s") return v < 1 ? Math.round(v * 1000) + "ms" : v.toFixed(2) + "s";
   if (p.unit === "st") return (v > 0 ? "+" : "") + Math.round(v);
   if (p.unit === "ct") return Math.round(v) + "c";
+  if (p.unit === "int") return String(Math.round(v));
   if (p.min < 0) return (v > 0 ? "+" : "") + Math.round(v * 100);
   return Math.round(v * 100) + "";
 }

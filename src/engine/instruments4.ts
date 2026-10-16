@@ -597,3 +597,40 @@ export const CHOP: InstrumentDef = {
     ck("Lo-fi Break", 11, { level: 0.57 }), ck("Lo-fi Muffled", 11, { level: 0.56, filter: 2000, tune: -1 }),
   ],
 };
+
+// ---------- External: a track that plays another instrument over MIDI ----------
+
+/** Common names for CC numbers (shown under a knob that has no label of its own). */
+export const CC_NAMES: Record<number, string> = {
+  1: "Mod", 2: "Breath", 5: "Porta time", 7: "Volume", 10: "Pan", 11: "Expression", 64: "Sustain", 65: "Porta",
+  71: "Resonance", 72: "Release", 73: "Attack", 74: "Cutoff", 75: "Decay", 76: "Vib rate", 77: "Vib depth",
+  91: "Reverb", 93: "Chorus", 94: "Detune",
+};
+/** A knob's label: the track's own, else the CC's common name, else "CC n". */
+export const ccLabel = (t: { params: Record<string, number>; ccLabels?: string[] }, i: number) => {
+  const n = Math.round(t.params[`ccn${i}`] ?? 0);
+  return t.ccLabels?.[i] || CC_NAMES[n] || `CC ${n}`;
+};
+const ccSet = (name: string, nums: number[], vals: number[] = []) => ({
+  name, params: Object.fromEntries(nums.flatMap((n, i) => [[`ccn${i}`, n], [`cc${i}`, vals[i] ?? 64]])),
+});
+
+export const EXTERNAL: InstrumentDef = {
+  kind: "midi",
+  name: "External",
+  role: "Play a plugin or hardware synth over MIDI",
+  group: "harmony",
+  params: [
+    { id: "channel", label: "Channel", min: 1, max: 16, def: 1, unit: "int" },
+    ...Array.from({ length: 8 }, (_, i) => ({ id: `cc${i}`, label: `CC knob ${i + 1}`, min: 0, max: 127, def: 64, unit: "int" })),
+    ...Array.from({ length: 8 }, (_, i) => ({ id: `ccn${i}`, label: `CC number ${i + 1}`, min: 0, max: 119, unit: "int", def: [74, 71, 73, 72, 1, 91, 93, 7][i] })),
+  ],
+  macros: ["cc0", "cc1", "cc2", "cc3", "cc4", "cc5", "cc6", "cc7"],
+  presets: [
+    ccSet("Synth", [74, 71, 73, 72, 1, 91, 93, 7], [64, 0, 0, 40, 0, 0, 0, 100]),
+    ccSet("Mixer", [7, 10, 11, 91, 93, 1, 64, 94], [100, 64, 127, 0, 0, 0, 0, 0]),
+    ccSet("Filter + Envelope", [74, 71, 73, 75, 72, 76, 77, 1], [64, 0, 0, 64, 40, 64, 0, 0]),
+    ccSet("Plain CCs 20-27", [20, 21, 22, 23, 24, 25, 26, 27]),
+    ccSet("Plain CCs 102-109", [102, 103, 104, 105, 106, 107, 108, 109]),
+  ],
+};

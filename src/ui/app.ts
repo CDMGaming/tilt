@@ -603,7 +603,7 @@ export class App {
     if (!p) return;
     const cur = getParam(track, id);
     let v: number;
-    if (p.options || p.unit === "st") v = Math.max(p.min, Math.min(p.max, Math.round(cur) + Math.sign(steps)));
+    if (p.options || p.unit === "st" || p.unit === "int") v = Math.max(p.min, Math.min(p.max, Math.round(cur) + Math.sign(steps)));
     else v = fromUnit(p, toUnit(p, cur) + steps * (mods.fine ? 0.002 : 0.01));
     this.setParam(track, id, v);
   }

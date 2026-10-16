@@ -309,7 +309,7 @@ export class Push1Surface {
     const [t, key] = slot;
     const p = paramInfo(t, key);
     if (!p) return;
-    if (p.options || p.unit === "st") {
+    if (p.options || p.unit === "st" || p.unit === "int") {
       this.stepped(`${t.id}:${key}`, ticks, 4, (dir) => this.app.setParam(t, key, Math.max(p.min, Math.min(p.max, Math.round(getParam(t, key)) + dir))));
     } else {
       const u = toUnit(p, getParam(t, key)) + ticks / (this.shift ? 1000 : 200);

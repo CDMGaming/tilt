@@ -93,6 +93,11 @@ export class MidiClock {
       if (!out || this.external) return;
       for (const t of times) out.send([0xf8], eng.perfTimeOf(t));
     };
+    // External tracks: each sends to its own output (by name, so a song finds the port again next time).
+    eng.onMidiOut = (track, data, t) => {
+      const out = this.app.midi.outputs().find((o) => o.name === track.midiPort);
+      if (out) out.send(data, t === null ? undefined : eng.perfTimeOf(t));
+    };
     eng.onTransport = (what, t) => {
       const out = this.output();
       if (!out || this.external) return;

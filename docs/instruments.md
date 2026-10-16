@@ -569,6 +569,13 @@ track) to a plugin (e.g. your Gadget VSTs in Ableton via a virtual cable). It re
 arranges like any track. Its panel: port / channel pickers and **8 assignable CC knobs** (number +
 label each), which record as automation like any knob.
 
+**Status: built.** "External" in the instrument list (kind `midi`). Silent in TILT and in exports. The output is
+stored by port name, so a song finds its cable again; the channel is a knob (1-16). Notes go out timestamped
+on the audio clock (in step with TILT's own sound and its MIDI clock out); live keys and pads go straight out.
+Each of the 8 CC knobs has an editable CC number and label (common CCs name themselves: 74 Cutoff, 1 Mod...);
+turning one sends at once and records as automation, and automation plays back as CCs. Stop sends All Notes
+Off. Mute / solo apply; the mixer's volume, pan and send don't (use a CC 7 / CC 10 knob). Five starting CC maps.
+
 ## 7. Samples and licences
 
 Only CC0 or permissive (CC-BY with credit) sources, each folder with a LICENSE.txt naming its source.

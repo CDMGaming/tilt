@@ -93,6 +93,7 @@ class RbInstrument extends AudioWorkletProcessor {
     else if (o.kind === "garage") { const d = new GarageDSP(o.params, sampleRate); if (o.samples) d.setSamples(o.samples, o.rates ?? []); this.dsp = d; }
     else if (o.kind === "piano") { const d = new PianoDSP(o.params, sampleRate); if (o.samples) d.setSamples(o.samples, o.rates ?? []); this.dsp = d; }
     else if (o.kind === "sampler") { const s = new SamplerDSP(o.params, sampleRate); if (o.samples) s.setSamples(o.samples, o.rates ?? []); this.dsp = s; }
+    else if (o.kind === "midi") this.dsp = { params: o.params, noteOn() {}, noteOff() {}, allOff() {}, render() {} }; // External: the notes go out as MIDI
     else this.dsp = new PolyDSP(o.params, sampleRate);
     this.base = o.params;
     if (hasToolkit(o.kind)) this.tk = new Toolkit(o.kind, o.params, sampleRate, this.clock, this.dsp);
