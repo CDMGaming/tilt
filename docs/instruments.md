@@ -465,6 +465,10 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** K.
 - **Theme:** wood cheeks, black panel, vintage chicken-head knobs, coloured cables.
 - **Presets:** 24.
+- **Status: built** (kind `patch`). VCO 1 saw + VCO 2 pulse (interval hidden) + noise, ladder filter, AR EG, two
+  MGs (triangle / saw / square / S&H). MG 1, MG 2 and EG each patch to one of 10 jacks with their own
+  amount (click a source, then a jack; again to unplug); cables are drawn. Drive: overdrive in, saturation
+  out, low shelf. 24 presets (basses, leads, bleeps, FX), level-matched.
 
 ### Vox: formant synth
 - **Idea:** voices without singers: choir pads and talking basses.

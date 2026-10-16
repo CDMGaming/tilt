@@ -227,3 +227,75 @@ export const ANTHEM: InstrumentDef = {
     an("Crowd Roar", { level: 0.11, twist: 1, diffuse: 1, shine: 1, cutoff: 3500, attack: 0.3, release: 3 }),
   ],
 };
+
+// ---------- semi-modular mono: "Patchwork" ----------
+
+export const PW_JACKS = ["Off", "Pitch", "PW", "VCO 2 pitch", "VCO 1 level", "VCO 2 level", "Noise level", "Cutoff", "VCA", "MG 1 rate", "MG 2 rate"];
+const MG_SHAPES = ["Triangle", "Saw", "Square", "S&H"];
+const pw = (name: string, params: Record<string, number>) => ({ name, params });
+// Jack numbers, for the presets' patches.
+const J = { off: 0, pitch: 1, pw: 2, vco2: 3, lv1: 4, lv2: 5, noise: 6, cutoff: 7, vca: 8, mg1: 9, mg2: 10 };
+
+export const PATCHWORK: InstrumentDef = {
+  kind: "patch",
+  name: "Patchwork",
+  role: "A little patchable mono synth for deep basses",
+  group: "bass",
+  params: [
+    { id: "vco1", label: "VCO 1", min: 0, max: 1, def: 0.8 },
+    { id: "vco2", label: "VCO 2", min: 0, max: 1, def: 0.5 },
+    { id: "noise", label: "Noise", min: 0, max: 1, def: 0 },
+    { id: "cutoff", label: "Cutoff", min: 40, max: 10000, def: 800, curve: "exp", unit: "Hz" },
+    { id: "peak", label: "Peak", min: 0, max: 1, def: 0.4 },
+    { id: "drive", label: "Drive", min: 0, max: 1, def: 0.3 },
+    { id: "attack", label: "Attack", min: 0.001, max: 2, def: 0.005, curve: "exp", unit: "s" },
+    { id: "release", label: "Release", min: 0.005, max: 3, def: 0.2, curve: "exp", unit: "s" },
+    { id: "mg1Rate", label: "MG 1 rate", min: 0.05, max: 30, def: 4, curve: "exp", unit: "Hz" },
+    { id: "mg2Rate", label: "MG 2 rate", min: 0.05, max: 30, def: 0.5, curve: "exp", unit: "Hz" },
+    { id: "level", label: "Level", min: 0, max: 1, def: 0.6 },
+    // The patch: where each cable goes, and how much.
+    { id: "mg1To", label: "MG 1 to", min: 0, max: 10, def: 0, options: PW_JACKS },
+    { id: "mg2To", label: "MG 2 to", min: 0, max: 10, def: 0, options: PW_JACKS },
+    { id: "egTo", label: "EG to", min: 0, max: 10, def: 7, options: PW_JACKS },
+    { id: "mg1Amt", label: "MG 1 amount", min: -1, max: 1, def: 0.3 },
+    { id: "mg2Amt", label: "MG 2 amount", min: -1, max: 1, def: 0.3 },
+    { id: "egAmt", label: "EG amount", min: -1, max: 1, def: 0.4 },
+    // Hidden voicing:
+    { id: "mg1Shape", label: "MG 1 shape", min: 0, max: 3, def: 0, options: MG_SHAPES },
+    { id: "mg2Shape", label: "MG 2 shape", min: 0, max: 3, def: 0, options: MG_SHAPES },
+    { id: "vco2Semi", label: "VCO 2 interval", min: -24, max: 24, def: 7, unit: "st" },
+    { id: "vco2Detune", label: "VCO 2 detune", min: -1, max: 1, def: 0.08 },
+    { id: "glide", label: "Glide", min: 0.001, max: 0.5, def: 0.02, curve: "exp", unit: "s" },
+  ],
+  macros: ["cutoff", "peak", "drive", "vco2", "mg1Rate", "mg2Rate", "release", "level"],
+  presets: [
+    // Basses
+    pw("Deep Patch", { level: 0.52,}),
+    pw("Sub Floor", { level: 0.40, vco1: 0.6, vco2: 0.7, vco2Semi: -12, cutoff: 300, peak: 0.2, drive: 0.4 }),
+    pw("Fat Fifth", { level: 0.37, vco2Semi: 7, vco2: 0.7, cutoff: 600, peak: 0.45, drive: 0.5, egAmt: 0.6 }),
+    pw("Octave Growl", { level: 0.31, vco2Semi: 12, vco2: 0.6, cutoff: 500, peak: 0.6, drive: 0.7, mg1To: J.cutoff, mg1Rate: 5, mg1Amt: 0.25 }),
+    pw("Pluck Bass", { level: 0.54, cutoff: 300, peak: 0.5, egAmt: 0.8, release: 0.08, attack: 0.002 }),
+    pw("Rubber", { level: 0.60, vco2: 0.3, cutoff: 400, peak: 0.7, egAmt: 0.5, glide: 0.08 }),
+    pw("Detuned Unison", { level: 0.40, vco2Semi: 0, vco2Detune: 0.25, vco2: 0.8, cutoff: 900, drive: 0.3 }),
+    pw("PWM Bass", { level: 0.41, vco1: 0.3, vco2: 0.9, vco2Semi: 0, mg1To: J.pw, mg1Rate: 0.6, mg1Amt: 0.6, cutoff: 1200 }),
+    pw("Dirty Square", { level: 0.21, vco1: 0, vco2: 1, vco2Semi: 0, drive: 0.9, cutoff: 1500, peak: 0.3 }),
+    pw("Wah Bass", { level: 0.53, cutoff: 250, peak: 0.75, mg1To: J.cutoff, mg1Rate: 2, mg1Amt: 0.55, egTo: 0 }),
+    // Leads
+    pw("Patch Lead", { level: 0.48, vco2Semi: 12, vco2: 0.5, cutoff: 2500, peak: 0.3, glide: 0.06, mg2To: J.pitch, mg2Rate: 5.5, mg2Amt: 0.012 }),
+    pw("Screamer", { level: 0.30, vco2Semi: 7, cutoff: 3000, peak: 0.85, drive: 0.8, egAmt: 0.3 }),
+    pw("Sync-ish Sweep", { level: 0.52, vco2Semi: 19, vco2: 0.7, egTo: J.vco2, egAmt: 0.6, cutoff: 3500 }),
+    pw("Flute Patch", { level: 0.44, vco1: 0.2, vco2: 0.6, vco2Semi: 12, noise: 0.15, cutoff: 1800, peak: 0.2, attack: 0.06, mg2To: J.pitch, mg2Rate: 5, mg2Amt: 0.01 }),
+    // Sequenced / arp-ish
+    pw("Bleep", { level: 0.39, vco1: 0, vco2: 1, vco2Semi: 12, cutoff: 2000, peak: 0.5, release: 0.05, egAmt: 0.7 }),
+    pw("S&H Burble", { level: 0.52, cutoff: 900, peak: 0.7, mg1To: J.cutoff, mg1Shape: 3, mg1Rate: 8, mg1Amt: 0.6 }),
+    pw("Trill", { level: 0.41, vco2Semi: 0, mg1To: J.pitch, mg1Shape: 2, mg1Rate: 9, mg1Amt: 0.08, cutoff: 2200 }),
+    // FX
+    pw("Siren", { level: 0.38, vco1: 0, vco2: 0.9, vco2Semi: 0, mg1To: J.pitch, mg1Rate: 0.6, mg1Amt: 0.5, cutoff: 3000, peak: 0.3 }),
+    pw("Laser", { level: 0.57, egTo: J.pitch, egAmt: -1, attack: 0.001, release: 0.3, cutoff: 4000, peak: 0.6 }),
+    pw("Wind", { level: 0.59, vco1: 0, vco2: 0, noise: 1, cutoff: 900, peak: 0.85, mg1To: J.cutoff, mg1Rate: 0.15, mg1Amt: 0.6, attack: 0.8, release: 1.5 }),
+    pw("UFO", { level: 0.53, vco2Semi: 5, mg1To: J.pitch, mg1Rate: 7, mg1Amt: 0.15, mg2To: J.mg1, mg2Rate: 0.3, mg2Amt: 0.8, cutoff: 3000, peak: 0.5 }),
+    pw("Wobble Patch", { level: 0.38, cutoff: 300, peak: 0.6, drive: 0.6, mg1To: J.cutoff, mg1Shape: 0, mg1Rate: 3, mg1Amt: 0.7, egTo: 0 }),
+    pw("Tremolo Drone", { level: 0.49, vco2Semi: -12, mg1To: J.vca, mg1Rate: 6, mg1Amt: -0.8, cutoff: 700, attack: 0.5, release: 1.2 }),
+    pw("Noise Snap", { level: 0.63, vco1: 0, vco2: 0.3, noise: 0.9, cutoff: 3000, peak: 0.5, release: 0.06, egAmt: 0.9 }),
+  ],
+};

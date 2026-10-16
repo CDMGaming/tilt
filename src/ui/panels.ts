@@ -8,7 +8,7 @@ import { chordName, noteName, scaleById, scaleDegree } from "../engine/music";
 import { decodeFile, listSamples, putSample, sampleLabel } from "./samples";
 import { CHIP_WAVES, SFX_GROUPS, WT_FRAMES, WT_SIZE } from "../engine/instruments3";
 import { WOB_RATES } from "../engine/instruments2";
-import { DRAWBAR_FEET, PLUCK_BODIES, VIB_CHORUS } from "../engine/instruments4";
+import { DRAWBAR_FEET, PLUCK_BODIES, PW_JACKS, VIB_CHORUS } from "../engine/instruments4";
 import { allPresets, applyPreset, deleteUserPreset, presetPosition, saveUserPreset, userPresets, USER_MARK, type PresetEntry } from "./presets";
 import { getParam } from "../engine/params";
 import { RECIPES, genBase, mutateParams, pickSound, soundKey, soundRoles, type SoundRef } from "../engine/sounds";
@@ -259,6 +259,23 @@ export function buildPanel(app: App, track: Track): HTMLElement {
         h("div", { class: "an-ring right" }, ctl("bottom", "Bottom"), ctl("shine", "Shine"), ctl("level", "Level"))),
       keyboard(app, track),
     );
+  } else if (track.kind === "patch") {
+    // Patchwork: wood cheeks, a black panel, chicken-head knobs, and a patch bay: pick a cable's source,
+    // then a jack (the same jack again unplugs it); each cable has its own amount.
+    body = h("div", { class: "panel-body patchwork" },
+      h("div", { class: "pw-case" },
+        h("div", { class: "pw-cheek" }),
+        h("div", { class: "pw-panel" },
+          h("div", { class: "pw-row" },
+            h("div", { class: "pw-sec" }, h("div", { class: "pw-sec-t" }, "MIXER"), ctl("vco1", "VCO 1"), ctl("vco2", "VCO 2"), ctl("noise", "Noise")),
+            h("div", { class: "pw-sec" }, h("div", { class: "pw-sec-t" }, "VCF"), ctl("cutoff", "Cutoff", "l"), ctl("peak", "Peak"), ctl("drive", "★ Drive", "l")),
+            h("div", { class: "pw-sec" }, h("div", { class: "pw-sec-t" }, "EG"), ctl("attack", "Attack"), ctl("release", "Release")),
+            h("div", { class: "pw-sec" }, h("div", { class: "pw-sec-t" }, "MG"), ctl("mg1Rate", "MG 1"), ctl("mg2Rate", "MG 2")),
+            ctl("level", "Level")),
+          patchBay(app, track, ctl)),
+        h("div", { class: "pw-cheek" })),
+      keyboard(app, track),
+    );
   } else if (track.kind === "acid") {
     // Squelch: one row of big knobs (Bite and Gnaw are the character controls), the arp under a lid.
     const arpOn = (track.params.arpOn ?? 0) >= 0.5;
@@ -348,6 +365,51 @@ function xyPad(app: App, track: Track, host: ControlHost): HTMLElement {
   });
   requestAnimationFrame(draw);
   return h("div", { class: "xy-wrap" }, pad, readout);
+}
+
+/** Patchwork's patch bay: three cable sources, the jacks, the cables drawn between them. */
+let patchFrom: "mg1" | "mg2" | "eg" | null = null;
+function patchBay(app: App, track: Track, ctl: (id: string, label?: string, size?: "s" | "m" | "l") => HTMLElement | null): HTMLElement {
+  const SOURCES: ["mg1" | "mg2" | "eg", string, string][] = [["mg1", "MG 1", "#f2b134"], ["mg2", "MG 2", "#4fc3f7"], ["eg", "EG", "#ef5350"]];
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "pw-cables");
+  const jacks = PW_JACKS.slice(1).map((name, k) => h("button", {
+    class: "pw-jack" + (patchFrom ? " armed" : ""), "data-nav": `jack-${k + 1}`, "data-jack": String(k + 1), title: patchFrom ? `Patch ${patchFrom.toUpperCase()} here` : "Pick a cable first (MG 1, MG 2 or EG)",
+    onclick: () => {
+      if (!patchFrom) return;
+      const key = `${patchFrom}To`, j = k + 1, now = Math.round(track.params[key] ?? 0);
+      app.edit("Patch", () => (track.params[key] = now === j ? 0 : j));
+      patchFrom = null;
+      app.screens.edit.render();
+    },
+  }, h("span", { class: "pw-hole" }), name));
+  const sources = SOURCES.map(([id, label, color]) => h("div", { class: "pw-src" },
+    h("button", {
+      class: "pw-jack src" + (patchFrom === id ? " on" : ""), "data-nav": `src-${id}`, "data-src": id, style: `--cable:${color}`,
+      title: `Patch ${label}: click here, then a jack`, onclick: () => { patchFrom = patchFrom === id ? null : id; app.screens.edit.render(); },
+    }, h("span", { class: "pw-hole" }), label),
+    ctl(`${id}Amt`, "Amt", "s")));
+  const bay = h("div", { class: "pw-bay" }, h("div", { class: "pw-srcs" }, sources), h("div", { class: "pw-jacks" }, jacks), svg);
+  // Draw the cables once laid out: a sagging curve from each source to its jack.
+  requestAnimationFrame(() => {
+    const box = bay.getBoundingClientRect();
+    svg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+    svg.replaceChildren();
+    for (const [id, , color] of SOURCES) {
+      const j = Math.round(track.params[`${id}To`] ?? 0);
+      if (!j) continue;
+      const a = bay.querySelector<HTMLElement>(`[data-src="${id}"] .pw-hole`)?.getBoundingClientRect();
+      const b = bay.querySelector<HTMLElement>(`[data-jack="${j}"] .pw-hole`)?.getBoundingClientRect();
+      if (!a || !b) continue;
+      const x1 = a.left + a.width / 2 - box.left, y1 = a.top + a.height / 2 - box.top, x2 = b.left + b.width / 2 - box.left, y2 = b.top + b.height / 2 - box.top;
+      const sag = Math.max(y1, y2) + 30 + Math.abs(x2 - x1) * 0.08;
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", `M ${x1} ${y1} C ${x1} ${sag}, ${x2} ${sag}, ${x2} ${y2}`);
+      path.setAttribute("stroke", color);
+      svg.append(path);
+    }
+  });
+  return bay;
 }
 
 /** Pixel's screen: two cycles of the chosen wave, drawn in chunky pixels. */

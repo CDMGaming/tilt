@@ -10,7 +10,7 @@ import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.t
 import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "../src/engine/dsp/instruments3-dsp.ts";
 import { buildMips, parseWav } from "../src/engine/wavetable.ts";
-import { AnthemDSP, OrganDSP, PluckDSP, TineDSP } from "../src/engine/dsp/instruments4-dsp.ts";
+import { AnthemDSP, OrganDSP, PatchworkDSP, PluckDSP, TineDSP } from "../src/engine/dsp/instruments4-dsp.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
 import { hasToolkit } from "../src/engine/toolkit.ts";
@@ -25,7 +25,7 @@ type Ev = { t: number; len: number; pitch: number; vel: number };
 
 /** A phrase that shows the instrument's idea: an acid line with accents and slides; held chords for arps. */
 function phrase(params: Record<string, number>): Ev[] {
-  if (kind === "wobble") {
+  if (kind === "wobble" || kind === "patch") {
     // A bass line held long enough to hear the wobble: two bars, a slide in the second.
     return [[0, 36, 7.5], [8, 36, 3.5], [12, 39, 3.5], [16, 34, 7.5], [24, 36, 8.5], [32, 43, 0]].filter(([, , l]) => l > 0)
       .map(([s0, pitch, l]) => ({ t: s0 * step, len: l * step, pitch, vel: 100 }));
@@ -132,6 +132,7 @@ function dspFor(params: Record<string, number>, clock: { bpm: number; zero: numb
     case "pluck": return new PluckDSP(params, SR);
     case "organ": return new OrganDSP(params, SR);
     case "anthem": return new AnthemDSP(params, SR);
+    case "patch": return new PatchworkDSP(params, SR);
     case "sampler": {
       const d = new SamplerDSP(params, SR);
       const refs = INSTRUMENTS.sampler.presets[currentPreset]?.samples ?? [];

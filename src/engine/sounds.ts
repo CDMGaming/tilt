@@ -13,14 +13,18 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 
 /** Instruments the dice may pick (the sampler is for sounds you bring). */
-export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "poly", "epiano", "organ", "pluck", "pad", "fm", "wave", "lead", "anthem", "chip"];
+export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "patch", "poly", "epiano", "organ", "pluck", "pad", "fm", "wave", "lead", "anthem", "chip"];
 
 // Role tags per preset, by name. A preset not listed gets its instrument's default.
 const DEFAULT_ROLE: Record<InstrumentKind, Role[]> = {
   drums: ["drums"], analog: ["drums"], acid: ["bass"], wobble: ["bass"], poly: ["keys"], pad: ["pad"],
-  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"], epiano: ["keys"], pluck: ["pluck"], organ: ["keys"], anthem: ["lead"],
+  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"], epiano: ["keys"], pluck: ["pluck"], organ: ["keys"], anthem: ["lead"], patch: ["bass"],
 };
 const TAGS: Partial<Record<InstrumentKind, Record<string, Role[]>>> = {
+  patch: {
+    "Patch Lead": ["lead"], "Screamer": ["lead"], "Sync-ish Sweep": ["lead"], "Flute Patch": ["lead"], "Bleep": ["arp", "pluck"], "S&H Burble": ["arp", "fx"],
+    "Trill": ["arp", "lead"], "Siren": ["fx"], "Laser": ["fx"], "Wind": ["fx"], "UFO": ["fx"], "Tremolo Drone": ["pad", "fx"], "Noise Snap": ["fx", "drums"],
+  },
   anthem: {
     "Saw Pad": ["pad"], "Pump Pad": ["pad"], "Wide Chords": ["pad", "keys"], "Dark Stack": ["pad"], "Sunrise": ["pad"], "Gated Pad": ["pad", "arp"],
     "Pluck Saw": ["pluck", "arp"], "Big Pluck": ["pluck"], "Stab": ["keys", "pluck"], "Pump Stab": ["keys", "pluck"],
@@ -154,7 +158,11 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
   wave: [
     pick("table", 0.4, range(0, 6)), knob("pos", 0.3), knob("warp", 0.25), knob("envAmt", 0.25), knob("envDecay", 0.22),
     knob("lfoAmt", 0.2, 0, 0.7), knob("lfoRate", 0.22), knob("detune", 0.2), knob("cutoff", 0.18, 0.3, 1), knob("reso", 0.15, 0, 0.6),
-  ],  anthem: [
+  ],  patch: [
+    knob("vco1", 0.2), knob("vco2", 0.2), knob("cutoff", 0.15, 0.2, 0.85), knob("peak", 0.18, 0, 0.85), knob("drive", 0.2), pick("vco2Semi", 0.3, [-12, 0, 5, 7, 12]),
+    knob("mg1Rate", 0.2), knob("mg2Rate", 0.2), knob("mg1Amt", 0.15), knob("egAmt", 0.15), pick("mg1To", 0.2, [0, 2, 7, 8]),
+  ],
+  anthem: [
     knob("twist", 0.2, 0.2, 1), knob("diffuse", 0.22), knob("bottom", 0.2, 0, 0.7), knob("shine", 0.2, 0, 0.8),
     knob("cutoff", 0.15, 0.4, 1), knob("fenv", 0.2), knob("fdecay", 0.18), knob("glide", 0.1, 0, 0.4),
   ],

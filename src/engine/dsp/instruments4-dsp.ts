@@ -1,6 +1,6 @@
 // DSP for the Phase 4 instruments (new ones). Runs in the AudioWorklet.
 
-import { ADSR, OnePole, SVF, TAU, blep, mtof, voiceMod } from "./units";
+import { ADSR, Ladder, OnePole, SVF, TAU, blep, mtof, smooth, voiceMod } from "./units";
 import { velGain, type InstrumentDSP } from "./instruments-dsp";
 import { claim } from "./instruments3-dsp";
 import { Reverb } from "./fx-dsp";
@@ -436,6 +436,116 @@ export class AnthemDSP implements InstrumentDSP {
       const wl = shine > 0.01 ? (this.il[i] - bl[i] * 0.65) * shine * 1.4 : 0, wr = shine > 0.01 ? (this.ir[i] - br[i] * 0.65) * shine * 1.4 : 0;
       L[i0 + i] += (bl[i] + wl) * level;
       R[i0 + i] += (br[i] + wr) * level;
+    }
+  }
+}
+
+// ---------------------------------------------------------------- Patchwork: semi-modular mono
+
+/** Patch jacks a cable (MG 1, MG 2, EG) can go to. */
+export const PATCH_JACKS = ["Off", "Pitch", "PW", "VCO 2 pitch", "VCO 1 level", "VCO 2 level", "Noise level", "Cutoff", "VCA", "MG 1 rate", "MG 2 rate"];
+
+/**
+ * Patchwork: a little patchable mono synth for deep basses. VCO 1 (saw), VCO 2 (pulse), noise, a
+ * resonant ladder filter, an AR envelope and two MGs (LFOs). MG 1, MG 2 and the EG each go to one
+ * jack with an amount. Drive (the character control): overdrive into the filter, saturation after it,
+ * and a low shelf so it gets fatter, not thinner.
+ */
+export class PatchworkDSP implements InstrumentDSP {
+  private held: number[] = [];
+  private freq = 110;
+  private target = 110;
+  private gate = false;
+  private eg = 0;
+  private velNow = 1;
+  private o1 = 0;
+  private o2 = 0;
+  private mg = [0, 0];
+  private sh = [0, 0];
+  private filt = new Ladder();
+  private low = new OnePole();
+  private dc = new OnePole();
+  private cut = 800;
+  private mod = new Float64Array(11);
+  private src = [0, 0, 0];
+  constructor(public params: Record<string, number>, private sr: number) {}
+
+  noteOn(pitch: number, vel: number) {
+    const legato = this.held.length > 0;
+    this.held = this.held.filter((p) => p !== pitch);
+    this.held.push(pitch);
+    this.target = mtof(pitch);
+    if (!legato || (this.params.glide ?? 0.02) < 0.005) this.freq = this.target;
+    this.velNow = vel / 127;
+    this.gate = true;
+  }
+  noteOff(pitch: number) {
+    this.held = this.held.filter((p) => p !== pitch);
+    if (this.held.length) this.target = mtof(this.held[this.held.length - 1]);
+    else this.gate = false;
+  }
+  allOff() { this.held = []; this.gate = false; }
+
+  render(L: Float32Array, R: Float32Array, i0: number, i1: number) {
+    const p = this.params, sr = this.sr;
+    if (!this.gate && this.eg < 1e-5) return;
+    const lv1 = p.vco1 ?? 0.8, lv2 = p.vco2 ?? 0.5, lvN = p.noise ?? 0;
+    const semi2 = p.vco2Semi ?? 7, det2 = p.vco2Detune ?? 0.08;
+    const peak = Math.min(0.96, p.peak ?? 0.4), drive = p.drive ?? 0.3;
+    const atk = p.attack ?? 0.005, rel = p.release ?? 0.2;
+    const aK = 1 - Math.exp(-1 / (Math.max(0.001, atk) * sr)), rK = 1 - Math.exp(-1 / (Math.max(0.005, rel) * sr));
+    const glideK = 1 - Math.exp(-1 / (Math.max(0.001, p.glide ?? 0.02) * sr));
+    const routes = [Math.round(p.mg1To ?? 0), Math.round(p.mg2To ?? 0), Math.round(p.egTo ?? 0)];
+    const amts = [p.mg1Amt ?? 0.3, p.mg2Amt ?? 0.3, p.egAmt ?? 0.5];
+    const shapes = [Math.round(p.mg1Shape ?? 0), Math.round(p.mg2Shape ?? 0)];
+    const g = 1 + drive * 5, gn = Math.tanh(g);
+    const level = (p.level ?? 0.6) * 0.85;
+    for (let i = i0; i < i1; i++) {
+      this.freq *= Math.pow(this.target / this.freq, glideK);
+      this.eg += ((this.gate ? 1 : 0) - this.eg) * (this.gate ? aK : rK);
+      // Modulation sums per jack.
+      const mod = this.mod, src = this.src;
+      mod.fill(0);
+      src[2] = this.eg;
+      for (let m = 0; m < 2; m++) {
+        let rate = (m === 0 ? p.mg1Rate ?? 4 : p.mg2Rate ?? 0.5);
+        const rj = m === 0 ? 9 : 10;
+        for (let c = 0; c < 3; c++) if (routes[c] === rj && c !== m) rate *= Math.pow(2, amts[c] * 3 * (c === 2 ? this.eg : this.mgVal(c)));
+        const prev = this.mg[m];
+        this.mg[m] = (this.mg[m] + rate / sr) % 1;
+        if (this.mg[m] < prev) this.sh[m] = Math.random() * 2 - 1;
+        src[m] = this.mgVal(m, shapes[m]);
+      }
+      for (let c = 0; c < 3; c++) if (routes[c]) mod[routes[c]] += amts[c] * src[c];
+      const f0 = this.freq * voiceMod.pitch * Math.pow(2, mod[1]);
+      const f2 = f0 * Math.pow(2, (semi2 + det2 + mod[3] * 12) / 12);
+      const pw = Math.max(0.05, Math.min(0.95, 0.5 + mod[2] * 0.45));
+      const d1 = f0 / sr, d2 = f2 / sr;
+      this.o1 = (this.o1 + d1) % 1; this.o2 = (this.o2 + d2) % 1;
+      const s1 = 2 * this.o1 - 1 - blep(this.o1, d1);
+      const s2 = (this.o2 < pw ? 1 : -1) + blep(this.o2, d2) - blep((this.o2 + 1 - pw) % 1, d2);
+      const clamp = (x: number) => Math.max(0, Math.min(1, x));
+      let x = s1 * clamp(lv1 + mod[4]) + s2 * clamp(lv2 + mod[5]) * 0.8 + noise() * clamp(lvN + mod[6]) * 0.7;
+      x = Math.tanh(x * g * 0.6) / gn; // Drive into the filter
+      this.cut = smooth(this.cut, p.cutoff ?? 800, 0.002);
+      const fc = Math.min(sr * 0.42, this.cut * Math.pow(2, mod[7] * 5));
+      let y = this.filt.process(x, fc, peak, sr) * (1 + peak * 1.5);
+      y = Math.tanh(y * (1 + drive * 1.5));
+      y += this.low.lp(y, 120, sr) * drive * 0.8; // Drive's low shelf
+      const vca = this.eg * Math.max(0, 1 + mod[8] * 0.8) * velGain(this.velNow);
+      y = this.dc.hp(y, 20, sr) * vca * level;
+      L[i] += y; R[i] += y;
+    }
+  }
+
+  /** An MG's current value, -1..1: triangle, saw, square or sample-and-hold. */
+  private mgVal(m: number, shape = Math.round(this.params[m === 0 ? "mg1Shape" : "mg2Shape"] ?? 0)): number {
+    const ph = this.mg[m] ?? 0;
+    switch (shape) {
+      case 1: return 1 - 2 * ph;
+      case 2: return ph < 0.5 ? 1 : -1;
+      case 3: return this.sh[m] ?? 0;
+      default: return 1 - 4 * Math.abs(ph - 0.5);
     }
   }
 }

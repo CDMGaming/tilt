@@ -9,7 +9,7 @@ import { AcidDSP, DrumsDSP, PolyDSP, type InstrumentDSP } from "../src/engine/ds
 import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.ts";
 import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "../src/engine/dsp/instruments3-dsp.ts";
-import { AnthemDSP, OrganDSP, PluckDSP, TineDSP } from "../src/engine/dsp/instruments4-dsp.ts";
+import { AnthemDSP, OrganDSP, PatchworkDSP, PluckDSP, TineDSP } from "../src/engine/dsp/instruments4-dsp.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
 import { hasToolkit } from "../src/engine/toolkit.ts";
@@ -46,6 +46,7 @@ function dsp(kind: InstrumentKind, params: Record<string, number>, preset: numbe
     case "pluck": return new PluckDSP(params, SR);
     case "organ": return new OrganDSP(params, SR);
     case "anthem": return new AnthemDSP(params, SR);
+    case "patch": return new PatchworkDSP(params, SR);
     default: return new PolyDSP(params, SR);
   }
 }
