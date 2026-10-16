@@ -303,6 +303,9 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** I, a framed ornamental panel.
 - **Theme:** deep teal lacquer, gold filigree borders, brass knobs.
 - **Presets:** 24 (bells, mallets, glass pads, plucks).
+- **Status: built.** Harmonics: FM index, feedback, and past halfway a slightly inharmonic ratio;
+  Strike: a brighter onset, more velocity to FM, a click; Shimmer: wider detune, a slow index wobble,
+  chorus. 24 presets (7 bells, 5 mallets, 3 keys, 4 glass pads, 5 plucks / basses / clang), level-matched.
 
 ### Morph: wavetable
 - **Idea:** sweep through waveforms; Warp bends them on a big pad.

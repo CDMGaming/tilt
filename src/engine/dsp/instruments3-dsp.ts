@@ -119,9 +119,20 @@ export class ChipDSP implements InstrumentDSP {
 
 interface FmVoice extends BaseVoice { vel: number; pc: number[]; pm: number; fb: number; t: number }
 
+/**
+ * Glint: two-operator FM (a modulator with feedback into two carriers, detuned for stereo).
+ * Character controls: Harmonics (FM index, feedback, and above halfway a slightly inharmonic
+ * modulator ratio), Strike (a brighter onset, more velocity to FM, a click) and Shimmer (wider
+ * stereo detune, a slow wobble of the FM index, chorus).
+ */
 export class FmDSP implements InstrumentDSP {
   private voices: FmVoice[] = [];
   private counter = 0;
+  private lfo = 0;
+  private cbL = new Float32Array(2048);
+  private cbR = new Float32Array(2048);
+  private cw = 0;
+  private cph = 0;
   constructor(public params: Record<string, number>, private sr: number) {}
 
   noteOn(pitch: number, vel: number) {
@@ -134,18 +145,24 @@ export class FmDSP implements InstrumentDSP {
 
   render(L: Float32Array, R: Float32Array, i0: number, i1: number) {
     const p = this.params, sr = this.sr;
-    const rc = Number(C_RATIOS[Math.round(p.ratioC ?? 1)] ?? 1), rm = Number(M_RATIOS[Math.round(p.ratioM ?? 6)] ?? 3.5);
-    const index = p.index ?? 3, idxDecay = p.indexDecay ?? 0.8, idxSus = p.indexSus ?? 0.15;
-    const fbAmt = (p.feedback ?? 0.05) * 1.5, velIdx = p.velIndex ?? 0.6;
-    const det = (p.detune ?? 0.3) * 0.004;
+    const harm = p.harmonics ?? 0.4, strike = p.strike ?? 0.4, shimmer = p.shimmer ?? 0.3;
+    const rc = Number(C_RATIOS[Math.round(p.ratioC ?? 1)] ?? 1);
+    const rm = Number(M_RATIOS[Math.round(p.ratioM ?? 6)] ?? 3.5) * (1 + Math.max(0, harm - 0.5) * 0.07);
+    const index = (p.index ?? 3) * (0.3 + harm * 1.6), idxDecay = p.indexDecay ?? 0.8, idxSus = p.indexSus ?? 0.15;
+    const fbAmt = ((p.feedback ?? 0.05) + harm * 0.3) * 1.5, velIdx = Math.min(1, (p.velIndex ?? 0.5) + strike * 0.4);
+    const det = ((p.detune ?? 0.1) + shimmer * 0.9) * 0.004;
     const a = p.attack ?? 0.002, d = p.decay ?? 1.6, s = p.sustain ?? 0, r = p.release ?? 1.2;
-    const level = (p.level ?? 0.6) * 0.3;
+    const level = (p.level ?? 0.6) * 1.3;
+    const wet = shimmer * 0.4, len = this.cbL.length;
     for (let i = i0; i < i1; i++) {
+      this.lfo = (this.lfo + 0.4 / sr) % 1;
+      const wob = 1 + shimmer * 0.35 * Math.sin(TAU * this.lfo);
       let l = 0, rr = 0;
       for (const v of this.voices) {
         if (!v.amp.active) continue;
         const f = mtof(v.pitch) * voiceMod.pitch;
-        const idx = index * (idxSus + (1 - idxSus) * Math.exp(-v.t / idxDecay)) * (1 - velIdx + velIdx * v.vel);
+        const hit = 1 + strike * 2 * Math.exp(-v.t / 0.03);
+        const idx = index * hit * wob * (idxSus + (1 - idxSus) * Math.exp(-v.t / idxDecay)) * (1 - velIdx + velIdx * v.vel);
         v.pm += (f * rm) / sr;
         if (v.pm >= 1) v.pm -= 1;
         const mod = Math.sin(TAU * v.pm + v.fb * fbAmt);
@@ -156,9 +173,23 @@ export class FmDSP implements InstrumentDSP {
           v.pc[c] += (f * rc * (1 + (c ? det : -det))) / sr;
           if (v.pc[c] >= 1) v.pc[c] -= 1;
         }
-        l += Math.sin(TAU * v.pc[0] + idx * mod) * env;
-        rr += Math.sin(TAU * v.pc[1] + idx * mod) * env;
+        const click = strike > 0.01 && v.t < 0.006 ? Math.sin(TAU * v.t * 3200) * strike * 0.35 * (1 - v.t / 0.006) * velGain(v.vel) : 0;
+        l += Math.sin(TAU * v.pc[0] + idx * mod) * env + click;
+        rr += Math.sin(TAU * v.pc[1] + idx * mod) * env + click;
         v.t += 1 / sr;
+      }
+      // Shimmer's chorus.
+      if (wet > 0.01) {
+        this.cbL[this.cw] = l; this.cbR[this.cw] = rr;
+        this.cph = (this.cph + 0.7 / sr) % 1;
+        const mod = Math.sin(TAU * this.cph) * 0.0025 * sr, base = 0.01 * sr;
+        const tap = (buf: Float32Array, dly: number) => {
+          const pos = (this.cw - dly + len) % len, k = Math.floor(pos), fr = pos - k;
+          return buf[k] + (buf[(k + 1) % len] - buf[k]) * fr;
+        };
+        l = l * (1 - wet * 0.5) + tap(this.cbL, base + mod) * wet;
+        rr = rr * (1 - wet * 0.5) + tap(this.cbR, base - mod) * wet;
+        this.cw = (this.cw + 1) % len;
       }
       L[i] += l * level;
       R[i] += rr * level;

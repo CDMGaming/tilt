@@ -77,36 +77,63 @@ export const CHIP: InstrumentDef = {
 export const C_RATIOS = ["0.5", "1", "2", "3", "4"];
 export const M_RATIOS = ["0.5", "1", "1.41", "2", "2.5", "3", "3.5", "4", "5", "6", "7", "8", "9", "11", "13"];
 
+const gl = (name: string, params: Record<string, number>) => ({ name, params });
+
 export const FM: InstrumentDef = {
   kind: "fm",
   name: "Glint",
-  role: "FM synth: bells, keys, metallic tones",
+  role: "Glassy, metallic FM tones: bells, mallets, tines",
   group: "harmony",
   params: [
+    { id: "ratioM", label: "Ratio", min: 0, max: 14, def: 6, options: M_RATIOS },
+    { id: "shimmer", label: "Shimmer", min: 0, max: 1, def: 0.3 },
+    { id: "strike", label: "Strike", min: 0, max: 1, def: 0.4 },
+    { id: "harmonics", label: "Harmonics", min: 0, max: 1, def: 0.4 },
+    { id: "attack", label: "Attack", min: 0.001, max: 2, def: 0.002, curve: "exp", unit: "s" },
+    { id: "decay", label: "Decay", min: 0.05, max: 6, def: 1.6, curve: "exp", unit: "s" },
+    { id: "release", label: "Release", min: 0.05, max: 6, def: 1.2, curve: "exp", unit: "s" },
+    { id: "level", label: "Level", min: 0, max: 1, def: 0.6 },
+    // Hidden voicing:
     { id: "ratioC", label: "Carrier", min: 0, max: 4, def: 1, options: C_RATIOS },
-    { id: "ratioM", label: "Modulator", min: 0, max: 14, def: 6, options: M_RATIOS },
     { id: "index", label: "FM amount", min: 0, max: 10, def: 3 },
     { id: "indexDecay", label: "FM decay", min: 0.02, max: 6, def: 0.8, curve: "exp", unit: "s" },
     { id: "indexSus", label: "FM sustain", min: 0, max: 1, def: 0.15 },
     { id: "feedback", label: "Feedback", min: 0, max: 1, def: 0.05 },
-    { id: "velIndex", label: "Vel → FM", min: 0, max: 1, def: 0.6 },
-    { id: "detune", label: "Stereo", min: 0, max: 1, def: 0.3 },
-    { id: "attack", label: "A", min: 0.001, max: 2, def: 0.002, curve: "exp", unit: "s" },
-    { id: "decay", label: "D", min: 0.05, max: 6, def: 1.6, curve: "exp", unit: "s" },
-    { id: "sustain", label: "S", min: 0, max: 1, def: 0 },
-    { id: "release", label: "R", min: 0.05, max: 6, def: 1.2, curve: "exp", unit: "s" },
-    { id: "level", label: "Level", min: 0, max: 1, def: 0.6 },
+    { id: "velIndex", label: "Vel → FM", min: 0, max: 1, def: 0.5 },
+    { id: "detune", label: "Stereo", min: 0, max: 1, def: 0.1 },
+    { id: "sustain", label: "Sustain", min: 0, max: 1, def: 0 },
   ],
-  macros: ["ratioM", "index", "indexDecay", "feedback", "detune", "decay", "release", "level"],
+  macros: ["harmonics", "strike", "shimmer", "ratioM", "decay", "release", "attack", "level"],
   presets: [
-    { name: "Glass Bell", params: {} },
-    { name: "Tine Keys", params: { ratioM: 7, index: 2.2, indexDecay: 0.4, decay: 2, sustain: 0.25, velIndex: 0.8 } },
-    { name: "Tubular", params: { ratioM: 3, index: 4, indexDecay: 2, decay: 4, release: 3 } },
-    { name: "Marimba", params: { ratioM: 7, index: 1.5, indexDecay: 0.08, decay: 0.4, release: 0.3 } },
-    { name: "Metal Clang", params: { ratioM: 2, index: 7, feedback: 0.4, indexDecay: 0.3, decay: 1 } },
-    { name: "FM Bass", params: { ratioC: 0, ratioM: 1, index: 4, indexDecay: 0.15, indexSus: 0.3, decay: 0.5, sustain: 0.6, release: 0.1 } },
-    { name: "Soft Pad", params: { ratioM: 3, index: 1.2, indexSus: 0.8, attack: 0.6, decay: 2, sustain: 0.8, release: 2.5 } },
-    { name: "Wind Chime", params: { ratioC: 2, ratioM: 13, index: 3, indexDecay: 1.2, decay: 5, release: 5, detune: 0.7 } },
+    // Bells
+    gl("Glass Bell", { level: 0.43,}),
+    gl("Tubular", { level: 0.33, ratioM: 5, index: 4, indexDecay: 2, decay: 4, release: 3, harmonics: 0.5 }),
+    gl("Church Bell", { level: 0.34, ratioC: 1, ratioM: 2, index: 5, indexDecay: 3, decay: 5, release: 4, harmonics: 0.65, shimmer: 0.5 }),
+    gl("Tiny Bell", { level: 0.49, ratioC: 2, ratioM: 9, index: 2, indexDecay: 0.6, decay: 1.2, release: 1, strike: 0.6 }),
+    gl("Wind Chime", { level: 0.35, ratioC: 2, ratioM: 13, index: 3, indexDecay: 1.2, decay: 5, release: 5, shimmer: 0.75 }),
+    gl("Gamelan", { level: 0.36, ratioM: 4, index: 4, indexDecay: 1.5, decay: 3, release: 2.5, harmonics: 0.75, shimmer: 0.4 }),
+    gl("Cluster Bell", { level: 0.37, ratioM: 13, index: 3.5, decay: 3, release: 3, harmonics: 0.8, shimmer: 0.6 }),
+    // Mallets
+    gl("Marimba", { level: 0.83, ratioM: 11, index: 1.5, indexDecay: 0.08, decay: 0.4, release: 0.3, strike: 0.6, harmonics: 0.3 }),
+    gl("Vibes", { level: 0.41, ratioM: 7, index: 1.8, indexDecay: 0.5, decay: 2, release: 1.5, shimmer: 0.6, strike: 0.3 }),
+    gl("Xylo", { level: 0.91, ratioM: 11, index: 2.2, indexDecay: 0.05, decay: 0.25, release: 0.2, strike: 0.8, harmonics: 0.35 }),
+    gl("Kalimba", { level: 0.63, ratioM: 9, index: 1.6, indexDecay: 0.12, decay: 0.7, release: 0.5, strike: 0.7, harmonics: 0.2 }),
+    gl("Steel Drum", { level: 0.55, ratioM: 5, index: 2.5, indexDecay: 0.2, decay: 0.9, release: 0.6, strike: 0.5, harmonics: 0.55 }),
+    // Keys / tines
+    gl("Tine Keys", { level: 0.36, ratioM: 13, index: 2.2, indexDecay: 0.4, decay: 2, sustain: 0.25, velIndex: 0.8, strike: 0.5 }),
+    gl("Glass Keys", { level: 0.38, ratioM: 7, index: 1.5, indexDecay: 0.6, decay: 1.8, sustain: 0.2, shimmer: 0.45, strike: 0.35 }),
+    gl("FM Organ", { level: 0.22, ratioM: 3, index: 1.2, indexSus: 1, sustain: 1, attack: 0.005, release: 0.15, harmonics: 0.3, strike: 0 }),
+    // Glass pads
+    gl("Soft Pad", { level: 0.29, ratioM: 5, index: 1.2, indexSus: 0.8, attack: 0.6, decay: 2, sustain: 0.8, release: 2.5, shimmer: 0.6, strike: 0 }),
+    gl("Glass Pad", { level: 0.26, ratioM: 7, index: 1, indexSus: 0.7, attack: 0.9, decay: 3, sustain: 0.7, release: 3, shimmer: 0.85, strike: 0, harmonics: 0.25 }),
+    gl("Frost", { level: 0.30, ratioC: 2, ratioM: 9, index: 1.5, indexSus: 0.6, attack: 1.2, decay: 3, sustain: 0.6, release: 3.5, shimmer: 1, strike: 0 }),
+    gl("Breath Pad", { level: 0.27, ratioM: 1, index: 0.8, indexSus: 0.9, attack: 0.8, sustain: 0.85, release: 2, shimmer: 0.5, feedback: 0.3, strike: 0 }),
+    // Plucks and others
+    gl("Glass Pluck", { level: 0.89, ratioM: 7, index: 2.5, indexDecay: 0.1, decay: 0.35, release: 0.3, strike: 0.7 }),
+    gl("Harp-ish", { level: 0.42, ratioM: 3, index: 1.6, indexDecay: 0.25, decay: 1.2, release: 0.8, strike: 0.45, shimmer: 0.3 }),
+    gl("Metal Clang", { level: 0.53, ratioM: 3, index: 7, feedback: 0.4, indexDecay: 0.3, decay: 1, harmonics: 0.85, strike: 0.7 }),
+    gl("FM Bass", { level: 0.33, ratioC: 0, ratioM: 1, index: 4, indexDecay: 0.15, indexSus: 0.3, decay: 0.5, sustain: 0.6, release: 0.1, shimmer: 0, strike: 0.5 }),
+    gl("Digital Pluck Bass", { level: 0.78, ratioC: 0, ratioM: 3, index: 3, indexDecay: 0.1, decay: 0.4, release: 0.1, shimmer: 0, strike: 0.6, harmonics: 0.45 }),
   ],
 };
 

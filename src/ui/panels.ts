@@ -21,7 +21,7 @@ import { trackColor } from "./theme";
 import { control, type ControlHost } from "./knob";
 
 /** Instruments rebuilt in the overhaul (docs/instruments.md): their own panel only, no MORE page. */
-const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums", "poly", "lead", "wobble", "pad", "chip"]);
+const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums", "poly", "lead", "wobble", "pad", "chip", "fm"]);
 /** Chordette: the category its sound list shows (null: the current sound's). */
 let chordetteCat: string | null = null;
 /** Kitbox: the channel whose More drawer is open (per session). */
@@ -164,13 +164,14 @@ export function buildPanel(app: App, track: Track): HTMLElement {
       keyboard(app, track),
     );
   } else if (track.kind === "fm") {
+    // Glint: knobs set in a framed, ornamental panel; Harmonics, Strike and Shimmer are the character controls.
     body = h("div", { class: "panel-body glint" },
-      h("div", { class: "knob-row" },
-        h("div", { class: "section-title small" }, "Ratios"), ctl("ratioC", "Carrier"), ctl("ratioM", "Modulator"),
-        h("div", { class: "section-title small" }, "FM"), ctl("index", "FM AMOUNT", "l"), ctl("indexDecay", "FM decay"), ctl("indexSus", "FM sustain"), ctl("feedback", "Feedback"), ctl("velIndex", "Vel → FM")),
-      h("div", { class: "knob-row" },
-        h("div", { class: "section-title small" }, "Amp"), ctl("attack", "A", "s"), ctl("decay", "D", "s"), ctl("sustain", "S", "s"), ctl("release", "R", "s"),
-        h("div", { class: "section-title small" }, "Out"), ctl("detune", "Stereo", "s"), ctl("level", "Level", "s")),
+      h("div", { class: "gl-frame" },
+        h("div", { class: "gl-title" }, "✧ Glint ✧"),
+        h("div", { class: "gl-row" },
+          ctl("ratioM", "Ratio"),
+          h("div", { class: "gl-char" }, ctl("harmonics", "★ Harmonics", "l"), ctl("strike", "★ Strike", "l"), ctl("shimmer", "★ Shimmer", "l")),
+          ctl("attack", "Attack"), ctl("decay", "Decay"), ctl("release", "Release"), ctl("level", "Level"))),
       keyboard(app, track),
     );
   } else if (track.kind === "wave") {

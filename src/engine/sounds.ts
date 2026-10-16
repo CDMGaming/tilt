@@ -50,7 +50,12 @@ const TAGS: Partial<Record<InstrumentKind, Record<string, Role[]>>> = {
     "Level Clear": ["fx", "arp"], "Game Over": ["fx"], "Fanfare Bit": ["fx", "arp"],
     "Coin": ["fx"], "Jump": ["fx"], "Power Up": ["fx"], "Laser Blip": ["fx"], "Noise Snare": ["fx"], "Explosion": ["fx"], "Hit": ["fx"], "Teleport": ["fx"],
   },
-  fm: { "Marimba": ["pluck", "keys"], "Metal Clang": ["fx"], "FM Bass": ["bass"], "Soft Pad": ["pad"], "Wind Chime": ["pluck", "fx"] },
+  fm: {
+    "Marimba": ["pluck", "keys"], "Vibes": ["keys", "pluck"], "Xylo": ["pluck"], "Kalimba": ["pluck"], "Steel Drum": ["pluck", "keys"],
+    "Glass Pluck": ["pluck"], "Harp-ish": ["pluck", "arp"], "Wind Chime": ["pluck", "fx"], "Metal Clang": ["fx"], "Cluster Bell": ["keys", "fx"],
+    "FM Bass": ["bass"], "Digital Pluck Bass": ["bass", "pluck"],
+    "Soft Pad": ["pad"], "Glass Pad": ["pad"], "Frost": ["pad"], "Breath Pad": ["pad"],
+  },
   wave: {
     "Sweep Pluck": ["pluck"], "Slow Scan": ["pad"], "Digital Bass": ["bass"], "Wide Pad": ["pad"], "Vowel Keys": ["keys"],
     "Glitch Stab": ["fx", "pluck"],
@@ -130,8 +135,8 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
     knob("decay", 0.18), knob("sustain", 0.18), knob("sweepTime", 0.15),
   ],
   fm: [
-    pick("ratioC", 0.15, [1, 2]), pick("ratioM", 0.35, range(0, 14)), knob("index", 0.18, 0.05, 0.8), knob("indexDecay", 0.22),
-    knob("indexSus", 0.18, 0, 0.6), knob("feedback", 0.18, 0, 0.5), knob("velIndex", 0.2), knob("detune", 0.2), knob("decay", 0.15), knob("release", 0.12),
+    knob("harmonics", 0.2, 0, 0.9), knob("strike", 0.22), knob("shimmer", 0.22), pick("ratioM", 0.3, range(0, 14)), pick("ratioC", 0.12, [1, 2]),
+    knob("indexDecay", 0.22), knob("indexSus", 0.18, 0, 0.6), knob("decay", 0.15), knob("release", 0.12),
   ],
   wave: [
     pick("table", 0.5, range(0, 6)), knob("pos", 0.3), knob("envAmt", 0.25), knob("envDecay", 0.22), knob("lfoAmt", 0.2, 0, 0.7),

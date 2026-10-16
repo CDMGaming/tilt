@@ -1327,3 +1327,21 @@ body.phone .panel-body.razor .knob.fader { width: 38px; }
 .panel.kind-chip .panel-body.pixel { --cap-fill: #7a4fd6; --cap-edge: #4b2f8a; --knob-dot: #fff; }
 .panel-body.pixel .knob-val { stroke: #e04a9b; }
 .panel-body.pixel .knob-track { stroke: #0000001f; }
+
+/* Glint: deep teal lacquer, gold filigree borders, brass knobs. */
+.panel-body.glint { padding: 10px; border-top-color: #c9a24a; background: radial-gradient(circle at 50% 0%, #1f5f5c, #0d3533 70%); }
+.gl-frame { position: relative; padding: 10px 18px 12px; border: 2px solid #c9a24a; border-radius: 6px;
+  box-shadow: inset 0 0 0 4px #0d3533, inset 0 0 0 5px #c9a24a88, 0 0 0 1px #6b5222; background: #0b2b2a66; }
+.gl-frame::before, .gl-frame::after { content: "❦"; position: absolute; top: -12px; font-size: 18px; color: #e3c271; background: #0f3d3b; padding: 0 6px; }
+.gl-frame::before { left: 14px; } .gl-frame::after { right: 14px; transform: scaleX(-1); }
+.gl-title { text-align: center; font: italic 700 15px Georgia, serif; letter-spacing: .3em; color: #e3c271; margin-bottom: 6px; text-shadow: 0 1px 0 #000a; }
+.gl-row { display: flex; gap: 8px 14px; align-items: flex-end; justify-content: center; flex-wrap: wrap; }
+.gl-char { display: flex; gap: 10px; padding: 4px 12px 2px; border-radius: 999px; border: 1px solid #c9a24a66; background: #0000002a; }
+.panel-body.glint .knob-label { color: #e8d39b; opacity: 1; font-family: Georgia, serif; font-style: italic; letter-spacing: .04em; text-transform: none; font-size: 12px; }
+.panel-body.glint .gl-char .knob-label { color: #ffe08a; }
+.panel-body.glint .knob-value { color: #bcd9d4; }
+.panel.kind-fm .panel-body.glint { --cap-fill: #b8913f; --cap-edge: #6b5222; --knob-dot: #2b1c05; --arc-w: 2.5; }
+.panel-body.glint .knob-cap { fill: url(#none); fill: #c9a24a; }
+.panel-body.glint .knob-val { stroke: #e3c271; }
+.panel-body.glint .knob-track { stroke: #ffffff18; }
+.panel-body.glint .switch { background: #0d3533; border-color: #c9a24a88; color: #e8d39b; }
