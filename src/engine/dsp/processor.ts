@@ -63,6 +63,8 @@ class RbInstrument extends AudioWorkletProcessor {
   private vol = -1;
   private pan = 0;
   private send = 0;
+  /** The track's safety limiter: gain now (1 = untouched). */
+  private safety = 1;
 
   constructor(options: { processorOptions: InstrumentOptions }) {
     super();
@@ -154,7 +156,12 @@ class RbInstrument extends AudioWorkletProcessor {
       this.send += (st - this.send) * 0.004;
       const g = this.vol * this.vol * 1.25; // squared: a fader-like curve
       const a = ((this.pan + 1) * Math.PI) / 4;
-      const l = L[i] * g * Math.cos(a) * 1.414, r = R[i] * g * Math.sin(a) * 1.414;
+      let l = L[i] * g * Math.cos(a) * 1.414, r = R[i] * g * Math.sin(a) * 1.414;
+      // Safety limiter: a stack of loud notes can't slam the master (instant attack, ~120 ms release).
+      const pk = Math.max(Math.abs(l), Math.abs(r)) * this.safety;
+      if (pk > 0.9) this.safety *= 0.9 / pk;
+      else this.safety += (1 - this.safety) * 0.00018;
+      l *= this.safety; r *= this.safety;
       L[i] = l; R[i] = r;
       if (sl && sr) { sl[i] = l * this.send; sr[i] = r * this.send; }
     }
