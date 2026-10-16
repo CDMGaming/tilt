@@ -9,7 +9,8 @@ import { AcidDSP, DrumsDSP, PolyDSP, type InstrumentDSP } from "../src/engine/ds
 import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.ts";
 import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "../src/engine/dsp/instruments3-dsp.ts";
-import { AnthemDSP, BoomDSP, OrganDSP, PatchworkDSP, PluckDSP, TineDSP, VoxDSP } from "../src/engine/dsp/instruments4-dsp.ts";
+import { AnthemDSP, BoomDSP, OrganDSP, PatchworkDSP, PianoDSP, PluckDSP, TineDSP, VoxDSP } from "../src/engine/dsp/instruments4-dsp.ts";
+import { sampleSetRefs } from "../src/engine/instruments4.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
 import { hasToolkit } from "../src/engine/toolkit.ts";
@@ -48,6 +49,11 @@ function dsp(kind: InstrumentKind, params: Record<string, number>, preset: numbe
     case "anthem": return new AnthemDSP(params, SR);
     case "patch": return new PatchworkDSP(params, SR);
     case "vox": return new VoxDSP(params, SR);
+    case "piano": {
+      const d = new PianoDSP(params, SR), refs = sampleSetRefs({ kind: "piano" } as never) ?? [];
+      d.setSamples(refs.map((r) => wav16(new URL(`../public/${r.slice(6)}.wav`, import.meta.url))), refs.map(() => 32000));
+      return d;
+    }
     case "boom": return new BoomDSP({ ...params, "song:key": 0, "song:minor": 1 }, SR, { bpm: 125, zero: 0 });
     default: return new PolyDSP(params, SR);
   }

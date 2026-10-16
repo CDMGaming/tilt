@@ -8,7 +8,7 @@ import { chordName, noteName, scaleById, scaleDegree } from "../engine/music";
 import { decodeFile, listSamples, putSample, sampleLabel } from "./samples";
 import { CHIP_WAVES, SFX_GROUPS, WT_FRAMES, WT_SIZE } from "../engine/instruments3";
 import { WOB_RATES } from "../engine/instruments2";
-import { DRAWBAR_FEET, PLUCK_BODIES, PW_JACKS, VIB_CHORUS } from "../engine/instruments4";
+import { DRAWBAR_FEET, PIANO_CATS, PLUCK_BODIES, PW_JACKS, VIB_CHORUS } from "../engine/instruments4";
 import { allPresets, applyPreset, deleteUserPreset, presetPosition, saveUserPreset, userPresets, USER_MARK, type PresetEntry } from "./presets";
 import { getParam } from "../engine/params";
 import { RECIPES, genBase, mutateParams, pickSound, soundKey, soundRoles, type SoundRef } from "../engine/sounds";
@@ -22,6 +22,8 @@ import { control, type ControlHost } from "./knob";
 
 /** Chordette: the category its sound list shows (null: the current sound's). */
 let chordetteCat: string | null = null;
+/** Parlor: the group its sound list shows (null: the current sound group). */
+let parlorCat: string | null = null;
 /** Kitbox: the channel whose More drawer is open (per session). */
 let kitboxMore: number | null = null;
 /** Squelch's arp lid, open or shut (per session). */
@@ -301,6 +303,26 @@ export function buildPanel(app: App, track: Track): HTMLElement {
           h("div", { class: "bm-char" }, ctl("rise", "★ Rise", "l"), ctl("impact", "★ Impact", "l")),
           ctl("tune", "Tune"), ctl("length", "Length"), ctl("level", "Level"))),
       h("p", { class: "note" }, "The Stab plays a chord on the song's key (major or minor from its scale)."),
+    );
+  } else if (track.kind === "piano") {
+    // Parlor: black lacquer and ivory type, no decoration: a short sound list, then the knob row.
+    const factory = INSTRUMENTS.piano.presets;
+    const cat = parlorCat ?? factory.find((x) => x.name === track.preset)?.cat ?? "Upright";
+    body = h("div", { class: "panel-body parlor" },
+      h("div", { class: "pl-face" },
+        h("div", { class: "pl-left" },
+          h("div", { class: "pl-cats" }, PIANO_CATS.map((c) => h("button", {
+            class: "pl-cat" + (c === cat ? " on" : ""), "data-nav": `cat-${c}`, "aria-pressed": String(c === cat),
+            onclick: () => { parlorCat = c; app.screens.edit.render(); },
+          }, c))),
+          h("div", { class: "pl-list", role: "listbox" }, factory.filter((x) => x.cat === cat).map((x) => h("button", {
+            class: "pl-row" + (x.name === track.preset ? " on" : ""), role: "option", "data-nav": `snd-${x.name}`, "aria-selected": String(x.name === track.preset),
+            onclick: () => { app.edit("Preset", () => applyPreset(track, { name: x.name, params: x.params, user: false })); previewSound(app, track); },
+          }, x.name)))),
+        h("div", { class: "pl-knobs" },
+          h("div", { class: "pl-char" }, ctl("character", "★ Character", "l")),
+          ctl("release", "Release"), ctl("low", "Low"), ctl("mid", "Mid"), ctl("high", "High"), ctl("room", "Room"), ctl("level", "Level"))),
+      keyboard(app, track),
     );
   } else if (track.kind === "acid") {
     // Squelch: one row of big knobs (Bite and Gnaw are the character controls), the arp under a lid.

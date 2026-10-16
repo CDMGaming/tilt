@@ -1,0 +1,3 @@
+Piano samples: from the Versilian Community Sample Library (VCSL), "Upright Piano, Yamaha",
+https://github.com/sgossner/VCSL  -  released under CC0 1.0 (public domain dedication).
+Trimmed, mixed to mono and resampled to 32 kHz for TILT by tools/make-samples.ts.

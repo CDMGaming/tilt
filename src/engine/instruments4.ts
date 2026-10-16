@@ -1,6 +1,7 @@
 // Phase 4 instruments (new): definitions (params, macros, presets). DSP lives in dsp/instruments4-dsp.ts.
 
 import type { InstrumentDef } from "./instruments";
+import type { Track } from "./model";
 
 // ---------- electric piano: "Tine" (FM, no samples) ----------
 
@@ -409,5 +410,69 @@ export const BOOM: InstrumentDef = {
     bm("Pop Drop", { level: 1.00, rise: 0.6, impact: 0.45, length: 0.9, tune: 2 }),
     bm("Sub Boom", { level: 0.37, rise: 0.3, impact: 0.8, length: 2.6, tune: -10, p3level: 0.4 }),
     bm("Airy", { level: 1.00, rise: 0.8, impact: 0.15, length: 1.8, tune: 12, p1level: 0.4 }),
+  ],
+};
+
+// ---------- sampled piano: "Parlor" (CC0 samples, public/piano) ----------
+
+const PIANO_NOTES = ["C0", "G0", "C1", "G1", "C2", "G2", "C3", "G3", "C4", "G4", "C5", "G5", "C6"];
+export const PIANO_CATS = ["Grand", "Upright", "Felt", "Colour"];
+const pn = (name: string, cat: string, params: Record<string, number>) => ({ name, cat, params });
+
+/** The sample files an instrument plays from (loaded on first use), or null if it has none. */
+export function sampleSetRefs(t: Track): string[] | null {
+  if (t.kind === "piano") return PIANO_NOTES.flatMap((n) => [`asset:piano/${n}-soft`, `asset:piano/${n}-hard`]);
+  return null;
+}
+
+export const PARLOR: InstrumentDef = {
+  kind: "piano",
+  name: "Parlor",
+  role: "A real piano, simple to play and to shape",
+  group: "harmony",
+  params: [
+    { id: "character", label: "Character", min: 0, max: 1, def: 0.5 },
+    { id: "release", label: "Release", min: 0.05, max: 3, def: 0.4, curve: "exp", unit: "s" },
+    { id: "low", label: "Low", min: -12, max: 12, def: 0, unit: "dB" },
+    { id: "mid", label: "Mid", min: -12, max: 12, def: 0, unit: "dB" },
+    { id: "high", label: "High", min: -12, max: 12, def: 0, unit: "dB" },
+    { id: "room", label: "Room", min: 0, max: 1, def: 0.25 },
+    { id: "level", label: "Level", min: 0, max: 1, def: 0.7 },
+    // Hidden voicing:
+    { id: "felt", label: "Felt", min: 0, max: 1, def: 0 },
+    { id: "width", label: "Width", min: 0, max: 1, def: 0.5 },
+    { id: "stretch", label: "Stretch", min: 0, max: 1, def: 0.3 },
+    { id: "velCurve", label: "Velocity curve", min: 0.5, max: 2, def: 1 },
+  ],
+  macros: ["character", "release", "low", "mid", "high", "room", "level", "velCurve"],
+  presets: [
+    // Grand-ish: wider, brighter, more room
+    pn("Concert", "Grand", { level: 0.56, character: 0.6, width: 0.9, room: 0.45, high: 2, low: 2, stretch: 0.5 }),
+    pn("Studio Grand", "Grand", { level: 0.79, character: 0.55, width: 0.8, room: 0.25, high: 1 }),
+    pn("Bright Pop", "Grand", { level: 0.77, character: 0.85, high: 6, mid: 1, room: 0.2, width: 0.7 }),
+    pn("Ballad Grand", "Grand", { level: 0.51, character: 0.4, release: 1, room: 0.6, width: 0.9, high: -1 }),
+    pn("Rock Piano", "Grand", { level: 0.66, character: 0.95, high: 4, mid: 3, room: 0.15, velCurve: 0.8 }),
+    pn("Hall", "Grand", { level: 0.33, character: 0.5, room: 0.9, release: 1.2, width: 1 }),
+    // Upright
+    pn("Upright", "Upright", { level: 0.79 }),
+    pn("Parlour Room", "Upright", { level: 0.68, room: 0.4, character: 0.45 }),
+    pn("Close Mic", "Upright", { level: 0.87, room: 0.05, character: 0.6, high: 2, width: 0.3 }),
+    pn("Soft Touch", "Upright", { level: 0.99, character: 0.2, velCurve: 1.5, high: -3 }),
+    pn("Hard Touch", "Upright", { level: 0.65, character: 0.8, velCurve: 0.7, mid: 2 }),
+    pn("Short Keys", "Upright", { level: 0.88, release: 0.08, character: 0.6, room: 0.1 }),
+    // Felt
+    pn("Felt", "Felt", { level: 0.72, felt: 1, character: 0.2, room: 0.35, release: 0.8 }),
+    pn("Night Felt", "Felt", { level: 0.49, felt: 1, character: 0.1, room: 0.55, release: 1.5, high: -4, low: 2 }),
+    pn("Muffled", "Felt", { level: 0.75, felt: 0.6, character: 0.3, high: -8, room: 0.3 }),
+    pn("Lullaby", "Felt", { level: 0.45, felt: 1, character: 0.15, room: 0.7, release: 2, width: 0.9 }),
+    pn("Intimate", "Felt", { level: 0.85, felt: 0.8, character: 0.25, room: 0.15, release: 0.6 }),
+    pn("Soft Felt Wide", "Felt", { level: 0.60, felt: 1, character: 0.2, width: 1, room: 0.5 }),
+    // Colour
+    pn("Honky Tonk", "Colour", { level: 0.79, character: 0.8, mid: 3, room: 0.2, "ifx:type": 8, "ifx:a": 0.6, "ifx:b": 0.35 }),
+    pn("Lo-fi Keys", "Colour", { level: 0.63, character: 0.4, high: -6, low: 3, room: 0.3, "ifx:type": 7, "ifx:a": 0.65, "ifx:b": 0.55 }),
+    pn("Tape Piano", "Colour", { level: 0.97, character: 0.45, high: -3, room: 0.25, "ifx:type": 8, "ifx:a": 0.15, "ifx:b": 0.3 }),
+    pn("Phased", "Colour", { level: 1.00, character: 0.5, room: 0.2, "ifx:type": 9, "ifx:a": 0.2, "ifx:b": 0.5 }),
+    pn("Echo Keys", "Colour", { level: 0.76, character: 0.5, room: 0.3, "ifx:type": 13, "ifx:a": 0.45, "ifx:b": 0.3 }),
+    pn("Telephone", "Colour", { level: 0.65, character: 0.7, low: -12, high: -10, mid: 6, room: 0.05 }),
   ],
 };

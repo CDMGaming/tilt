@@ -754,3 +754,98 @@ export class BoomDSP implements InstrumentDSP {
     }
   }
 }
+
+// ---------------------------------------------------------------- Parlor: sampled piano
+
+/** The piano's sampled notes (MIDI roots), each with a soft and a hard layer: samples [2k] soft, [2k + 1] hard. */
+export const PIANO_ROOTS = [24, 31, 36, 43, 48, 55, 60, 67, 72, 79, 84, 91, 96];
+
+interface PianoVoice { pitch: number; held: boolean; age: number; amp: ADSR; vel: number; t: number; idx: number; pos: number; rate: number; mix: number; rel: number; f: SVF; pan: number; hammer: number }
+
+/**
+ * Parlor: a sampled upright (CC0, VCSL), two velocity layers per sampled note, each played up to
+ * 3.5 semitones from its root. Character (the character control): how fast velocity brightens the tone,
+ * how much the hard layer comes in, and the hammer noise. Release is the damper; Low / Mid / High a
+ * three-band EQ; Room its own reverb. Hidden: felt (a darker, softer voicing), width, stretch tuning.
+ */
+export class PianoDSP implements InstrumentDSP {
+  private voices: PianoVoice[] = [];
+  private counter = 0;
+  private samples: Float32Array[] = [];
+  private rates: number[] = [];
+  private room: Reverb;
+  private eq = [new OnePole(), new OnePole(), new OnePole(), new OnePole()];
+  private bl = new Float32Array(128);
+  private br = new Float32Array(128);
+  private il = new Float32Array(128);
+  private ir = new Float32Array(128);
+  constructor(public params: Record<string, number>, private sr: number) {
+    this.room = new Reverb(sr, 1.2);
+  }
+
+  setSamples(s: Float32Array[], rates: number[]) { this.samples = s; this.rates = rates; }
+
+  noteOn(pitch: number, vel: number) {
+    let k = 0;
+    for (let i = 1; i < PIANO_ROOTS.length; i++) if (Math.abs(PIANO_ROOTS[i] - pitch) < Math.abs(PIANO_ROOTS[k] - pitch)) k = i;
+    const p = this.params, v01 = vel / 127;
+    const ch = p.character ?? 0.5, felt = p.felt ?? 0;
+    const stretch = (p.stretch ?? 0.3) * ((pitch - 60) / 12) * 3; // cents: low notes flatter, high sharper
+    const v = claim(this.voices, 24, pitch, () => ({ pitch, held: true, age: 0, amp: new ADSR(), vel: 1, t: 0, idx: 0, pos: 0, rate: 1, mix: 0, rel: 0, f: new SVF(), pan: 0, hammer: 0 }), ++this.counter);
+    v.vel = Math.pow(v01, p.velCurve ?? 1); v.t = 0; v.idx = k; v.pos = 0; v.rel = 0;
+    v.rate = Math.pow(2, (pitch - PIANO_ROOTS[k] + stretch / 100) / 12) * ((this.rates[k * 2] ?? 32000) / this.sr);
+    v.mix = felt > 0.5 ? 0 : Math.max(0, Math.min(1, (v01 - 0.35 + ch * 0.3) * (1.2 + ch)));
+    v.pan = Math.max(-1, Math.min(1, ((pitch - 60) / 30) * (p.width ?? 0.5)));
+    v.hammer = ch * v01 * (1 - felt);
+    v.amp.gate(true);
+  }
+  noteOff(pitch: number) { for (const v of this.voices) if (v.pitch === pitch && v.held) { v.held = false; v.amp.gate(false); } }
+  allOff() { for (const v of this.voices) { v.held = false; v.amp.gate(false); } }
+
+  render(L: Float32Array, R: Float32Array, i0: number, i1: number) {
+    const p = this.params, sr = this.sr, n = i1 - i0;
+    const ch = p.character ?? 0.5, felt = p.felt ?? 0, release = p.release ?? 0.4;
+    const db = (x: number) => Math.pow(10, x / 20);
+    const gL = db(p.low ?? 0), gM = db(p.mid ?? 0), gH = db(p.high ?? 0);
+    const roomLv = p.room ?? 0.25, level = (p.level ?? 0.7) * 0.55;
+    if (this.bl.length < n) { this.bl = new Float32Array(n); this.br = new Float32Array(n); this.il = new Float32Array(n); this.ir = new Float32Array(n); }
+    const bl = this.bl, br = this.br;
+    bl.fill(0, 0, n); br.fill(0, 0, n);
+    for (const v of this.voices) {
+      const soft = this.samples[v.idx * 2], hard = this.samples[v.idx * 2 + 1];
+      if (!soft?.length || !hard?.length || !v.amp.active) { if (!soft?.length) v.amp.gate(false); continue; }
+      // Brightness follows velocity (more so with Character); Felt darkens everything.
+      const cut = Math.min(sr * 0.45, (900 + 9000 * Math.pow(v.vel, 1.5 - ch)) * (1 - felt * 0.8));
+      const gl = panL(v.pan) * velGain(v.vel), gr = panR(v.pan) * velGain(v.vel);
+      for (let i = 0; i < n; i++) {
+        const ip = v.pos | 0;
+        if (ip + 1 >= soft.length || ip + 1 >= hard.length) { v.amp.gate(false); v.held = false; break; }
+        const fr = v.pos - ip;
+        const a = soft[ip] + (soft[ip + 1] - soft[ip]) * fr, b = hard[ip] + (hard[ip + 1] - hard[ip]) * fr;
+        let x = a + (b - a) * v.mix;
+        if (v.hammer > 0.01 && v.t < 0.012) x += noise() * v.hammer * 0.25 * (1 - v.t / 0.012);
+        x = v.f.lp(x, cut, 0.05, sr);
+        const env = v.amp.next(0.0005, 30, 1, release, sr);
+        bl[i] += x * env * gl; br[i] += x * env * gr;
+        v.pos += v.rate;
+        v.t += 1 / sr;
+        if (!v.amp.active) break;
+      }
+    }
+    this.voices = this.voices.filter((v) => v.amp.active || v.held);
+    // Three-band EQ (shared), then Room (only the reverb's own sound is added).
+    for (let i = 0; i < n; i++) {
+      const lowL = this.eq[0].lp(bl[i], 250, sr), hiL = bl[i] - this.eq[1].lp(bl[i], 3500, sr);
+      const lowR = this.eq[2].lp(br[i], 250, sr), hiR = br[i] - this.eq[3].lp(br[i], 3500, sr);
+      bl[i] = lowL * gL + (bl[i] - lowL - hiL) * gM + hiL * gH;
+      br[i] = lowR * gL + (br[i] - lowR - hiR) * gM + hiR * gH;
+    }
+    this.il.set(bl.subarray(0, n)); this.ir.set(br.subarray(0, n));
+    if (roomLv > 0.01) this.room.process(this.il, this.ir, n, 0.45 + roomLv * 0.4, 1);
+    for (let i = 0; i < n; i++) {
+      const wl = roomLv > 0.01 ? (this.il[i] - bl[i] * 0.65) * roomLv * 1.5 : 0, wr = roomLv > 0.01 ? (this.ir[i] - br[i] * 0.65) * roomLv * 1.5 : 0;
+      L[i0 + i] += (bl[i] + wl) * level;
+      R[i0 + i] += (br[i] + wr) * level;
+    }
+  }
+}

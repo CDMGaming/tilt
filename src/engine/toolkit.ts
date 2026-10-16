@@ -10,9 +10,9 @@ import type { InstrumentKind } from "./model";
 import { FX_TYPES } from "./params";
 
 /** Synths that get the toolkit (drum machines and the sampler don't). */
-export const TOOLKIT_KINDS: InstrumentKind[] = ["acid", "poly", "lead", "wobble", "pad", "chip", "fm", "wave", "epiano", "pluck", "anthem", "patch", "vox"];
+export const TOOLKIT_KINDS: InstrumentKind[] = ["acid", "poly", "lead", "wobble", "pad", "chip", "fm", "wave", "epiano", "pluck", "anthem", "patch", "vox", "piano"];
 /** Polyphonic synths: these get the voice-mode section (the mono ones have their own glide / legato). */
-export const POLY_KINDS: InstrumentKind[] = ["poly", "pad", "chip", "fm", "wave", "epiano", "pluck", "vox"];
+export const POLY_KINDS: InstrumentKind[] = ["poly", "pad", "chip", "fm", "wave", "epiano", "pluck", "vox", "piano"];
 /** Lead synths: these get the performance FX (Pump, Repeat). */
 export const LEAD_KINDS: InstrumentKind[] = ["lead", "chip", "anthem"];
 

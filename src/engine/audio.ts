@@ -9,6 +9,7 @@ import { PPQ, sceneTicks, sceneTempo, type Master, type Song, type Track } from 
 import { workletParams } from "./params";
 import { buildMips, parseWav } from "./wavetable";
 import { DEFAULT_SAMPLER_REFS } from "./instruments3";
+import { sampleSetRefs } from "./instruments4";
 import {
   barCut, eventsInWindow, expandPitch, firstInstance, nextInstance, secPerTick, wholeSong,
   type NoteEvent, type PlayMode, type SceneInstance,
@@ -160,6 +161,9 @@ export class AudioEngine {
     if (!p) {
       if (ref.startsWith("sfx:")) {
         p = fetch(`${import.meta.env.BASE_URL}sfx/${ref.slice(4)}.wav`).then((r) => r.arrayBuffer()).then((b) => parseWav(b)).catch(() => null);
+      } else if (ref.startsWith("asset:")) {
+        // Instrument sample sets that ship with the app (piano, acoustic kit...): public/<path>.wav
+        p = fetch(`${import.meta.env.BASE_URL}${ref.slice(6)}.wav`).then((r) => r.arrayBuffer()).then((b) => parseWav(b)).catch(() => null);
       } else if (ref.startsWith("user:") && this.userSampleLoader) {
         p = this.userSampleLoader(ref.slice(5)).catch(() => null);
       } else p = Promise.resolve(null);
@@ -169,7 +173,7 @@ export class AudioEngine {
   }
 
   private async padSounds(t: Track): Promise<{ samples: Float32Array[]; rates: number[] }> {
-    const refs = t.samples ?? DEFAULT_SAMPLER_REFS;
+    const refs = sampleSetRefs(t) ?? t.samples ?? DEFAULT_SAMPLER_REFS;
     const got = await Promise.all(refs.map((r) => (r ? this.sample(r) : Promise.resolve(null))));
     return { samples: got.map((g) => g?.data ?? new Float32Array(0)), rates: got.map((g) => g?.rate ?? 48000) };
   }
@@ -182,8 +186,8 @@ export class AudioEngine {
         tn.tableIdx = idx;
         void this.mips(idx).then((m) => { if (tn.tableIdx === idx) this.post(tn, { t: "wavetable", mips: m }); });
       }
-    } else if (t.kind === "sampler") {
-      const key = JSON.stringify(t.samples ?? DEFAULT_SAMPLER_REFS);
+    } else if (t.kind === "sampler" || sampleSetRefs(t)) {
+      const key = JSON.stringify(sampleSetRefs(t) ?? t.samples ?? DEFAULT_SAMPLER_REFS);
       if (tn.sampleKey !== key) {
         tn.sampleKey = key;
         void this.padSounds(t).then((s) => { if (tn.sampleKey === key) this.post(tn, { t: "samples", ...s }); });
@@ -551,7 +555,7 @@ export class AudioEngine {
     for (const t of song.tracks) {
       if (opts.onlyTrack !== undefined && t.id !== opts.onlyTrack) continue;
       const extra = t.kind === "wave" ? { mips: await this.mips(Math.round(t.params.table ?? 0)) }
-        : t.kind === "sampler" ? await this.padSounds(t) : {};
+        : t.kind === "sampler" || sampleSetRefs(t) ? await this.padSounds(t) : {};
       const tn = createTrackNodes(off, t, {
         kind: t.kind, params: workletParams(t, song), samples: t.kind === "drums" ? samples : undefined, samplesRate: sr,
         events: byTrack.get(t.id) ?? [], clock: { bpm: song.tempo, zero: 0 }, ...extra,

@@ -10,7 +10,8 @@ import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.t
 import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "../src/engine/dsp/instruments3-dsp.ts";
 import { buildMips, parseWav } from "../src/engine/wavetable.ts";
-import { AnthemDSP, BoomDSP, OrganDSP, PatchworkDSP, PluckDSP, TineDSP, VoxDSP } from "../src/engine/dsp/instruments4-dsp.ts";
+import { AnthemDSP, BoomDSP, OrganDSP, PatchworkDSP, PianoDSP, PluckDSP, TineDSP, VoxDSP } from "../src/engine/dsp/instruments4-dsp.ts";
+import { sampleSetRefs } from "../src/engine/instruments4.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
 import { hasToolkit } from "../src/engine/toolkit.ts";
@@ -86,7 +87,7 @@ function phrase(params: Record<string, number>): Ev[] {
     return [...ch(0, 7.5, [48, 55, 60, 63].map((x) => x + lo)), ...ch(8, 7.5, [44, 51, 56, 60].map((x) => x + lo)),
       ...[[16, 60], [18, 63], [20, 65], [21, 66], [22, 67], [24, 70], [26, 67], [28, 63]].map(([s0, pitch]) => ({ t: s0 * step, len: 1.6 * step, pitch: pitch + lo, vel: 100 }))];
   }
-  if (kind === "epiano") {
+  if (kind === "epiano" || kind === "piano") {
     // Comping: two voiced chords, then a short melody on top.
     const ch = (t0: number, l: number, ps: number[], vel = 90) => ps.map((pitch) => ({ t: t0 * step, len: l * step, pitch, vel }));
     return [...ch(0, 6, [48, 55, 58, 63]), ...ch(8, 6, [44, 51, 55, 60], 70), ...ch(16, 3, [46, 53, 56, 62], 110),
@@ -145,6 +146,11 @@ function dspFor(params: Record<string, number>, clock: { bpm: number; zero: numb
     case "anthem": return new AnthemDSP(params, SR);
     case "patch": return new PatchworkDSP(params, SR);
     case "vox": return new VoxDSP(params, SR);
+    case "piano": {
+      const d = new PianoDSP(params, SR), refs = sampleSetRefs({ kind: "piano" } as never) ?? [];
+      d.setSamples(refs.map((r) => readWav16(new URL(`../public/${r.slice(6)}.wav`, import.meta.url))), refs.map(() => 32000));
+      return d;
+    }
     case "boom": return new BoomDSP({ ...params, "song:key": 0, "song:minor": 1 }, SR, { bpm: 125, zero: 0 });
     case "sampler": {
       const d = new SamplerDSP(params, SR);

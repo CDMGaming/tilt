@@ -370,6 +370,11 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** D, a minimal sound list with Grand, Upright and Felt (variants of one set).
 - **Theme:** black lacquer, ivory type, no decoration.
 - **Presets:** 24 (grand, upright, felt, honky, lo-fi, bright pop...).
+- **Status: built** (kind `piano`). Samples: VCSL "Upright Piano, Yamaha" (CC0), C and G in every octave from
+  C0 to C6 in VCSL naming (C3 = middle C), a soft and a hard layer each, trimmed to 3-6 s, mono, 32 kHz:
+  7.3 MB in public/piano, loaded only when a song uses Parlor (tools/make-samples.ts). Character: how fast
+  velocity brightens, how much the hard layer comes in, hammer noise. Grand / Upright / Felt / Colour are
+  voicings of the one set (width, EQ, room, felt, effects). 24 presets, level-matched and stress-checked.
 
 ### Tine: electric piano (FM, no samples)
 - **Idea:** the bell-and-bark electric piano.
@@ -554,8 +559,8 @@ label each), which record as automation like any knob.
 
 ## 7. Samples and licences
 
-Only CC0 or permissive (CC-BY with credit) sources, listed in `public/kit/LICENSE.txt` and
-`public/samples/LICENSE.txt` with source URLs. **I'll ask before downloading anything.**
+Only CC0 or permissive (CC-BY with credit) sources, each folder with a LICENSE.txt naming its source.
+Downloads approved by you on 2026-10-15. In use: VCSL (CC0) for Parlor (public/piano).
 
 Candidates to check (each licence verified on its own page before use):
 - **Versilian Community Sample Library (VCSL):** CC0. Piano, keys, mallets, orchestral, some percussion.
