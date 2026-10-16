@@ -2,8 +2,7 @@
 // keyboard (synths, scale-locked by default) or pads (drums).
 
 import { CHORD_CATS, DRUM_BASE_NOTE, DRUM_PART_LABELS, INSTRUMENTS, KITS, drumPartName, kitSoundName, formatParam, fromUnit, isDrumKind, paramDef, toUnit } from "../engine/instruments";
-import { LEAD_KINDS, POLY_KINDS, XY_PARAMS, hasToolkit } from "../engine/toolkit";
-import { FX_TYPES } from "../engine/params";
+import { XY_PARAMS } from "../engine/toolkit";
 import type { Track } from "../engine/model";
 import { chordName, noteName, scaleById, scaleDegree } from "../engine/music";
 import { decodeFile, listSamples, putSample, sampleLabel } from "./samples";
@@ -20,8 +19,6 @@ import { h } from "./dom";
 import { trackColor } from "./theme";
 import { control, type ControlHost } from "./knob";
 
-/** Instruments rebuilt in the overhaul (docs/instruments.md): their own panel only, no MORE page. */
-const REDESIGNED = new Set<Track["kind"]>(["acid", "analog", "drums", "poly", "lead", "wobble", "pad", "chip", "fm", "wave", "sampler"]);
 /** Chordette: the category its sound list shows (null: the current sound's). */
 let chordetteCat: string | null = null;
 /** Kitbox: the channel whose More drawer is open (per session). */
@@ -251,59 +248,9 @@ export function buildPanel(app: App, track: Track): HTMLElement {
       keyboard(app, track),
     );
   }
-  // Synths: SOUND (their own knobs, unchanged) | MORE (the voice toolkit) | XY.
-  // A redesigned instrument has only its own panel: the toolkit is hidden voicing its presets set.
-  if (!hasToolkit(track.kind) || REDESIGNED.has(track.kind)) return h("div", { class: `panel kind-${track.kind}`, style: `--track:${trackColor(track)}` }, presetBar, body);
-  const hasXy = !!XY_PARAMS[track.kind];
-  const page = !hasXy && app.ed.panelPage === "xy" ? "main" : app.ed.panelPage ?? "main";
-  const tab = (id: "main" | "more" | "xy", label: string, title: string) => h("button", {
-    class: "page-tab" + (page === id ? " on" : ""), "data-nav": `page-${id}`, "aria-pressed": String(page === id), title,
-    onclick: () => { app.ed.panelPage = id; app.screens.edit.render(); },
-  }, label);
-  const pages = h("div", { class: "panel-pages", role: "tablist" },
-    tab("main", "SOUND", "This instrument's own controls"), tab("more", "MORE", "Filter 2, LFOs, voice, pitch envelope, built-in FX"),
-    hasXy ? tab("xy", "XY", "Two parameters on one pad") : null);
-  const shown = page === "more" ? morePage(app, track, ctl) : page === "xy" ? xyPage(app, track, host) : body;
-  return h("div", { class: `panel kind-${track.kind} page-${page}`, style: `--track:${trackColor(track)}` }, presetBar, pages, shown);
-}
-
-type Ctl = (id: string, label?: string, size?: "s" | "m" | "l") => HTMLElement | null;
-
-/** MORE: the shared voice toolkit (filter 2, 2 LFOs, voice, pitch env, pulse width, velocity, built-in FX, performance FX). */
-function morePage(app: App, track: Track, ctl: Ctl): HTMLElement {
-  const v = (id: string) => getParam(track, id);
-  const sec = (title: string, ...kids: (HTMLElement | null)[]) => h("div", { class: "tk-sec" }, h("div", { class: "section-title small" }, title), ...kids);
-  // Controls that do nothing in the current setting are dimmed (still reachable).
-  const dim = (el: HTMLElement | null, off: boolean) => { if (el && off) el.classList.add("dimmed"); return el; };
-  const filterOff = v("tk:fType") === 0;
-  const lfo = (n: 1 | 2) => {
-    const off = v(`tk:l${n}Dest`) === 0, synced = v(`tk:l${n}Sync`) > 0;
-    return sec(`LFO ${n}`, ctl(`tk:l${n}Dest`, "To"), dim(ctl(`tk:l${n}Amt`, "Amount", "l"), off), dim(ctl(`tk:l${n}Shape`, "Shape"), off),
-      dim(ctl(`tk:l${n}Rate`, "Rate"), off || synced), dim(ctl(`tk:l${n}Sync`, "Sync"), off), dim(ctl(`tk:l${n}Key`, "Key"), off), dim(ctl(`tk:l${n}Delay`, "Fade in"), off));
-  };
-  const fxType = FX_TYPES[Math.round(v("ifx:type"))] ?? FX_TYPES[0];
-  const fxOff = fxType.id === "off";
-  return h("div", { class: "panel-body more-page" },
-    h("div", { class: "knob-row" },
-      sec("Filter 2", ctl("tk:fType", "Type"), dim(ctl("tk:fCut", "Cutoff", "l"), filterOff), dim(ctl("tk:fRes", "Reso"), filterOff), dim(ctl("tk:fTrack", "Key track"), filterOff),
-        dim(ctl("tk:fEnv", "Env"), filterOff), dim(ctl("tk:fA", "A", "s"), filterOff), dim(ctl("tk:fD", "D", "s"), filterOff), dim(ctl("tk:fS", "S", "s"), filterOff), dim(ctl("tk:fR", "R", "s"), filterOff))),
-    h("div", { class: "knob-row" }, lfo(1), lfo(2)),
-    h("div", { class: "knob-row" },
-      POLY_KINDS.includes(track.kind) ? sec("Voice", ctl("tk:mode", "Mode"), ctl("tk:uni", "Unison"), dim(ctl("tk:uniDet", "Detune"), v("tk:uni") <= 1), dim(ctl("tk:glide", "Glide"), v("tk:mode") === 0)) : null,
-      sec("Pitch env", ctl("tk:pAmt", "Amount"), dim(ctl("tk:pDec", "Decay"), v("tk:pAmt") === 0)),
-      sec("Pulse", ctl("tk:pw", "Width")),
-      sec("Velocity", ctl("tk:velAmp", "→ Amp"), ctl("tk:velFilt", "→ Filter"))),
-    h("div", { class: "knob-row" },
-      sec("Built-in FX", ctl("ifx:type", "Type"), dim(ctl("ifx:a", fxType.a || "Edit 1"), fxOff), dim(ctl("ifx:b", fxType.b || "Edit 2"), fxOff),
-        h("span", { class: "note tk-note" }, "Saved with the preset")),
-      LEAD_KINDS.includes(track.kind) ? sec("Perform", ctl("tk:pump", "Pump", "l"), ctl("tk:repeat", "Repeat", "l"), dim(ctl("tk:repDiv", "Rate"), v("tk:repeat") === 0)) : null),
-  );
-}
-
-/** XY: the synth's two most expressive parameters on one pad (mouse, touch, a pad's right stick; moves record as automation). */
-function xyPage(app: App, track: Track, host: ControlHost): HTMLElement {
-  return h("div", { class: "panel-body xy-page" }, xyPad(app, track, host),
-    h("p", { class: "note" }, "While recording, moves are written into the clip as automation for both parameters."));
+  // Every instrument has only its own panel: the voice toolkit (filter 2, LFOs, unison, built-in FX...)
+  // is hidden voicing that its presets set.
+  return h("div", { class: `panel kind-${track.kind}`, style: `--track:${trackColor(track)}` }, presetBar, body);
 }
 
 /** An XY pad for the instrument's two pad parameters (XY_PARAMS), with a readout under it. */

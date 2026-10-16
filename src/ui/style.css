@@ -1218,16 +1218,8 @@ body.phone .chain-chip { padding: 6px 8px 8px; }
 .len-btn.own { color: var(--dmd); border-color: color-mix(in srgb, var(--dmd) 55%, var(--line)); }
 .len-btn .len-note { opacity: .8; }
 
-/* ---------- Synth panels: SOUND | MORE | XY ---------- */
-.panel-pages { display: flex; gap: 3px; padding: 3px; margin: 6px 0 4px; width: fit-content; background: var(--well); border-radius: calc(var(--r-m) + 3px); }
-.page-tab { font: 700 11px var(--font-display); letter-spacing: .12em; padding: 4px 12px; background: transparent; border-color: transparent; box-shadow: none; color: var(--dim); }
-.page-tab.on, button.page-tab.on:hover:not(:disabled) { background: var(--track); color: var(--key-ink); border-color: transparent; }
-.more-page .knob-row { gap: 14px; row-gap: 8px; }
-.tk-sec { display: flex; align-items: flex-end; gap: 6px; flex-wrap: wrap; padding: 6px 8px 4px; border-radius: var(--r-m); background: var(--well); }
-.tk-sec > .section-title { align-self: center; writing-mode: vertical-rl; transform: rotate(180deg); margin-right: 2px; }
-.dimmed { opacity: .38; }
-.tk-note { align-self: center; max-width: 90px; font-size: 11px; }
-.xy-page { display: flex; flex-direction: column; gap: 8px; }
+/* ---------- The XY pad (Morph) ---------- */
+.xy-wrap { display: flex; flex-direction: column; gap: 6px; }
 .xy-pad { position: relative; height: 230px; border-radius: var(--r-m); cursor: crosshair; touch-action: none;
   background: radial-gradient(circle at 30% 70%, color-mix(in srgb, var(--track) 14%, transparent), transparent 70%), var(--well);
   background-image: linear-gradient(#ffffff0a 1px, transparent 1px), linear-gradient(90deg, #ffffff0a 1px, transparent 1px); background-size: 25% 25%;

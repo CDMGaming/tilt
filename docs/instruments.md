@@ -35,7 +35,7 @@ They're a generic synth page, which this design rules out. The plan:
   hidden voicing that presets set. Songs already using them keep sounding the same.
 - **The pages go**, instrument by instrument, as each is rebuilt in Phase 3.
 - **An XY pad survives only where it's the instrument's idea:** Morph's Warp pad and Vox's vowel pad.
-  (Done: the XY tab now shows on Morph only.)
+  (Done: every instrument is rebuilt, so the MORE and XY pages are gone; Morph's pad is on its panel.)
 - **The built-in FX** becomes one or two named controls where an instrument has an effect as
   part of its idea (Haze's Space, Anthem's Shine...). Otherwise it's hidden voicing.
 
