@@ -10,6 +10,7 @@ import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.t
 import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "../src/engine/dsp/instruments3-dsp.ts";
 import { buildMips, parseWav } from "../src/engine/wavetable.ts";
+import { TineDSP } from "../src/engine/dsp/instruments4-dsp.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
 import { hasToolkit } from "../src/engine/toolkit.ts";
@@ -54,6 +55,12 @@ function phrase(params: Record<string, number>): Ev[] {
     }
     [[5, 12], [5, 13], [6, 14], [6, 15]].forEach(([part, s]) => out.push({ t: (16 + s) * step, len: step, pitch: 36 + part, vel: 100 }));
     return out;
+  }
+  if (kind === "epiano") {
+    // Comping: two voiced chords, then a short melody on top.
+    const ch = (t0: number, l: number, ps: number[], vel = 90) => ps.map((pitch) => ({ t: t0 * step, len: l * step, pitch, vel }));
+    return [...ch(0, 6, [48, 55, 58, 63]), ...ch(8, 6, [44, 51, 55, 60], 70), ...ch(16, 3, [46, 53, 56, 62], 110),
+      ...[[20, 70], [22, 72], [24, 75], [26, 74], [28, 70]].map(([s0, pitch]) => ({ t: s0 * step, len: 1.8 * step, pitch, vel: 100 }))];
   }
   if (kind === "poly") {
     // Two chords: i then VI in C minor (Chordette expands each key into a chord itself).
@@ -102,6 +109,7 @@ function dspFor(params: Record<string, number>, clock: { bpm: number; zero: numb
       w.setMips(mipCache[t]);
       return w;
     }
+    case "epiano": return new TineDSP(params, SR);
     case "sampler": {
       const d = new SamplerDSP(params, SR);
       const refs = INSTRUMENTS.sampler.presets[currentPreset]?.samples ?? [];

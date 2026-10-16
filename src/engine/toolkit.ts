@@ -10,9 +10,9 @@ import type { InstrumentKind } from "./model";
 import { FX_TYPES } from "./params";
 
 /** Synths that get the toolkit (drum machines and the sampler don't). */
-export const TOOLKIT_KINDS: InstrumentKind[] = ["acid", "poly", "lead", "wobble", "pad", "chip", "fm", "wave"];
+export const TOOLKIT_KINDS: InstrumentKind[] = ["acid", "poly", "lead", "wobble", "pad", "chip", "fm", "wave", "epiano"];
 /** Polyphonic synths: these get the voice-mode section (the mono ones have their own glide / legato). */
-export const POLY_KINDS: InstrumentKind[] = ["poly", "pad", "chip", "fm", "wave"];
+export const POLY_KINDS: InstrumentKind[] = ["poly", "pad", "chip", "fm", "wave", "epiano"];
 /** Lead synths: these get the performance FX (Pump, Repeat). */
 export const LEAD_KINDS: InstrumentKind[] = ["lead", "chip"];
 
@@ -20,6 +20,7 @@ export const hasToolkit = (k: InstrumentKind) => TOOLKIT_KINDS.includes(k);
 
 /** Each synth's most characterful parameter: an LFO destination ("Tone") alongside the common ones. */
 export const TONE_PARAM: Partial<Record<InstrumentKind, { id: string; label: string }>> = {
+  epiano: { id: "tone", label: "Tone" },
   acid: { id: "envmod", label: "Env mod" }, poly: { id: "mix", label: "Osc mix" }, lead: { id: "sync", label: "Sync" },
   wobble: { id: "xmod", label: "X-mod" }, pad: { id: "lofi", label: "Lo-fi" }, chip: { id: "crush", label: "Crush" },
   fm: { id: "index", label: "FM amount" }, wave: { id: "pos", label: "Position" },

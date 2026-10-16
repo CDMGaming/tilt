@@ -13,12 +13,12 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 
 /** Instruments the dice may pick (the sampler is for sounds you bring). */
-export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "poly", "pad", "fm", "wave", "lead", "chip"];
+export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "poly", "epiano", "pad", "fm", "wave", "lead", "chip"];
 
 // Role tags per preset, by name. A preset not listed gets its instrument's default.
 const DEFAULT_ROLE: Record<InstrumentKind, Role[]> = {
   drums: ["drums"], analog: ["drums"], acid: ["bass"], wobble: ["bass"], poly: ["keys"], pad: ["pad"],
-  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"],
+  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"], epiano: ["keys"],
 };
 const TAGS: Partial<Record<InstrumentKind, Record<string, Role[]>>> = {
   acid: {
@@ -143,7 +143,11 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
   wave: [
     pick("table", 0.4, range(0, 6)), knob("pos", 0.3), knob("warp", 0.25), knob("envAmt", 0.25), knob("envDecay", 0.22),
     knob("lfoAmt", 0.2, 0, 0.7), knob("lfoRate", 0.22), knob("detune", 0.2), knob("cutoff", 0.18, 0.3, 1), knob("reso", 0.15, 0, 0.6),
-  ],  sampler: [
+  ],  epiano: [
+    knob("bark", 0.22), knob("tone", 0.18, 0.15, 0.95), knob("index", 0.18, 0.1, 0.8), knob("bell", 0.2), knob("keyOff", 0.2),
+    pick("trem", 0.25, [0, 1, 2]), knob("tremRate", 0.2), knob("tremDepth", 0.2), knob("decay", 0.15),
+  ],
+  sampler: [
     knob("crunch", 0.2, 0, 0.8), knob("vinyl", 0.2, 0, 0.8), knob("pitch", 0.1),
     ...Array.from({ length: 8 }, (_, i) => [knob(`p${i}tune`, 0.06), knob(`p${i}start`, 0.08, 0, 0.4), knob(`p${i}decay`, 0.1)]).flat(),
   ],

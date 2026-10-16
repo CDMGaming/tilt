@@ -200,6 +200,23 @@ export function buildPanel(app: App, track: Track): HTMLElement {
         h("div", { class: "gb-grille" })),
       h("div", { class: "note drop-hint" }, "Drop an audio file on a pad to load it."),
     );
+  } else if (track.kind === "epiano") {
+    // Tine: one row of knobs on brushed silver over black tolex; the tremolo switch is a three-way lever.
+    const trem = Math.round(track.params.trem ?? 0);
+    body = h("div", { class: "panel-body tine" },
+      h("div", { class: "tn-face" },
+        h("div", { class: "tn-logo" }, "Tine"),
+        h("div", { class: "tn-lever", role: "radiogroup", "aria-label": "Tremolo" },
+          h("div", { class: "tn-lever-label" }, "TREMOLO"),
+          ["Off", "Mono", "Stereo"].map((name, i) => h("button", {
+            class: "tn-pos" + (i === trem ? " on" : ""), "data-nav": `trem-${i}`, "aria-pressed": String(i === trem),
+            onclick: () => { app.edit("Tremolo", () => (track.params.trem = i)); app.screens.edit.render(); },
+          }, name))),
+        ctl("tremRate", "Rate"), ctl("tremDepth", "Depth"),
+        h("div", { class: "tn-char" }, ctl("bark", "★ Bark", "l")),
+        ctl("keyOff", "Key-off"), ctl("tone", "Tone", "l"), ctl("level", "Level")),
+      keyboard(app, track),
+    );
   } else if (track.kind === "acid") {
     // Squelch: one row of big knobs (Bite and Gnaw are the character controls), the arp under a lid.
     const arpOn = (track.params.arpOn ?? 0) >= 0.5;

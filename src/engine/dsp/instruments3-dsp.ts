@@ -11,7 +11,7 @@ const panR = (p: number) => Math.sin(((p + 1) * Math.PI) / 4);
 
 /** Shared polyphony bookkeeping: find a voice for a new note, stealing released ones first. */
 interface BaseVoice { pitch: number; held: boolean; age: number; amp: ADSR }
-function claim<V extends BaseVoice>(voices: V[], max: number, pitch: number, make: () => V, counter: number): V {
+export function claim<V extends BaseVoice>(voices: V[], max: number, pitch: number, make: () => V, counter: number): V {
   let v = voices.find((x) => x.pitch === pitch && x.held);
   if (!v) {
     if (voices.length >= max) {

@@ -384,6 +384,9 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** C, with the tremolo switch as a three-way lever.
 - **Theme:** brushed silver over black tolex.
 - **Presets:** 24.
+- **Status: built** (kind `epiano`). FM tine (carrier + same-ratio modulator with a falling index), a
+  ×14 "ping" for the strike, a damper thump on key-off, low notes ringing longer. Bark: drive, velocity
+  to FM, a mid lift. Tremolo off / mono (level) / stereo (auto-pan) on a lever. 24 presets, level-matched.
 
 ### Wheelhouse: tonewheel organ (additive)
 - **Idea:** drawbars, percussion and a rotating speaker.

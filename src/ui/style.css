@@ -49,6 +49,7 @@
   --inst-fm: #e9d8b4;      /* Glint: sand */
   --inst-wave: #5ce07a;    /* Morph: green */
   --inst-sampler: #c3cbe0; /* Grab: steel */
+  --inst-epiano: #e07a5f;  /* Tine: terracotta */
 
   /* ---- shape ---- */
   --r-s: 4px;
@@ -201,7 +202,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .chip[class*="kind-"] { color: var(--kc); box-shadow: inset 2px 0 0 var(--kc); }
 .kind-drums { --kc: var(--inst-drums); } .kind-analog { --kc: var(--inst-analog); } .kind-acid { --kc: var(--inst-acid); }
 .kind-wobble { --kc: var(--inst-wobble); } .kind-poly { --kc: var(--inst-poly); } .kind-pad { --kc: var(--inst-pad); } .kind-lead { --kc: var(--inst-lead); }
-.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); }
+.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); } .kind-epiano { --kc: var(--inst-epiano); }
 .dice-actions { display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap; justify-content: center; }
 .roll-btn { font-size: 28px; font-weight: 900; padding: 16px 36px; border-radius: 16px; background: var(--raise); border: 2px solid var(--accent); display: flex; flex-direction: column; align-items: center; }
 .roll-btn small, .go-btn small { font-size: 11px; color: var(--dim); font-weight: 400; }
@@ -1382,3 +1383,21 @@ body.phone .gb-box { flex-direction: column; }
 body.phone .gb-master { flex-direction: row; border-left: none; }
 .gb-pads .pad-label { font-size: 11px; line-height: 1.1; }
 .gb-master { display: grid; grid-template-columns: repeat(2, auto); gap: 4px 8px; }
+
+/* Tine: brushed silver over black tolex; a three-way tremolo lever. */
+.panel-body.tine { padding: 10px; border-top-color: #e07a5f;
+  background: radial-gradient(#ffffff08 1px, transparent 1.5px) 0 0 / 3px 3px, #18181a; }
+.tn-face { display: flex; gap: 8px 14px; align-items: flex-end; flex-wrap: wrap; padding: 10px 16px; border-radius: 6px;
+  background: repeating-linear-gradient(90deg, #ffffff12 0 1px, transparent 1px 3px), linear-gradient(180deg, #d7dadd, #a9adb2); box-shadow: inset 0 1px 0 #fff9, 0 2px 4px #000a; color: #1a1a1a; }
+.tn-logo { font: italic 800 26px Georgia, serif; color: #2a2a2a; letter-spacing: .02em; align-self: center; margin-right: 6px; text-shadow: 0 1px 0 #fff8; }
+.tn-lever { display: flex; flex-direction: column; gap: 2px; padding: 4px; border-radius: 6px; background: #1b1b1d; box-shadow: inset 0 1px 3px #000; }
+.tn-lever-label { font: 700 9px var(--font-display); letter-spacing: .2em; color: #aaa; text-align: center; }
+.tn-pos { padding: 2px 10px; font: 700 10px var(--font-display); color: #888; background: transparent; border: none; border-radius: 3px; text-align: left; }
+.tn-pos.on { color: #1a1a1a; background: linear-gradient(90deg, #e07a5f, #f0a48c); box-shadow: 0 0 6px #e07a5f88; }
+.tn-char { padding: 4px 8px 2px; border-radius: 10px; background: #0000001a; box-shadow: inset 0 1px 2px #0003; }
+.panel-body.tine .knob-label { color: #1a1a1a; opacity: 1; font-weight: 800; }
+.panel-body.tine .tn-char .knob-label { color: #a8402a; }
+.panel-body.tine .knob-value { color: #3a3a3a; }
+.panel.kind-epiano .panel-body.tine { --cap-fill: #1e1e20; --cap-edge: #000; --knob-dot: #e07a5f; }
+.panel-body.tine .knob-val { stroke: #c24e33; }
+.panel-body.tine .knob-track { stroke: #0000002a; }
