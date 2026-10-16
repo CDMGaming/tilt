@@ -10,7 +10,7 @@ import { LeadDSP, PadDSP, WobbleDSP } from "../src/engine/dsp/instruments2-dsp.t
 import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "../src/engine/dsp/instruments3-dsp.ts";
 import { buildMips, parseWav } from "../src/engine/wavetable.ts";
-import { PluckDSP, TineDSP } from "../src/engine/dsp/instruments4-dsp.ts";
+import { OrganDSP, PluckDSP, TineDSP } from "../src/engine/dsp/instruments4-dsp.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
 import { hasToolkit } from "../src/engine/toolkit.ts";
@@ -62,6 +62,13 @@ function phrase(params: Record<string, number>): Ev[] {
     return [...[60, 63, 67, 72, 67, 63].map((pitch, i) => ({ t: i * 2 * step, len: 1.8 * step, pitch: pitch + lo, vel: 100 })),
       ...[60, 64, 67].map((pitch) => ({ t: 14 * step, len: 8 * step, pitch: pitch + lo, vel: 90 })),
       ...[48, 51, 55, 53].map((pitch, i) => ({ t: (24 + i * 2) * step, len: 1.8 * step, pitch: pitch + lo, vel: 110 }))];
+  }
+  if (kind === "organ") {
+    // Held chords (the rotary and vibrato need time), then a short riff.
+    const ch = (t0: number, l: number, ps: number[]) => ps.map((pitch) => ({ t: t0 * step, len: l * step, pitch, vel: 100 }));
+    const lo = (params.db2 ?? 0) === 6 && (params.db0 ?? 0) === 8 && (params.db3 ?? 0) === 0 && (params.db1 ?? 0) === 6 ? -12 : 0;
+    return [...ch(0, 7.5, [48, 55, 60, 63].map((x) => x + lo)), ...ch(8, 7.5, [44, 51, 56, 60].map((x) => x + lo)),
+      ...[[16, 60], [18, 63], [20, 65], [21, 66], [22, 67], [24, 70], [26, 67], [28, 63]].map(([s0, pitch]) => ({ t: s0 * step, len: 1.6 * step, pitch: pitch + lo, vel: 100 }))];
   }
   if (kind === "epiano") {
     // Comping: two voiced chords, then a short melody on top.
@@ -118,6 +125,7 @@ function dspFor(params: Record<string, number>, clock: { bpm: number; zero: numb
     }
     case "epiano": return new TineDSP(params, SR);
     case "pluck": return new PluckDSP(params, SR);
+    case "organ": return new OrganDSP(params, SR);
     case "sampler": {
       const d = new SamplerDSP(params, SR);
       const refs = INSTRUMENTS.sampler.presets[currentPreset]?.samples ?? [];

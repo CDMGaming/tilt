@@ -8,7 +8,7 @@ import { chordName, noteName, scaleById, scaleDegree } from "../engine/music";
 import { decodeFile, listSamples, putSample, sampleLabel } from "./samples";
 import { CHIP_WAVES, SFX_GROUPS, WT_FRAMES, WT_SIZE } from "../engine/instruments3";
 import { WOB_RATES } from "../engine/instruments2";
-import { PLUCK_BODIES } from "../engine/instruments4";
+import { DRAWBAR_FEET, PLUCK_BODIES, VIB_CHORUS } from "../engine/instruments4";
 import { allPresets, applyPreset, deleteUserPreset, presetPosition, saveUserPreset, userPresets, USER_MARK, type PresetEntry } from "./presets";
 import { getParam } from "../engine/params";
 import { RECIPES, genBase, mutateParams, pickSound, soundKey, soundRoles, type SoundRef } from "../engine/sounds";
@@ -230,6 +230,24 @@ export function buildPanel(app: App, track: Track): HTMLElement {
         h("div", { class: "pk-knobs" },
           h("div", { class: "pk-char" }, ctl("pick", "★ Pick", "l"), ctl("metal", "★ Wood ↔ Metal", "l"), ctl("damp", "★ Damp", "l")),
           ctl("decay", "Decay"), ctl("room", "Room"), ctl("level", "Level"))),
+      keyboard(app, track),
+    );
+  } else if (track.kind === "organ") {
+    // Wheelhouse: a drawbar bank in walnut, a chrome rotary switch, the vibrato / chorus selector, Drive.
+    const rot = Math.round(track.params.rotary ?? 1), vc = Math.round(track.params.vibChorus ?? 0);
+    const sel = (key: string, label: string, opts: string[], cur: number, cls: string) => h("div", { class: `wh-sel ${cls}`, role: "radiogroup", "aria-label": label },
+      h("div", { class: "wh-sel-label" }, label),
+      h("div", { class: "wh-sel-opts" }, opts.map((o, i) => h("button", {
+        class: "wh-opt" + (i === cur ? " on" : ""), "data-nav": `${key}-${i}`, "aria-pressed": String(i === cur),
+        onclick: () => { app.edit(label, () => (track.params[key] = i)); app.screens.edit.render(); },
+      }, o))));
+    body = h("div", { class: "panel-body wheelhouse" },
+      h("div", { class: "wh-face" },
+        h("div", { class: "wh-bars" }, DRAWBAR_FEET.map((_, k) => h("div", { class: `wh-bar b${k}` }, fdr(`db${k}`)))),
+        h("div", { class: "wh-right" },
+          sel("rotary", "Rotary", ["Stop", "Slow", "Fast"], rot, "rotary"),
+          sel("vibChorus", "Vib / Chorus", VIB_CHORUS, vc, "vib"),
+          h("div", { class: "wh-knobs" }, h("div", { class: "wh-char" }, ctl("drive", "★ Drive", "l")), ctl("level", "Level")))),
       keyboard(app, track),
     );
   } else if (track.kind === "acid") {

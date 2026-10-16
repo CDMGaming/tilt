@@ -111,3 +111,60 @@ export const PLUCK: InstrumentDef = {
     pl("Gong-ish", { level: 0.18, body: 7, pick: 0.2, metal: 1, decay: 12, damp: 0, room: 0.5 }),
   ],
 };
+
+// ---------- tonewheel organ: "Wheelhouse" (additive, no samples) ----------
+
+export const DRAWBAR_FEET = ["16'", "5⅓'", "8'", "4'", "2⅔'", "2'", "1⅗'", "1⅓'", "1'"];
+export const VIB_CHORUS = ["Off", "V1", "V2", "V3", "C1", "C2", "C3"];
+const STEPS = ["0", "1", "2", "3", "4", "5", "6", "7", "8"];
+
+/** A registration: nine drawbar digits ("888000000") plus settings. */
+const reg = (name: string, bars: string, params: Record<string, number> = {}) => ({
+  name, params: { ...Object.fromEntries([...bars].map((d, k) => [`db${k}`, Number(d)])), ...params },
+});
+
+export const ORGAN: InstrumentDef = {
+  kind: "organ",
+  name: "Wheelhouse",
+  role: "Drawbars, percussion and a rotating speaker",
+  group: "harmony",
+  params: [
+    ...DRAWBAR_FEET.map((ft, k) => ({ id: `db${k}`, label: ft, min: 0, max: 8, def: [8, 8, 8, 0, 0, 0, 0, 0, 0][k], options: STEPS })),
+    { id: "rotary", label: "Rotary", min: 0, max: 2, def: 1, options: ["Stop", "Slow", "Fast"] },
+    { id: "vibChorus", label: "Vib / Chorus", min: 0, max: 6, def: 0, options: VIB_CHORUS },
+    { id: "drive", label: "Drive", min: 0, max: 1, def: 0.25 },
+    { id: "level", label: "Level", min: 0, max: 1, def: 0.6 },
+    // Hidden voicing:
+    { id: "perc", label: "Percussion", min: 0, max: 2, def: 0, options: ["Off", "2nd", "3rd"] },
+    { id: "percFast", label: "Perc decay", min: 0, max: 1, def: 1, options: ["Slow", "Fast"] },
+    { id: "click", label: "Key click", min: 0, max: 1, def: 0.3 },
+    { id: "leak", label: "Leakage", min: 0, max: 1, def: 0.1 },
+  ],
+  macros: ["drive", "rotary", "vibChorus", "db0", "db2", "db3", "db5", "level"],
+  presets: [
+    reg("Gospel Full", "888888888", { level: 0.30, rotary: 2, drive: 0.45 }),
+    reg("Jazz Combo", "888000000", { level: 0.42, perc: 2, rotary: 1, vibChorus: 6, drive: 0.15 }),
+    reg("Blues Shuffle", "888800000", { level: 0.33, perc: 1, rotary: 2, drive: 0.4 }),
+    reg("Rock Bark", "888800008", { level: 0.28, drive: 0.85, rotary: 2, click: 0.6 }),
+    reg("Soft Flute", "008000000", { level: 0.64, rotary: 1, vibChorus: 2, drive: 0, click: 0.1 }),
+    reg("Mellow", "806000000", { level: 0.47, vibChorus: 5, rotary: 1, drive: 0.1 }),
+    reg("Bright Stops", "888888000", { level: 0.31, rotary: 1, drive: 0.3 }),
+    reg("Percussive", "800000000", { level: 0.42, perc: 2, percFast: 1, rotary: 0, click: 0.5 }),
+    reg("Ballad", "838000000", { level: 0.49, rotary: 1, vibChorus: 6, drive: 0.05 }),
+    reg("Reedy", "688600000", { level: 0.36, rotary: 1, drive: 0.3 }),
+    reg("Whistle", "000000008", { level: 0.71, rotary: 1, vibChorus: 3, drive: 0 }),
+    reg("Dark Pad", "860000000", { level: 0.55, rotary: 1, vibChorus: 6, drive: 0.1, click: 0 }),
+    reg("Cathedral", "888888886", { level: 0.22, rotary: 0, vibChorus: 0, drive: 0, click: 0.1, "ifx:type": 15, "ifx:a": 0.8, "ifx:b": 0.45 }),
+    reg("Funk Stab", "888000000", { level: 0.32, perc: 1, percFast: 1, drive: 0.35, rotary: 0, click: 0.6 }),
+    reg("Soul", "868000000", { level: 0.42, perc: 2, vibChorus: 6, rotary: 1, drive: 0.2 }),
+    reg("Screamer", "888888888", { level: 0.26, drive: 1, rotary: 2, click: 0.7 }),
+    reg("Cinema", "876543210", { level: 0.42, rotary: 1, vibChorus: 5, drive: 0.1 }),
+    reg("Bass Pedal", "860000000", { level: 0.41, rotary: 0, drive: 0.2, click: 0.2 }),
+    reg("Hollow", "808080800", { level: 0.37, rotary: 1, vibChorus: 4, drive: 0.1 }),
+    reg("Bells", "800008008", { level: 0.42, perc: 2, percFast: 0, rotary: 1, drive: 0.05 }),
+    reg("Skank", "888000000", { level: 0.36, perc: 0, rotary: 0, drive: 0.1, click: 0.7 }),
+    reg("Gentle", "606000000", { level: 0.79, vibChorus: 1, rotary: 1, drive: 0, click: 0.05 }),
+    reg("Swirl", "888600000", { level: 0.40, rotary: 2, vibChorus: 5, drive: 0.2 }),
+    reg("Garage Organ", "008808000", { level: 0.29, drive: 0.6, rotary: 2, vibChorus: 3, click: 0.4 }),
+  ],
+};

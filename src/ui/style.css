@@ -51,6 +51,7 @@
   --inst-sampler: #c3cbe0; /* Grab: steel */
   --inst-epiano: #e07a5f;  /* Tine: terracotta */
   --inst-pluck: #c9955a;   /* Pluck: honey wood */
+  --inst-organ: #b5462f;   /* Wheelhouse: oxblood */
 
   /* ---- shape ---- */
   --r-s: 4px;
@@ -203,7 +204,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .chip[class*="kind-"] { color: var(--kc); box-shadow: inset 2px 0 0 var(--kc); }
 .kind-drums { --kc: var(--inst-drums); } .kind-analog { --kc: var(--inst-analog); } .kind-acid { --kc: var(--inst-acid); }
 .kind-wobble { --kc: var(--inst-wobble); } .kind-poly { --kc: var(--inst-poly); } .kind-pad { --kc: var(--inst-pad); } .kind-lead { --kc: var(--inst-lead); }
-.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); } .kind-epiano { --kc: var(--inst-epiano); } .kind-pluck { --kc: var(--inst-pluck); }
+.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); } .kind-epiano { --kc: var(--inst-epiano); } .kind-pluck { --kc: var(--inst-pluck); } .kind-organ { --kc: var(--inst-organ); }
 .dice-actions { display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap; justify-content: center; }
 .roll-btn { font-size: 28px; font-weight: 900; padding: 16px 36px; border-radius: 16px; background: var(--raise); border: 2px solid var(--accent); display: flex; flex-direction: column; align-items: center; }
 .roll-btn small, .go-btn small { font-size: 11px; color: var(--dim); font-weight: 400; }
@@ -1420,3 +1421,25 @@ body.phone .gb-master { flex-direction: row; border-left: none; }
 .panel.kind-pluck .panel-body.pluck { --cap-fill: #6b4423; --cap-edge: #3b2612; --knob-dot: #f6e3c0; }
 .panel-body.pluck .knob-val { stroke: #7a2e12; }
 .panel-body.pluck .knob-track { stroke: #0000002a; }
+
+/* Wheelhouse: walnut wood, cream drawbar caps (brown for the subs, black for the off-octaves), a chrome rotary switch. */
+.panel-body.wheelhouse { padding: 10px; border-top-color: #b5462f; background: #1a110b; }
+.wh-face { display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap; padding: 12px 16px; border-radius: 8px;
+  background: repeating-linear-gradient(95deg, #0000001a 0 3px, transparent 3px 11px), linear-gradient(180deg, #6b3f22, #3f2412); box-shadow: inset 0 2px 0 #ffffff22, 0 3px 6px #000a; }
+.wh-bars { display: flex; gap: 2px; padding: 6px 8px; border-radius: 6px; background: #120a05; box-shadow: inset 0 2px 6px #000; }
+.wh-bar { --fader-cap: #efe6cf; --fader-fill: #efe6cf; }
+.wh-bar.b0, .wh-bar.b1 { --fader-cap: #8a4b2a; --fader-fill: #b7703f; }
+.wh-bar.b4, .wh-bar.b6, .wh-bar.b7 { --fader-cap: #1d1d1d; --fader-fill: #8a8a8a; }
+.panel-body.wheelhouse .knob.fader { width: 40px; }
+.panel-body.wheelhouse .knob-label { color: #efe6cf; opacity: 1; font-weight: 700; }
+.panel-body.wheelhouse .knob-value { color: #d9c7a3; }
+.wh-right { display: flex; flex-direction: column; gap: 10px; justify-content: center; }
+.wh-sel-label { font: 700 10px var(--font-display); letter-spacing: .18em; color: #efe6cf; margin-bottom: 3px; }
+.wh-sel-opts { display: flex; gap: 3px; flex-wrap: wrap; }
+.wh-opt { padding: 4px 9px; font: 700 11px var(--font-display); color: #d9c7a3; background: #2a1a0f; border: 1px solid #000; border-radius: 4px; }
+.wh-opt.on { color: #111; background: linear-gradient(180deg, #f4f6f8, #a9b0b8); box-shadow: 0 0 6px #fff6; }
+.wh-sel.rotary .wh-opt { min-width: 52px; padding: 8px 10px; border-radius: 999px; }
+.wh-knobs { display: flex; gap: 10px; align-items: flex-end; }
+.wh-char .knob-label { color: #ffb38a !important; }
+.panel.kind-organ .panel-body.wheelhouse { --cap-fill: #c9ced4; --cap-edge: #555; --knob-dot: #b5462f; }
+.panel-body.wheelhouse .knob-val { stroke: #ffb38a; }

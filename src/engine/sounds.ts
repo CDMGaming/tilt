@@ -13,14 +13,15 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 
 /** Instruments the dice may pick (the sampler is for sounds you bring). */
-export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "poly", "epiano", "pluck", "pad", "fm", "wave", "lead", "chip"];
+export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "acid", "wobble", "poly", "epiano", "organ", "pluck", "pad", "fm", "wave", "lead", "chip"];
 
 // Role tags per preset, by name. A preset not listed gets its instrument's default.
 const DEFAULT_ROLE: Record<InstrumentKind, Role[]> = {
   drums: ["drums"], analog: ["drums"], acid: ["bass"], wobble: ["bass"], poly: ["keys"], pad: ["pad"],
-  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"], epiano: ["keys"], pluck: ["pluck"],
+  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"], epiano: ["keys"], pluck: ["pluck"], organ: ["keys"],
 };
 const TAGS: Partial<Record<InstrumentKind, Record<string, Role[]>>> = {
+  organ: { "Soft Flute": ["keys", "pad"], "Dark Pad": ["pad"], "Cathedral": ["pad", "keys"], "Ballad": ["keys", "pad"], "Bass Pedal": ["bass"], "Whistle": ["lead"], "Screamer": ["keys", "lead"] },
   pluck: {
     "Finger Bass": ["bass"], "Pick Bass": ["bass"], "Muted Bass": ["bass"], "Upright-ish": ["bass"],
     "Marimba": ["pluck", "keys"], "Soft Mallets": ["keys", "pluck"], "Vibes-ish": ["keys"], "Harp": ["pluck", "arp"], "Glass Harp": ["pluck", "arp"],
@@ -148,7 +149,11 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
   wave: [
     pick("table", 0.4, range(0, 6)), knob("pos", 0.3), knob("warp", 0.25), knob("envAmt", 0.25), knob("envDecay", 0.22),
     knob("lfoAmt", 0.2, 0, 0.7), knob("lfoRate", 0.22), knob("detune", 0.2), knob("cutoff", 0.18, 0.3, 1), knob("reso", 0.15, 0, 0.6),
-  ],  pluck: [
+  ],  organ: [
+    ...Array.from({ length: 9 }, (_, k) => pick(`db${k}`, 0.3, [0, 2, 4, 6, 8])), knob("drive", 0.2, 0, 0.9), pick("rotary", 0.3, [0, 1, 2]),
+    pick("vibChorus", 0.3, [0, 1, 2, 3, 4, 5, 6]), pick("perc", 0.25, [0, 1, 2]), knob("click", 0.2),
+  ],
+  pluck: [
     knob("pick", 0.25), knob("metal", 0.22), knob("damp", 0.2, 0, 0.8), knob("decay", 0.15), knob("room", 0.2, 0, 0.7), knob("bright", 0.15),
   ],
   epiano: [

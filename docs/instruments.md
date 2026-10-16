@@ -403,6 +403,10 @@ hidden voicing · 8 macros · layout · theme · presets**. Front-control counts
 - **Layout:** E, a drawbar fader bank.
 - **Theme:** walnut wood, cream drawbar caps, a chrome rotary switch.
 - **Presets:** 24 registrations.
+- **Status: built** (kind `organ`). Nine drawbars (sines at the footages, ~3 dB a step), single-trigger
+  percussion, key click, leakage, a scanner vibrato / chorus (V1-V3, C1-C3), and a rotary speaker whose horn
+  (highs: doppler, pan) spins up faster than the drum (lows). Drive: preamp overdrive, louder horn, more
+  click. 24 registrations, level-matched.
 
 ### Pluck: physical modelling
 - **Idea:** plucked and struck things: guitar, harp, kalimba, marimba, steel drum, bass guitar.

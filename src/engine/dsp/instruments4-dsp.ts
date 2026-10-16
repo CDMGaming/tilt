@@ -234,3 +234,103 @@ export class PluckDSP implements InstrumentDSP {
     }
   }
 }
+
+// ---------------------------------------------------------------- Wheelhouse: tonewheel organ
+
+/** Drawbar footages as harmonics of the 8' pitch: 16', 5 1/3', 8', 4', 2 2/3', 2', 1 3/5', 1 1/3', 1'. */
+export const DRAWBAR_RATIOS = [0.5, 1.5, 1, 2, 3, 4, 5, 6, 8];
+const SINE_N = 4096;
+const SINE = Float32Array.from({ length: SINE_N + 1 }, (_, i) => Math.sin((TAU * i) / SINE_N));
+const sinT = (ph: number) => { const x = (ph - Math.floor(ph)) * SINE_N, i = x | 0; return SINE[i] + (SINE[i + 1] - SINE[i]) * (x - i); };
+
+interface OrganVoice { pitch: number; held: boolean; age: number; amp: ADSR; vel: number; t: number; ph: Float64Array; perc: boolean }
+
+/**
+ * Wheelhouse: an additive tonewheel organ. Nine drawbars (sines at the classic footages), a key click,
+ * single-trigger percussion (2nd or 3rd harmonic), a scanner vibrato / chorus, and a rotating speaker
+ * (a horn for the highs with doppler and pan, a drum for the lows) that speeds up and slows down.
+ * Drive (the character control): preamp overdrive, a louder horn, more key click.
+ */
+export class OrganDSP implements InstrumentDSP {
+  private voices: OrganVoice[] = [];
+  private counter = 0;
+  private vibBuf = new Float32Array(1024);
+  private vw = 0;
+  private vibPh = 0;
+  private hornSpd = 0.8;
+  private drumSpd = 0.7;
+  private hornPh = 0;
+  private drumPh = 0;
+  private split = new OnePole();
+  private hornBuf = new Float32Array(1024);
+  private hw = 0;
+  constructor(public params: Record<string, number>, private sr: number) {}
+
+  noteOn(pitch: number, vel: number) {
+    // Percussion is single-trigger: only when no other key is held.
+    const perc = !this.voices.some((v) => v.held);
+    const v = claim(this.voices, 16, pitch, () => ({ pitch, held: true, age: 0, amp: new ADSR(), vel: 1, t: 0, ph: new Float64Array(10), perc: false }), ++this.counter);
+    v.vel = vel / 127; v.t = 0; v.perc = perc;
+    v.amp.gate(true);
+  }
+  noteOff(pitch: number) { for (const v of this.voices) if (v.pitch === pitch && v.held) { v.held = false; v.amp.gate(false); } }
+  allOff() { for (const v of this.voices) { v.held = false; v.amp.gate(false); } }
+
+  render(L: Float32Array, R: Float32Array, i0: number, i1: number) {
+    const p = this.params, sr = this.sr;
+    const bars = DRAWBAR_RATIOS.map((_, k) => { const b = p[`db${k}`] ?? 0; return b < 0.5 ? 0 : Math.pow(10, ((b - 8) * 3) / 20); });
+    const drive = p.drive ?? 0.25;
+    const percMode = Math.round(p.perc ?? 0), percRatio = percMode === 2 ? 3 : 2, percDecay = (p.percFast ?? 1) >= 0.5 ? 0.2 : 1, percLv = percMode ? 0.5 : 0;
+    const click = (p.click ?? 0.3) * (1 + drive);
+    const leak = (p.leak ?? 0.1) * 0.01;
+    const vc = Math.round(p.vibChorus ?? 0); // 0 off, 1-3 vibrato, 4-6 chorus
+    const vibDepth = vc ? [0, 0.0007, 0.0013, 0.0022][((vc - 1) % 3) + 1] * sr : 0, chorus = vc >= 4;
+    const rot = Math.round(p.rotary ?? 1); // 0 stop, 1 slow, 2 fast
+    const hornTarget = rot === 0 ? 0 : rot === 1 ? 0.8 : 6.8, drumTarget = rot === 0 ? 0 : rot === 1 ? 0.7 : 5.9;
+    const gain = 1 + drive * 5, dn = Math.tanh(gain);
+    const level = (p.level ?? 0.6) * 0.65;
+    const hornLv = 0.7 + drive * 0.5;
+    for (let i = i0; i < i1; i++) {
+      let x = 0;
+      for (const v of this.voices) {
+        if (!v.amp.active) continue;
+        const f = mtof(v.pitch) * voiceMod.pitch;
+        const env = v.amp.next(0.004, 0.1, 1, 0.012, sr);
+        let s = 0;
+        for (let k = 0; k < 9; k++) {
+          v.ph[k] += (f * DRAWBAR_RATIOS[k]) / sr;
+          if (bars[k] > 0) s += sinT(v.ph[k]) * bars[k];
+          else if (leak) s += sinT(v.ph[k]) * leak;
+        }
+        if (percLv && v.perc) { v.ph[9] += (f * percRatio) / sr; s += sinT(v.ph[9]) * percLv * Math.exp(-v.t / percDecay); }
+        if (click > 0.01 && v.t < 0.006) s += noise() * click * 0.5 * (1 - v.t / 0.006);
+        x += s * env;
+        v.t += 1 / sr;
+      }
+      x = Math.tanh(x * 0.25 * gain) / dn;
+      // Scanner vibrato / chorus: a short delay swept at ~7 Hz (chorus mixes in the dry signal).
+      if (vibDepth > 0) {
+        this.vibBuf[this.vw] = x;
+        this.vibPh = (this.vibPh + 6.9 / sr) % 1;
+        const d = 2 + vibDepth * (1 + Math.sin(TAU * this.vibPh)), pos = (this.vw - d + 1024) % 1024, k = Math.floor(pos), fr = pos - k;
+        const y = this.vibBuf[k] + (this.vibBuf[(k + 1) % 1024] - this.vibBuf[k]) * fr;
+        this.vw = (this.vw + 1) % 1024;
+        x = chorus ? (x + y) * 0.6 : y;
+      }
+      // The rotating speaker: speeds glide (the horn spins up faster than the drum).
+      this.hornSpd += (hornTarget - this.hornSpd) * (1 / (0.7 * sr));
+      this.drumSpd += (drumTarget - this.drumSpd) * (1 / (2.5 * sr));
+      this.hornPh = (this.hornPh + this.hornSpd / sr) % 1;
+      this.drumPh = (this.drumPh + this.drumSpd / sr) % 1;
+      const lo = this.split.lp(x, 800, sr), hi = x - lo;
+      this.hornBuf[this.hw] = hi;
+      const hs = Math.sin(TAU * this.hornPh), hd = 8 + 6 * hs, hpos = (this.hw - hd + 1024) % 1024, hk = Math.floor(hpos);
+      const horn = (this.hornBuf[hk] + (this.hornBuf[(hk + 1) % 1024] - this.hornBuf[hk]) * (hpos - hk)) * (1 - 0.3 * Math.cos(TAU * this.hornPh)) * hornLv;
+      this.hw = (this.hw + 1) % 1024;
+      const ds = Math.sin(TAU * this.drumPh), drum = lo * (1 - 0.2 * ds);
+      L[i] += (horn * (0.5 + 0.45 * hs) + drum * (0.55 + 0.1 * ds)) * level * 1.4;
+      R[i] += (horn * (0.5 - 0.45 * hs) + drum * (0.55 - 0.1 * ds)) * level * 1.4;
+    }
+    this.voices = this.voices.filter((v) => v.amp.active || v.held);
+  }
+}
