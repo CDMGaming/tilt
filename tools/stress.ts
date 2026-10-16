@@ -106,7 +106,7 @@ export function stress(kind: InstrumentKind) {
 
 if (import.meta.main) {
   const json = Deno.args.includes("--json");
-  const kinds = (Deno.args[0] && !Deno.args[0].startsWith("--") ? [Deno.args[0]] : Object.keys(INSTRUMENTS)) as InstrumentKind[];
+  const kinds = (Deno.args[0] && !Deno.args[0].startsWith("--") ? [Deno.args[0]] : Object.keys(INSTRUMENTS).filter((k) => k !== "midi")) as InstrumentKind[];
   if (json) { console.log(JSON.stringify(Object.fromEntries(kinds.map((k) => [k, stress(k).peaks])))); Deno.exit(0); }
   for (const k of kinds) {
     const r = stress(k);
