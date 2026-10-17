@@ -76,14 +76,13 @@ const ARENA: Template = {
       { name: "Walk up", by: { verse: "1---1---3---5---", chorus: "1-1-3-3-5-5-8-5-", any: "1---5---8---5---" } },
     ]),
     {
-      role: "guitar", name: "Rhythm guitar", kind: "pluck", preset: "Bright Strum", center: 47, home: { gain: 0.7 },
-      params: { "ifx:type": 6, "ifx:a": 0.7, "ifx:b": 0.5 },
+      role: "guitar", name: "Rhythm guitar", kind: "guitar", preset: "Wall of Sound", center: 47, home: { gain: 0.55, width: 0.75 },
       pool: [
         { name: "Power eighths", by: { intro: "X-------X-------", verse: "m.m.m.m.m.m.m.m.", chorus: "X-x-x-x-x-x-x-x-", bridge: "X---------------", breakdown: "................", solo: "x-x-x-x-x-x-x-x-", outro: "X---------------" } },
         { name: "Big strums", by: { verse: "c-------c---c---", chorus: "c---c-c---c-c---", any: "c-------c-------" } },
         { name: "Chug and ring", by: { verse: "mmmmmmmmX-------", chorus: "X-------mmmmX---", any: "X-------X-------" } },
       ],
-      mix: { vol: 0.42, pan: -0.25 },
+      mix: { vol: 0.75, pan: -0.15 },
     },
     {
       role: "keys", name: "Organ", kind: "organ", preset: "Rock Bark", center: 62,
@@ -96,7 +95,7 @@ const ARENA: Template = {
       mix: { vol: 0.71, pan: 0.25 },
     },
     {
-      role: "lead", name: "Lead", kind: "anthem", preset: "Thin Lead", center: 72,
+      role: "lead", name: "Lead guitar", kind: "guitar", preset: "Singing Lead", center: 67,
       pool: [
         { name: "Hook", by: { chorus: "5---3---1-2-3---2---1---<5------", solo: "1-3-5-8-9-8-5-3-5---3---1-------", intro: "8-------5-------", bridge: "3-------2-------", outro: "8---------------" } },
         { name: "Soaring", by: { chorus: "8-------7---5---6-------5-------", solo: "5-6-8-9-8-6-5-3-2-3-5-----------", intro: "5-------8-------" } },

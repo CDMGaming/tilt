@@ -634,3 +634,58 @@ export const EXTERNAL: InstrumentDef = {
     ccSet("Plain CCs 102-109", [102, 103, 104, 105, 106, 107, 108, 109]),
   ],
 };
+
+// ---------- electric guitar through an amp: "Axe" (modelled, no samples) ----------
+
+export const GUITAR_AMPS = ["Clean", "Crunch", "High gain"];
+const ax = (name: string, params: Record<string, number>) => ({ name, params });
+
+export const AXE: InstrumentDef = {
+  kind: "guitar",
+  name: "Axe",
+  role: "An electric guitar through an amp: clean to high gain",
+  group: "harmony",
+  params: [
+    { id: "amp", label: "Amp", min: 0, max: 2, def: 1, options: GUITAR_AMPS },
+    { id: "gain", label: "Gain", min: 0, max: 1, def: 0.5 },
+    { id: "tone", label: "Tone", min: 0, max: 1, def: 0.55 },
+    { id: "width", label: "Width", min: 0, max: 1, def: 0.4 },
+    { id: "room", label: "Room", min: 0, max: 1, def: 0.12 },
+    { id: "level", label: "Level", min: 0, max: 1, def: 0.6 },
+    // Hidden voicing:
+    { id: "pickup", label: "Neck ↔ Bridge", min: 0, max: 1, def: 0.7 },
+    { id: "pick", label: "Pick attack", min: 0, max: 1, def: 0.6 },
+    { id: "palm", label: "Palm mute", min: 0, max: 1, def: 0.7 },
+    { id: "sustain", label: "Sustain", min: 0.5, max: 10, def: 4, curve: "exp", unit: "s" },
+  ],
+  macros: ["amp", "gain", "tone", "width", "pickup", "palm", "room", "level"],
+  presets: [
+    // Clean
+    ax("Clean Chime", { level: 0.52, amp: 0, gain: 0.3, tone: 0.7, pickup: 0.35, width: 0.5, room: 0.2 }),
+    ax("Glassy Clean", { level: 0.53, amp: 0, gain: 0.2, tone: 0.85, pickup: 0.6, width: 0.7, room: 0.3 }),
+    ax("Round Neck", { level: 0.49, amp: 0, gain: 0.25, tone: 0.3, pickup: 0.05, width: 0.3, room: 0.15 }),
+    ax("Clean Arpeggio", { level: 0.46, amp: 0, gain: 0.3, tone: 0.65, pickup: 0.45, width: 0.6, room: 0.4, sustain: 6 }),
+    ax("Spanky", { level: 0.49, amp: 0, gain: 0.6, tone: 0.75, pickup: 0.95, pick: 0.85, width: 0.4 }),
+    ax("Surf-ish", { level: 0.31, amp: 0, gain: 0.4, tone: 0.8, pickup: 0.9, room: 0.6, width: 0.3 }),
+    // Crunch
+    ax("Crunch Rhythm", { level: 0.50, amp: 1, gain: 0.5, tone: 0.55, width: 0.6 }),
+    ax("Bluesy Crunch", { level: 0.47, amp: 1, gain: 0.35, tone: 0.45, pickup: 0.3, room: 0.2 }),
+    ax("Classic Rock", { level: 0.49, amp: 1, gain: 0.7, tone: 0.6, width: 0.6, room: 0.15 }),
+    ax("Fuzzy Garage", { level: 0.40, amp: 1, gain: 1, tone: 0.4, width: 0.3, room: 0.25 }),
+    ax("Pub Rock", { level: 0.40, amp: 1, gain: 0.45, tone: 0.5, room: 0.25, width: 0.2 }),
+    ax("Power Pop", { level: 0.47, amp: 1, gain: 0.55, tone: 0.7, width: 0.85 }),
+    ax("Punk Crunch", { level: 0.44, amp: 1, gain: 0.85, tone: 0.65, width: 0.35, pick: 0.85 }),
+    // High gain
+    ax("High Gain Rhythm", { level: 0.51, amp: 2, gain: 0.55, tone: 0.55, width: 0.8 }),
+    ax("Chug Machine", { level: 0.48, amp: 2, gain: 0.7, tone: 0.5, width: 0.9, palm: 0.95, pick: 0.8 }),
+    ax("Hair Lead", { level: 0.42, amp: 2, gain: 0.6, tone: 0.75, sustain: 8, room: 0.3, width: 0.4 }),
+    ax("Shred Lead", { level: 0.39, amp: 2, gain: 0.85, tone: 0.8, pickup: 1, sustain: 9, room: 0.25, width: 0.3 }),
+    ax("Scooped", { level: 0.51, amp: 2, gain: 0.75, tone: 0.55, width: 0.9 }),
+    ax("Doom Wall", { level: 0.48, amp: 2, gain: 0.9, tone: 0.3, width: 1, pickup: 0.5 }),
+    ax("Sludge", { level: 0.51, amp: 2, gain: 0.45, tone: 0.35, width: 0.7, pickup: 0.4 }),
+    ax("Ballad Lead", { level: 0.34, amp: 2, gain: 0.35, tone: 0.55, pickup: 0.2, room: 0.45, sustain: 9, width: 0.3 }),
+    ax("Singing Lead", { level: 0.41, amp: 2, gain: 0.55, tone: 0.6, pickup: 0.2, room: 0.35, sustain: 10, width: 0.4 }),
+    ax("Wall of Sound", { level: 0.44, amp: 2, gain: 0.6, tone: 0.6, width: 1, room: 0.25 }),
+    ax("Hardcore Buzz", { level: 0.52, amp: 2, gain: 1, tone: 0.6, width: 0.6, palm: 0.85, pick: 0.9 }),
+  ],
+};

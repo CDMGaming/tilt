@@ -11,6 +11,7 @@ import { ThumpLabDSP } from "../src/engine/dsp/thumplab-dsp.ts";
 import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "../src/engine/dsp/instruments3-dsp.ts";
 import { AnthemDSP, BoomDSP, ChopDSP, GarageDSP, OrganDSP, PatchworkDSP, PianoDSP, PluckDSP, TineDSP, VoxDSP } from "../src/engine/dsp/instruments4-dsp.ts";
 import { sampleSetRefs } from "../src/engine/instruments4.ts";
+import { GuitarDSP } from "../src/engine/dsp/guitar-dsp.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
 import { hasToolkit } from "../src/engine/toolkit.ts";
@@ -45,6 +46,7 @@ function dsp(kind: InstrumentKind, params: Record<string, number>, preset: numbe
     }
     case "epiano": return new TineDSP(params, SR);
     case "pluck": return new PluckDSP(params, SR);
+    case "guitar": return new GuitarDSP(params, SR);
     case "organ": return new OrganDSP(params, SR);
     case "anthem": return new AnthemDSP(params, SR);
     case "patch": return new PatchworkDSP(params, SR);

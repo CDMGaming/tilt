@@ -59,6 +59,7 @@
   --inst-garage: #b08850;  /* Garage: oiled oak */
   --inst-chop: #ff8a1f;    /* Chop: MPC orange */
   --inst-midi: #9aa4b2;    /* External: cable grey */
+  --inst-guitar: #ffd23f;  /* Axe: a sunburst's yellow */
   --inst-patch: #f2b134;   /* Patchwork: amber (an orange-gold, not the DMD yellow) */
 
   /* ---- shape ---- */
@@ -212,7 +213,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 .chip[class*="kind-"] { color: var(--kc); box-shadow: inset 2px 0 0 var(--kc); }
 .kind-drums { --kc: var(--inst-drums); } .kind-analog { --kc: var(--inst-analog); } .kind-acid { --kc: var(--inst-acid); }
 .kind-wobble { --kc: var(--inst-wobble); } .kind-poly { --kc: var(--inst-poly); } .kind-pad { --kc: var(--inst-pad); } .kind-lead { --kc: var(--inst-lead); }
-.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); } .kind-epiano { --kc: var(--inst-epiano); } .kind-pluck { --kc: var(--inst-pluck); } .kind-organ { --kc: var(--inst-organ); } .kind-anthem { --kc: var(--inst-anthem); } .kind-patch { --kc: var(--inst-patch); } .kind-vox { --kc: var(--inst-vox); } .kind-boom { --kc: var(--inst-boom); } .kind-piano { --kc: var(--inst-piano); } .kind-garage { --kc: var(--inst-garage); } .kind-chop { --kc: var(--inst-chop); } .kind-midi { --kc: var(--inst-midi); }
+.kind-chip { --kc: var(--inst-chip); } .kind-fm { --kc: var(--inst-fm); } .kind-wave { --kc: var(--inst-wave); } .kind-sampler { --kc: var(--inst-sampler); } .kind-epiano { --kc: var(--inst-epiano); } .kind-pluck { --kc: var(--inst-pluck); } .kind-organ { --kc: var(--inst-organ); } .kind-anthem { --kc: var(--inst-anthem); } .kind-patch { --kc: var(--inst-patch); } .kind-vox { --kc: var(--inst-vox); } .kind-boom { --kc: var(--inst-boom); } .kind-piano { --kc: var(--inst-piano); } .kind-garage { --kc: var(--inst-garage); } .kind-chop { --kc: var(--inst-chop); } .kind-midi { --kc: var(--inst-midi); } .kind-guitar { --kc: var(--inst-guitar); }
 .dice-actions { display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap; justify-content: center; }
 .roll-btn { font-size: 28px; font-weight: 900; padding: 16px 36px; border-radius: 16px; background: var(--raise); border: 2px solid var(--accent); display: flex; flex-direction: column; align-items: center; }
 .roll-btn small, .go-btn small { font-size: 11px; color: var(--dim); font-weight: 400; }
@@ -1668,3 +1669,20 @@ body.phone .timeup-pill { bottom: 76px; gap: 8px; padding: 6px 6px 6px 12px; }
 .quad-jump kbd, .quad-hint kbd { font: inherit; font-weight: 700; padding: 0 4px; border-radius: 3px; background: var(--well); color: var(--text); }
 .quad-scene-note { color: var(--yellow); }
 .quad-jump kbd { margin-left: 2px; padding: 0 5px; font-size: 13px; line-height: 1; }
+
+/* ---- Axe: a sunburst guitar top, cream knobs, the amp channels as lit switches */
+.panel-body.axe { padding: 10px; border-top-color: #ffd23f; background: radial-gradient(ellipse at 50% 60%, #f2b33d 0%, #c8661e 38%, #5a1f0c 72%, #1d0905 100%); }
+.axe .ax-face { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 8px; }
+.axe .ax-amps { display: flex; flex-direction: column; gap: 6px; }
+.axe .ax-amp { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 6px; background: #1b1310; border: 1px solid #000; color: #e8d9b8; font: 700 12px system-ui; letter-spacing: .08em; text-transform: uppercase; }
+.axe .ax-lamp { width: 9px; height: 9px; border-radius: 50%; background: #3a2a1a; }
+.axe .ax-amp.on { color: #fff3d6; border-color: #ffb347; }
+.axe .ax-amp.on .ax-lamp { background: #ff5a2a; box-shadow: 0 0 8px #ff5a2a; }
+.axe .ax-knobs { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 14px; }
+.axe .ax-char { display: flex; gap: 10px; padding: 6px 10px; border-radius: 10px; background: #0003; }
+.panel.kind-guitar .panel-body.axe { --cap-fill: #efe6cf; --cap-edge: #6e5a3a; --knob-dot: #2a1a0c; }
+.panel-body.axe .knob-label { color: #1c0b04; opacity: 1; font-weight: 800; }
+.panel-body.axe .knob-value { color: #3a1a08; }
+.panel-body.axe .knob-val { stroke: #1c0b04; }
+.panel-body.axe .knob-track { stroke: #00000033; }
+.panel-body.axe .note { color: #2a1206; font-weight: 600; }
