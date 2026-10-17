@@ -229,10 +229,66 @@ export class PianoRoll {
 
   // ------------------------------------------------------------ drawing
 
+  /**
+   * A lit key: the name cell in the track colour, glowing into the row; `a` 0..1. Pale track
+   * colours (which would vanish against the light key column) light up dark, with coloured ink.
+   * Returns the ink colour for the name.
+   */
+  private lightRow(g: CanvasRenderingContext2D, y: number, hh: number, color: string, a: number): string {
+    g.fillStyle = color;
+    const hex = String(g.fillStyle), pale = /^#[0-9a-f]{6}$/i.test(hex) && luma(hex) > 0.72;
+    g.save();
+    g.globalAlpha = a;
+    g.shadowColor = color;
+    g.shadowBlur = 10;
+    g.fillStyle = pale ? "#0b0e16" : color;
+    g.fillRect(0, y, KEYS_W - 2, hh - 1);
+    g.shadowBlur = 0;
+    if (pale) { g.fillStyle = color; g.fillRect(KEYS_W - 5, y, 3, hh - 1); }
+    const w = Math.min(260, this.size().w - KEYS_W), grad = g.createLinearGradient(KEYS_W, 0, KEYS_W + w, 0);
+    grad.addColorStop(0, color);
+    grad.addColorStop(1, "transparent");
+    g.globalAlpha = a * 0.35;
+    g.fillStyle = grad;
+    g.fillRect(KEYS_W, y, w, hh - 1);
+    g.restore();
+    return pale ? color : "#0b0e16";
+  }
+
+  /** Rows that flash after a note lands on them (pitch -> when the flash ends), and the notes seen so far. */
+  private flashes = new Map<number, number>();
+  private seen: { where: string; ids: Set<number> } = { where: "", ids: new Set() };
+  private litKey = "";
+
+  /**
+   * The note names on the left light up for what's sounding: held keys / pads / MIDI and previews,
+   * the notes under the playhead, and (for a moment) notes just added, by anyone.
+   */
+  private litRows(playTick: number): Map<number, number> {
+    const lit = new Map<number, number>(), now = performance.now(), track = this.track, clip = this.clip;
+    if (!track) return lit;
+    // New notes in this clip (mouse, pad, step input, recording, other players): a short flash.
+    const ids = new Set(clip?.notes.map((n) => n.id) ?? []), where = `${track.id}:${this.app.ed.sceneId}`;
+    if (this.seen.where === where) {
+      for (const n of clip?.notes ?? []) if (!this.seen.ids.has(n.id)) this.flashes.set(n.pitch, now + 450);
+    }
+    this.seen = { where, ids };
+    for (const [p, until] of this.flashes) {
+      if (until <= now) this.flashes.delete(p);
+      else lit.set(p, Math.min(1, (until - now) / 450 + 0.25));
+    }
+    if (playTick >= 0) for (const n of clip?.notes ?? []) if (playTick >= n.start && playTick < n.start + n.len) lit.set(n.pitch, 1);
+    for (const p of this.app.heldNotes.get(track.id)?.keys() ?? []) lit.set(p, 1);
+    return lit;
+  }
+
   frame() {
     const pos = this.app.engine.position();
     const playTick = pos && pos.sceneId === this.app.ed.sceneId ? pos.tick % this.clipTicks() : -1;
     if (playTick !== this.lastPlayTick) { this.lastPlayTick = playTick; this.dirty = true; }
+    const lit = this.litRows(playTick);
+    const key = [...lit].map(([p, a]) => `${p}:${a.toFixed(1)}`).join(",");
+    if (key !== this.litKey) { this.litKey = key; this.lit = lit; this.dirty = true; }
     if (this.app.rollGhosts) this.dirty = true; // the outlines pulse
     if (playTick >= 0 && this.zoomed() && (this.app.recording || performance.now() - this.lastNav > 3000)) {
       const vt = this.viewTicks(), s = this.scroll();
@@ -240,6 +296,8 @@ export class PianoRoll {
     }
     if (this.dirty) this.draw(playTick);
   }
+
+  private lit = new Map<number, number>();
 
   private draw(playTick: number) {
     this.dirty = false;
@@ -279,7 +337,9 @@ export class PianoRoll {
         g.fillRect(KEYS_W, y, w - KEYS_W, hh);
         g.fillStyle = col("--roll-keys");
         g.fillRect(0, y, KEYS_W - 2, hh - 1);
-        g.fillStyle = col("--ink");
+        const la = this.lit.get(pitch);
+        const ink = la ? this.lightRow(g, y, hh, color, la) : "";
+        g.fillStyle = la ? ink : col("--ink");
         g.font = `${Math.min(12, hh - 3)}px system-ui`;
         const part = pitch - DRUM_BASE_NOTE;
         g.fillText(track.kind === "sampler" ? sampleLabel(track.samples?.[part], track.sampleNames, part) : drumPartName(track.params, part, track.kind), 6, y + hh / 2 - (hh > 26 ? 6 : 0));
@@ -300,15 +360,17 @@ export class PianoRoll {
       g.fillStyle = deg ? col("--roll-key-in") : col("--roll-key-out");
       g.fillRect(0, y + (root ? 1 : 0), KEYS_W - 2, hh - 1 - (root ? 1 : 0));
       if (root) { g.fillStyle = color; g.fillRect(0, y + 1, 3, hh - 2); }
+      const la = this.lit.get(pitch);
+      const ink = la ? this.lightRow(g, y, hh, color, la) : "";
       const fs = Math.min(12, hh - 2);
       if (fs >= 7) {
-        g.font = `${root ? "700 " : ""}${fs}px system-ui`;
-        g.fillStyle = root ? col("--roll-key-root-ink") : deg ? col("--roll-key-in-ink") : col("--roll-key-out-ink");
+        g.font = `${root || la ? "700 " : ""}${fs}px system-ui`;
+        g.fillStyle = la ? ink : root ? col("--roll-key-root-ink") : deg ? col("--roll-key-in-ink") : col("--roll-key-out-ink");
         g.fillText(noteName(pitch), 6, y + hh / 2);
         if (deg && hh >= 12) {
           g.font = `${root ? "700 " : ""}${Math.min(10, fs - 1)}px system-ui`;
           g.textAlign = "right";
-          g.fillStyle = root ? color : col("--roll-key-deg");
+          g.fillStyle = la ? ink : root ? color : col("--roll-key-deg");
           g.fillText(String(deg), KEYS_W - 6, y + hh / 2);
           g.textAlign = "left";
         }
@@ -848,4 +910,10 @@ function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number,
   g.arcTo(x, y + h, x, y, r);
   g.arcTo(x, y, x + w, y, r);
   g.closePath();
+}
+
+/** Relative brightness of a #rrggbb colour, 0..1. */
+function luma(hex: string): number {
+  const n = parseInt(hex.slice(1), 16), r = (n >> 16) & 255, gr = (n >> 8) & 255, b = n & 255;
+  return (0.2126 * r + 0.7152 * gr + 0.0722 * b) / 255;
 }

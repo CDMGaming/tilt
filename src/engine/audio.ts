@@ -255,6 +255,7 @@ export class AudioEngine {
     const pitches = expandPitch(this.song, t, pitch);
     this.liveChords.set(`${trackId}:${pitch}`, pitches);
     for (const p of pitches) this.post(tn, { t: "live", type: "on", pitch: p, vel });
+    for (const p of pitches) this.onLiveNote?.(trackId, p, true);
     if (t.kind === "midi" && this.sends(t)) for (const p of pitches) this.midiOut(t, [0x90, p, vel], null);
   }
 
@@ -264,9 +265,13 @@ export class AudioEngine {
     const pitches = this.liveChords.get(key) ?? [pitch];
     this.liveChords.delete(key);
     if (tn) for (const p of pitches) this.post(tn, { t: "live", type: "off", pitch: p, vel: 0 });
+    for (const p of pitches) this.onLiveNote?.(trackId, p, false);
     const t = this.song.tracks.find((x) => x.id === trackId);
     if (t?.kind === "midi") for (const p of pitches) this.midiOut(t, [0x80, p, 0], null);
   }
+
+  /** Every live note (keys, MIDI, pads, previews), as it starts and ends: the piano roll lights its row. */
+  onLiveNote: ((trackId: number, pitch: number, on: boolean) => void) | null = null;
 
   /** Short preview note (piano-roll note preview, pad taps). */
   preview(trackId: number, pitch: number, vel = 100, dur = 0.18) {

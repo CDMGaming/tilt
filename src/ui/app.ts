@@ -224,6 +224,12 @@ export class App {
     await this.engine.init(song);
     if (this.settings.outputDevice) await this.engine.setOutputDevice(this.settings.outputDevice).catch(() => {});
     this.engine.onEnded = () => { this.recording = false; this.renderHeader(); };
+    this.engine.onLiveNote = (trackId, pitch, on) => {
+      let m = this.heldNotes.get(trackId);
+      if (!m) this.heldNotes.set(trackId, (m = new Map()));
+      const n = (m.get(pitch) ?? 0) + (on ? 1 : -1);
+      if (n > 0) m.set(pitch, n); else m.delete(pitch);
+    };
     this.clock.bindOutput();
     // Browsers start audio suspended until the first click or key.
     const resume = () => { if (this.engine.ctx.state !== "running") void this.engine.ctx.resume(); };
@@ -1081,6 +1087,9 @@ export class App {
   coach: { step: number; total: number; text: string } | null = null;
   /** Outlines the piano roll draws where notes should go (the tutorial's kicks), or null. */
   rollGhosts: { trackId: number; sceneId: number; notes: { pitch: number; start: number; len: number }[] } | null = null;
+  /** Notes sounding live right now, per track (pitch -> how many presses hold it): the piano roll lights them. */
+  heldNotes = new Map<number, Map<number, number>>();
+
   /** The DICE screen (a new jam): the rail's Dice button and the menu's "New jam". */
   openDice?: () => void;
   openShortcut?: () => void;
