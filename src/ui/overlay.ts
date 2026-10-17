@@ -14,6 +14,8 @@ export interface Overlay {
 
 export interface MenuItem {
   label: string;
+  /** A section heading (not an action): its label groups the items after it. */
+  heading?: boolean;
   hint?: string;
   checked?: boolean;
   disabled?: boolean;
@@ -96,7 +98,7 @@ export class OverlayHost {
       const sheet = document.body.classList.contains("phone") && !host.rect();
       const box = h("div", { class: "menu" + (sheet ? " sheet" : ""), role: "menu" },
         title && depth === 0 ? h("div", { class: "menu-title" }, title) : null,
-        list.map((it, i) => h("button", {
+        list.map((it, i) => it.heading ? h("div", { class: "menu-heading", role: "presentation" }, it.label) : h("button", {
           class: "menu-item" + (it.checked ? " checked" : ""),
           "data-nav": `m${i}`,
           disabled: it.disabled,
@@ -151,7 +153,8 @@ export class OverlayHost {
       });
       return ov;
     };
-    this.push(build(items, 0, anchor));
+    // Start on the first item that can be picked (a heading can't).
+    this.push(build(items, 0, anchor, Math.max(0, items().findIndex((x) => !x.heading))));
   }
 
   // ---------------------------------------------------------------- dialogs

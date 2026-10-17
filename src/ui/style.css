@@ -1686,3 +1686,38 @@ body.phone .timeup-pill { bottom: 76px; gap: 8px; padding: 6px 6px 6px 12px; }
 .panel-body.axe .knob-val { stroke: #1c0b04; }
 .panel-body.axe .knob-track { stroke: #00000033; }
 .panel-body.axe .note { color: #2a1206; font-weight: 600; }
+/* ---- menu section headings */
+.menu-heading { font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); padding: 10px 10px 3px; }
+.menu-heading:first-of-type { padding-top: 4px; }
+.menu.sheet .menu-heading { font-size: 11px; padding-top: 12px; }
+
+/* ---- editor: the selection bar: one slim row over the bar ruler while notes are selected (never over notes) */
+.roll-wrap { position: relative; }
+.sel-bar { position: absolute; top: 0; left: 54px; right: 0; height: 24px; z-index: 6; display: none; align-items: center; gap: 3px; padding: 0 6px;
+  background: var(--panel); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; white-space: nowrap; }
+.sel-bar.on { display: flex; }
+.sb-count { font-size: 11px; font-weight: 800; color: var(--accent); padding: 0 6px 0 2px; }
+.sb-btn { padding: 1px 8px; height: 20px; border-radius: 6px; font-size: 12px; line-height: 16px; }
+.sb-group { display: inline-flex; align-items: center; gap: 1px; border-radius: 7px; background: var(--well); }
+.sb-group .sb-btn { min-width: 22px; padding: 1px 5px; }
+.sb-label { font-size: 11px; color: var(--dim); padding: 0 3px; }
+.sb-close { color: var(--dim); margin-left: auto; }
+.sel-bar .navfocus { outline: 2px solid var(--focus); outline-offset: 0; }
+/* ---- Song screen: the ⋯ on headers and clips (desktop), auto-arrange on the chain strip */
+.track-head, .scene-head, .cell { position: relative; }
+.more-btn { position: absolute; top: 3px; right: 3px; z-index: 2; display: none; width: 22px; height: 18px; padding: 0; line-height: 14px; font-size: 14px; border-radius: 5px;
+  background: color-mix(in srgb, var(--panel) 90%, transparent); border: 1px solid var(--line); color: var(--text); }
+.track-head:hover > .more-btn, .scene-head:hover > .more-btn, .cell:hover > .more-btn, .cursor > .more-btn, .cursor .more-btn { display: block; }
+.cell .more-btn { top: 2px; right: 2px; }
+.chain-arrange { flex: none; margin-left: 8px; padding: 6px 12px; border-radius: 8px; font-weight: 700; white-space: nowrap; }
+
+/* ---- Share: Song | Setup code tabs */
+.share-tabs { display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: var(--well); margin-bottom: 4px; }
+.share-tab { flex: 1; padding: 7px 10px; border-radius: 8px; border: none; background: transparent; font-weight: 700; }
+.share-tab.on { background: var(--panel); box-shadow: 0 1px 0 #0006; }
+
+/* ---- Jump to: the screens row */
+.sc-screens { display: flex; gap: 6px; margin: 4px 0 8px; }
+.sc-screen { flex: 1; padding: 6px 10px; border-radius: 8px; font-weight: 700; }
+.sc-screen.now { color: var(--yellow); }
+.sc-screen.cursor { outline: 3px solid var(--focus); }

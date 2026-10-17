@@ -27,6 +27,9 @@ export function openShortcut(app: App) {
   const curScene = me ? app.ed.sceneId : app.currentSceneId();
   let col = Math.max(0, song.tracks.findIndex((t) => t.id === curTrack));
   let row = Math.max(0, song.scenes.findIndex((s) => s.id === curScene));
+  // Row -1: the screens (Song / Edit / Mix): a gamepad's way between them (keys have F2-F4). Not on the couch.
+  const SCREENS = [["song", "▦ Song"], ["edit", "♪ Edit"], ["mix", "⫼ Mix"]] as const;
+  let scr = Math.max(0, SCREENS.findIndex(([id]) => id === app.screenName));
   const opened = performance.now();
   let moved = false;
   const box = h("div", { class: "shortcut" });
@@ -51,6 +54,10 @@ export function openShortcut(app: App) {
   const draw = () => {
     box.replaceChildren(
       h("div", { class: "menu-title" }, "Jump to…", h("span", { class: "sc-keys" }, " hold ` / LB and release, or click")),
+      c ? "" : h("div", { class: "sc-screens", role: "group", "aria-label": "Screens" }, SCREENS.map(([id, label], k) => h("button", {
+        class: "sc-screen" + (row === -1 && k === scr ? " cursor" : "") + (app.screenName === id ? " now" : ""), title: `${label.slice(2)} screen (F${k + 2})`,
+        onclick: () => { row = -1; scr = k; jump(); },
+      }, label))),
       h("div", { class: "sc-grid", style: `grid-template-columns: minmax(70px, 110px) repeat(${song.tracks.length}, minmax(56px, 90px))` },
         h("div", null),
         song.tracks.map((t, ci) => {
@@ -77,16 +84,24 @@ export function openShortcut(app: App) {
     el: wrap,
     handle(a: Action) {
       if (a.type === "dir") {
+        if (row === -1) {
+          if (a.dir === "left") scr = Math.max(0, scr - 1);
+          if (a.dir === "right") scr = Math.min(SCREENS.length - 1, scr + 1);
+          if (a.dir === "down") row = 0;
+          moved = true;
+          draw();
+          return true;
+        }
         if (a.dir === "left") col = Math.max(0, col - 1);
         if (a.dir === "right") col = Math.min(song.tracks.length - 1, col + 1);
-        if (a.dir === "up") row = Math.max(0, row - 1);
+        if (a.dir === "up") row = c || row > 0 ? Math.max(0, row - 1) : -1;
         if (a.dir === "down") row = Math.min(song.scenes.length - 1, row + 1);
         moved = true;
         draw();
         return true;
       }
       if (a.type === "play") {
-        const s = song.scenes[row];
+        const s = song.scenes[Math.max(0, row)];
         if (c) { if (c.isConductor(me)) { c.setScene(s.id); app.refresh(); } else app.overlays.toast(`Only ${c.conductor.toUpperCase()} (the conductor) changes the scene`, 1200); return true; }
         if (app.engine.playing) app.engine.queue({ kind: "scene", sceneId: s.id }); else app.engine.play({ kind: "scene", sceneId: s.id });
         app.songMode = "scene";
@@ -102,6 +117,7 @@ export function openShortcut(app: App) {
   };
   const jump = () => {
     app.overlays.remove(ov);
+    if (row === -1) { app.show(SCREENS[scr][0]); return; }
     const t = song.tracks[col], s = song.scenes[row];
     if (c && me) { couchJump(app, me, t, s); return; }
     if (app.screenName === "song") {

@@ -3,7 +3,7 @@
 //  - explore: never ends by itself; "I'm ready ▶" (or its key) moves on when you are.
 // The instruction runs across the dot-matrix display (a card on phones), a soft spotlight
 // sits on the target, and the hints follow the input you last used (mouse, keyboard,
-// gamepad, touch). Skip does a step for you; Later keeps your place (TILT menu picks it up).
+// gamepad, touch). Skip does a step for you; Later keeps your place (TILT menu → Controls & tutorial picks it up).
 
 import { songFromSetup } from "../engine/dice";
 import { formatParam } from "../engine/instruments";
@@ -164,7 +164,7 @@ const STEPS: Step[] = [
   },
   {
     kind: "do",
-    dmd: (c) => c.app.screenName !== "song" ? by("CLICK SONG", "PRESS F2 FOR SONG", "START, THEN SONG SCREEN", "TAP SONG")
+    dmd: (c) => c.app.screenName !== "song" ? by("CLICK SONG", "PRESS F2 FOR SONG", "TAP LB, UP, A ON SONG", "TAP SONG")
       : by("RIGHT-CLICK SCENE 1: DUPLICATE SCENE", "M ON SCENE 1: DUPLICATE SCENE", "X ON SCENE 1: DUPLICATE SCENE", "HOLD SCENE 1: DUPLICATE SCENE"),
     card: (c) => c.app.screenName !== "song"
       ? "Now the whole song. Go to the Song screen."
@@ -270,7 +270,7 @@ export class Tutorial {
   pause() {
     this.app.stopLocal();
     this.teardown();
-    this.app.overlays.toast("Tutorial paused: TILT menu → First song tutorial picks it up", 3000);
+    this.app.overlays.toast("Tutorial paused: TILT menu → Controls & tutorial picks it up", 3000);
   }
 
   private teardown() {
@@ -348,7 +348,7 @@ export class Tutorial {
       h("p", { class: "coach-text" }, "Two scenes, three instruments, playing on a loop. A few things for next time:"),
       h("ul", { class: "coach-list" },
         h("li", null, h("b", null, "Saved: "), `it's in Songs as “${app.song.title}”. Every song saves itself.`),
-        h("li", null, h("b", null, "Share: "), "TILT menu → Share song gives you a code, a link and a QR code."),
+        h("li", null, h("b", null, "Share: "), "TILT menu → Share gives you a code, a link and a QR code."),
         h("li", null, h("b", null, "Export: "), "TILT menu → Export: WAV, stems or MIDI."),
         h("li", null, h("b", null, "NUDGE: "), "on the setup screen (Dice), a new key, tempo and lineup in one press.")),
       h("div", { class: "coach-btns" }, h("button", { class: "small-btn primary", onclick: done }, "Done")));

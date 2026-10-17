@@ -20,7 +20,8 @@ import { libraryDialog } from "./library";
 import { openCodeOrLink } from "./sharesong";
 import { phraseGridDialog } from "./phrasegrid";
 import { dmdText } from "./dmd";
-import { gameModeDialog } from "./dialogs";
+import { settingsDialog } from "./dialogs";
+import { codeLink } from "./share";
 import type { MenuItem } from "./overlay";
 import { ROLES, ROLE_LABEL, generatePreset, type Role, type SoundRef } from "../engine/sounds";
 import { noteRoll, pickOptions } from "./sounds";
@@ -125,6 +126,7 @@ export class DiceScreen implements Screen {
         h("button", { class: "small-btn", "data-nav": "save-setup", onclick: () => this.saveSetup(), title: "Save the held fields and lineup slots under a name" }, "Save setup…"),
         h("div", { class: "code" }, h("span", { class: "die-label" }, "Share code "), h("code", null, encodeSetup(s))),
         h("button", { class: "small-btn", "data-nav": "copy", onclick: () => this.copyCode() }, "Copy"),
+        h("button", { class: "small-btn", "data-nav": "copy-link", title: "A link that opens TILT with this setup", onclick: () => { void navigator.clipboard?.writeText(codeLink(encodeSetup(s))); app.overlays.toast("Link copied", 1200); } }, "Copy link"),
         h("button", { class: "small-btn", "data-nav": "enter", onclick: () => this.enterCode() }, "Enter code…"),
         h("button", { class: "small-btn", "data-nav": "library", onclick: () => libraryDialog(app, { onOpen: () => app.show("song") }) }, "Songs…"),
         h("button", { class: "small-btn", "data-nav": "blank", onclick: () => this.blank() }, "Blank song"),
@@ -133,7 +135,7 @@ export class DiceScreen implements Screen {
       h("div", { class: "dice-bar" },
         h("button", { class: "roll-btn nudge-btn", "data-nav": "nudge", onclick: () => this.nudge(), title: "Re-roll everything that isn't held (Y / Space)" }, "NUDGE", h("small", null, "Y / Space")),
         h("div", { class: "timer-pick" },
-          h("div", { class: "die-label" }, "Timer ", h("button", { class: "link-btn", "data-nav": "game-mode", onclick: () => gameModeDialog(app, () => this.changed()) }, app.settings.gameMode ? "Game mode: on…" : "Game mode…")),
+          h("div", { class: "die-label" }, "Timer ", h("button", { class: "link-btn", "data-nav": "game-mode", onclick: () => settingsDialog(app, "timer") }, app.settings.gameMode ? "Game mode: on…" : "Game mode…")),
           h("div", { class: "seg" }, TIMER_CHOICES.map((m) => h("button", { class: "seg-btn" + (d.minutes === m ? " on" : ""), "data-nav": `t${m}`, onclick: () => { d.minutes = m; this.changed(); } }, m ? `${m} min` : "Off")))),
         this.cardsOn ? h("div", { class: "timer-pick" },
           h("div", { class: "die-label" }, "Challenges"),

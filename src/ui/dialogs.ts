@@ -2,7 +2,6 @@
 // WAV export, settings and the system menu (time's up: timeup.ts).
 
 import { defaultRelayUrl } from "./app";
-import { autoArrange, canArrange } from "../engine/arranger";
 import { pickPreset, usedPresets } from "../engine/dice";
 import { ALL_KINDS, INSTRUMENTS } from "../engine/instruments";
 import type { InstrumentKind } from "../engine/model";
@@ -10,18 +9,18 @@ import { NOTE_NAMES, SCALES, scaleById } from "../engine/music";
 import { encodeWav, peakDb } from "../engine/wav";
 import type { App } from "./app";
 import { download, h } from "./dom";
-import { libraryDialog, safeName } from "./library";
-import { shareCodeDialog } from "./share";
+import { libraryDialog, safeName, saveTake } from "./library";
 import { enterCodeDialog, shareSongDialog } from "./sharesong";
-import { tutorialLabel, tutorialStatus } from "./tutorial";
+import { tutorialStatus } from "./tutorial";
 import { lastInput } from "./lastinput";
 import { dmdText } from "./dmd";
 
 declare const __BUILD__: string;
-import { phraseGridDialog } from "./phrasegrid";
 import { exportMidi } from "../engine/smf";
 import { zip } from "../engine/zip";
-import { stepper } from "./overlay";
+import { stepper, type MenuItem } from "./overlay";
+import { paramInfo } from "../engine/params";
+import { NOTE_LENGTHS, lengthLabel } from "../engine/songops";
 import { GEN_SHARES } from "./sounds";
 
 const KINDS: InstrumentKind[] = ALL_KINDS;
@@ -146,48 +145,31 @@ export function exportDialog(app: App, then?: () => void) {
 
 // ------------------------------------------------------------ settings
 
-/**
- * Game mode: the pinball side of TILT. Off (the default) it's a quick-start DAW: the timer
- * pauses, and at zero says TIME with unlimited extra balls. On: challenge cards, no pausing,
- * editing locks at zero, the TILT flash and buzz, then SONG COMPLETE with one EXTRA BALL.
- */
-export function gameModeDialog(app: App, onChange?: () => void) {
-  const st = app.settings;
-  app.overlays.dialog("Game mode", (_close, rerender) => h("div", { class: "form" },
-    h("button", { class: "switch-row" + (st.gameMode ? " on" : ""), "data-nav": "game", onclick: () => { st.gameMode = !st.gameMode; app.saveSettings(); rerender(); app.renderHeader(); onChange?.(); } },
-      h("span", { class: "switch-row-label" }, "Game mode"), h("span", { class: "switch-row-value" }, st.gameMode ? "ON" : "OFF")),
-    h("p", { class: "note" }, "With game mode on:"),
-    h("ul", { class: "note game-list" },
-      h("li", null, "Challenge cards: dealt on the setup screen, shown in the top bar."),
-      h("li", null, "No pausing the timer: the clock is the game."),
-      h("li", null, "At zero, editing locks: TILT flashes with a buzz, then SONG COMPLETE with your challenge results. Editing stays locked until you choose what's next."),
-      h("li", null, "EXTRA BALL: five more minutes, once per session."),
-    ),
-    h("p", { class: "note" }, "Off (the default), the timer can be paused, and at zero the display says TIME and the same card comes up, with as many extra balls as you like. Nothing locks."),
-    h("p", { class: "note" }, "Either way, at zero the bar that's playing finishes and fades out, and the song is kept as a timed take (Songs → the song → Versions)."),
-    st.gameMode ? stepper("cards", "Challenge cards", app.dice.cards ? String(app.dice.cards) : "Off", (d) => {
-      app.dice.cards = Math.max(0, Math.min(3, app.dice.cards + d));
-      app.saveDice();
-      rerender();
-      onChange?.();
-    }) : "",
-    h("button", { class: "row-btn primary", "data-nav": "ok", onclick: () => _close() }, "Done")));
-}
+export type SettingsSection = "audio" | "midi" | "editing" | "sounds" | "timer" | "display";
 
-export function settingsDialog(app: App) {
+/**
+ * Settings, in six groups: Audio / Controllers & MIDI / Editing defaults / Sounds / Timer & game
+ * mode / Display. `section`: open scrolled to that group (TILT menu → Game mode & timer, the setup
+ * screen's Game mode link).
+ */
+export function settingsDialog(app: App, section?: SettingsSection) {
   let devices: MediaDeviceInfo[] = [];
   const refreshDevices = async () => {
     devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audiooutput" && d.deviceId !== "default");
   };
   let rr: (() => void) | null = null;
+  const title = (id: SettingsSection, label: string) => h("div", { class: "section-title", "data-section": id }, label);
+  const save = (fn: () => void) => () => { fn(); app.saveSettings(); rr?.(); app.refresh(); };
   app.overlays.dialog("Settings", (close, rerender) => {
     rr = rerender;
     const st = app.settings, eng = app.engine;
     const devIdx = devices.findIndex((d) => d.deviceId === st.outputDevice);
     const devName = st.outputDevice ? devices[devIdx]?.label || "selected device" : "Windows default";
     const mini = app.midi.miniLabConnected;
+    const binds = app.song.midiMap ?? [];
     return h("div", { class: "form settings" },
-      h("div", { class: "section-title" }, "Audio"),
+      // ---- Audio
+      title("audio", "Audio"),
       stepper("out", "Output", devName, async (d) => {
         if (!devices.length) await refreshDevices();
         const ids = ["", ...devices.map((x) => x.deviceId)];
@@ -201,18 +183,40 @@ export function settingsDialog(app: App) {
         await refreshDevices(); rerender();
       } }, "Show device names (asks for mic permission)"),
       h("p", { class: "note" }, `Output latency ${((eng.ctx.baseLatency + (eng.ctx.outputLatency || 0)) * 1000).toFixed(0)} ms at ${eng.ctx.sampleRate} Hz. Recorded notes are shifted back by this much.`),
-      h("div", { class: "section-title" }, "MIDI"),
-      h("p", { class: "note" }, app.midi.error || (app.midi.inputs().length ? `Inputs: ${app.midi.inputs().map((i) => i.name).join(", ")}` : "No MIDI inputs found. Plug one in; it's picked up live.")),
+
+      // ---- Controllers & MIDI
+      title("midi", "Controllers & MIDI"),
+      h("p", { class: "note" }, app.pad.connected ? `Gamepad: ${app.pad.connected}` : "No gamepad seen yet. Press a button on it."),
+      stepper("layout", "Gamepad buttons", { auto: "Auto-detect", xbox: "Xbox (A bottom)", nintendo: "Nintendo (A right)" }[st.padLayout], (d) => {
+        const o: typeof st.padLayout[] = ["auto", "xbox", "nintendo"];
+        st.padLayout = o[(o.indexOf(st.padLayout) + d + 3) % 3];
+        app.saveSettings();
+        rerender();
+      }),
+      h("p", { class: "note" }, app.midi.error || (app.midi.inputs().length ? `MIDI inputs: ${app.midi.inputs().map((i) => i.name).join(", ")}` : "No MIDI inputs found. Plug one in; it's picked up live.")),
       mini ? h("p", { class: "note ok" }, "MiniLab mkII detected: keys play the selected track (scale-locked), knobs 1-8 = the track's 8 macros, knobs 9-16 = track volumes, pads = drum parts on a drum track, otherwise scene launch. Knob 1 click = play/stop.") : null,
       app.midi.pushConnected ? h("p", { class: "note ok" }, "Push 1 connected: Session button = clip grid, Note button = steps + keys, encoders = macros (upper buttons: Macros / Mixer / FX), Play / Record / Tap / Undo / Double / Quantize / Mute / Solo work. The LCD shows the countdown.") : null,
       app.midi.knobModes().length ? h("p", { class: "note" }, `Knob modes seen: ${app.midi.knobModes().join(", ")}`) : null,
-      stepper("sync", "MIDI sync", { int: "Internal", ext: "Follow external clock", auto: "Auto (follow when clock arrives)" }[st.midiSync], (d) => {
+      h("div", { class: "die-label" }, `MIDI learn bindings (this song): ${binds.length || "none"}`),
+      binds.length ? h("div", { class: "binding-list" }, binds.map((m, i) => {
+        const t = app.song.tracks.find((x) => x.id === m.trackId);
+        const p = t ? paramInfo(t, m.key) : undefined;
+        return h("div", { class: "binding-row" },
+          h("span", null, `CC ${m.cc} · ch ${m.ch + 1} → ${t ? `${t.name}: ` : "(gone) "}${p?.label ?? m.key}`),
+          h("button", { class: "small-btn", "data-nav": `unbind${i}`, onclick: () => { app.edit("Remove MIDI binding", () => { app.song.midiMap = (app.song.midiMap ?? []).filter((x) => x !== m); }); rerender(); } }, "Remove"));
+      })) : null,
+      h("button", { class: "row-btn", "data-nav": "learn", onclick: () => { close(); app.setLearning(true); } }, "MIDI learn: touch a control, then move a knob…"),
+      h("button", { class: "row-btn", "data-nav": "learn-play", onclick: () => { app.learnTransport = "play"; app.overlays.toast("Press the button on your MIDI device for play / stop"); } },
+        `Transport CC, play / stop: ${st.transport.play ? `CC ${st.transport.play.cc} ch ${st.transport.play.ch + 1}` : "not set"} (click, then press a button)`),
+      h("button", { class: "row-btn", "data-nav": "learn-rec", onclick: () => { app.learnTransport = "record"; app.overlays.toast("Press the button on your MIDI device for record"); } },
+        `Transport CC, record: ${st.transport.record ? `CC ${st.transport.record.cc} ch ${st.transport.record.ch + 1}` : "not set"}`),
+      stepper("sync", "Clock: follow", { int: "Off (internal)", ext: "Follow external clock", auto: "Auto (when clock arrives)" }[st.midiSync], (d) => {
         const o: typeof st.midiSync[] = ["auto", "int", "ext"];
         st.midiSync = o[(o.indexOf(st.midiSync) + d + 3) % 3];
         app.saveSettings();
         rerender();
       }),
-      stepper("clockout", "Send clock to", st.clockOut ? app.midi.outputs().find((o) => o.id === st.clockOut)?.name ?? "(disconnected)" : "Off", (d) => {
+      stepper("clockout", "Clock: send to", st.clockOut ? app.midi.outputs().find((o) => o.id === st.clockOut)?.name ?? "(disconnected)" : "Off", (d) => {
         const ids = ["", ...app.midi.outputs().map((o) => o.id)];
         st.clockOut = ids[(ids.indexOf(st.clockOut) + d + ids.length) % ids.length];
         app.saveSettings();
@@ -220,34 +224,24 @@ export function settingsDialog(app: App) {
       }),
       h("p", { class: "note" }, app.engine.externalTempo ? `Following external clock at ${app.engine.externalTempo.toFixed(1)} bpm.` : "Follow: TILT starts, stops and keeps tempo with incoming MIDI clock. Send: it drives other gear (and Ableton, with Sync on its MIDI input) while it plays."),
       h("button", { class: "row-btn", "data-nav": "monitor", onclick: () => midiMonitor(app) }, "MIDI monitor…"),
-      h("button", { class: "row-btn", "data-nav": "learn-play", onclick: () => { app.learnTransport = "play"; app.overlays.toast("Press the button on your MIDI device for play / stop"); } },
-        `Transport CC, play / stop: ${st.transport.play ? `CC ${st.transport.play.cc} ch ${st.transport.play.ch + 1}` : "not set"} (click, then press a button)`),
-      h("button", { class: "row-btn", "data-nav": "learn-rec", onclick: () => { app.learnTransport = "record"; app.overlays.toast("Press the button on your MIDI device for record"); } },
-        `Transport CC, record: ${st.transport.record ? `CC ${st.transport.record.cc} ch ${st.transport.record.ch + 1}` : "not set"}`),
-      h("button", { class: "row-btn", "data-nav": "learn", onclick: () => { close(); app.setLearning(true); } }, "MIDI learn for knobs…"),
-      h("div", { class: "section-title" }, "Controller"),
-      h("p", { class: "note" }, app.pad.connected ? `Gamepad: ${app.pad.connected}` : "No gamepad seen yet. Press a button on it."),
-      stepper("layout", "Button layout", { auto: "Auto-detect", xbox: "Xbox (A bottom)", nintendo: "Nintendo (A right)" }[st.padLayout], (d) => {
-        const o: typeof st.padLayout[] = ["auto", "xbox", "nintendo"];
-        st.padLayout = o[(o.indexOf(st.padLayout) + d + 3) % 3];
+
+      // ---- Editing defaults
+      title("editing", "Editing defaults"),
+      toggle("ci", "Count-in (1 bar) before recording", st.countIn, save(() => (st.countIn = !st.countIn))),
+      toggle("rq", "Quantize while recording", st.recQuantize, save(() => (st.recQuantize = !st.recQuantize))),
+      toggle("preview", "Note preview", st.notePreview, save(() => (st.notePreview = !st.notePreview))),
+      stepper("deflen", "Default note length", st.defaultNoteLen ? lengthLabel(st.defaultNoteLen) : "Same as the grid", (d) => {
+        const opts = [0, ...NOTE_LENGTHS.map((l) => l.ticks)];
+        const i = Math.max(0, opts.indexOf(st.defaultNoteLen ?? 0));
+        st.defaultNoteLen = opts[Math.max(0, Math.min(opts.length - 1, i + d))] || undefined;
         app.saveSettings();
         rerender();
       }),
-      h("div", { class: "section-title" }, "Editing"),
-      toggle("preview", "Note preview", st.notePreview, () => { st.notePreview = !st.notePreview; app.saveSettings(); rerender(); }),
-      toggle("lock", "Scale lock", st.scaleLock, () => { st.scaleLock = !st.scaleLock; app.saveSettings(); rerender(); app.refresh(); }),
-      toggle("rq", "Quantize while recording", st.recQuantize, () => { st.recQuantize = !st.recQuantize; app.saveSettings(); rerender(); }),
-      toggle("ci", "Count-in (1 bar) before recording", st.countIn, () => { st.countIn = !st.countIn; app.saveSettings(); rerender(); }),
-      h("div", { class: "section-title" }, "Timer"),
-      toggle("tick", "Soft tick in the last 10 seconds", !!st.timerTick, () => { st.timerTick = !st.timerTick; app.saveSettings(); rerender(); }),
-      stepper("after-save", "After Save as-is", { "": "Ask", library: "Go to my songs", stay: "Stay here" }[st.afterTimedSave ?? ""], (d) => {
-        const o: ("" | "library" | "stay")[] = ["", "library", "stay"];
-        st.afterTimedSave = o[(o.indexOf(st.afterTimedSave ?? "") + d + 3) % 3];
-        app.saveSettings();
-        rerender();
-      }),
-      toggle("gas", "Show the phrase grid right after START", st.gridAtStart, () => { st.gridAtStart = !st.gridAtStart; app.saveSettings(); rerender(); }),
-      h("div", { class: "section-title" }, "Sounds"),
+      h("p", { class: "note" }, "For tracks that haven't picked their own (the ♪ picker in the editor sets one per track)."),
+      toggle("gas", "Show the phrase grid right after START", st.gridAtStart, save(() => (st.gridAtStart = !st.gridAtStart))),
+
+      // ---- Sounds
+      title("sounds", "Sounds"),
       stepper("genshare", "Generated sounds", st.genShare ? `${Math.round(st.genShare * 100)}% of rolls` : "Off: curated only", (d) => {
         const i = GEN_SHARES.indexOf(st.genShare);
         st.genShare = GEN_SHARES[Math.max(0, Math.min(GEN_SHARES.length - 1, (i < 0 ? 2 : i) + d))];
@@ -255,10 +249,44 @@ export function settingsDialog(app: App) {
         rerender();
       }),
       h("p", { class: "note" }, "The dice and NUDGE pick a sound by role (drums, bass, lead, pad, keys, pluck, arp, fx). Some are new ones grown from an instrument's recipe, marked ✦; they're saved in the song, and ★ Save keeps one for every song."),
+
+      // ---- Timer & game mode
+      title("timer", "Timer & game mode"),
+      h("p", { class: "note" }, "The timer itself is picked on the setup screen (Off, 5-20 minutes)."),
+      toggle("game", "Game mode", st.gameMode, save(() => (st.gameMode = !st.gameMode))),
+      h("ul", { class: "note game-list" },
+        h("li", null, st.gameMode ? "On: challenge cards (dealt on the setup screen, shown in the top bar), no pausing the timer, editing locks at zero until you choose, one EXTRA BALL (+5 minutes), the TILT flash." : "Off: the timer can be paused; at zero the display says TIME, with as many extra balls as you like. Nothing locks."),
+        h("li", null, "Either way, at zero the bar that's playing finishes and fades out, and the song is kept as a timed take (Songs → the song → Versions)."),
+      ),
+      st.gameMode ? stepper("cards", "Challenge cards", app.dice.cards ? String(app.dice.cards) : "Off", (d) => {
+        app.dice.cards = Math.max(0, Math.min(3, app.dice.cards + d));
+        app.saveDice();
+        rerender();
+        app.refresh();
+      }) : null,
+      toggle("tick", "Soft tick in the last 10 seconds", !!st.timerTick, save(() => (st.timerTick = !st.timerTick))),
+      stepper("after-save", "After Save as-is", { "": "Ask", library: "Go to my songs", stay: "Stay here" }[st.afterTimedSave ?? ""], (d) => {
+        const o: ("" | "library" | "stay")[] = ["", "library", "stay"];
+        st.afterTimedSave = o[(o.indexOf(st.afterTimedSave ?? "") + d + 3) % 3];
+        app.saveSettings();
+        rerender();
+      }),
+
+      // ---- Display
+      title("display", "Display"),
+      toggle("scope", "Oscilloscope", !!app.scopeOpen?.(), () => { app.toggleScope?.(); rerender(); }),
+      stepper("labels", "Piano roll labels", { both: "Note names + scale degrees", names: "Note names", degrees: "Scale degrees" }[st.rollLabels ?? "both"], (d) => {
+        const o: ("both" | "names" | "degrees")[] = ["both", "names", "degrees"];
+        st.rollLabels = o[(o.indexOf(st.rollLabels ?? "both") + d + 3) % 3];
+        app.saveSettings();
+        rerender();
+        app.refresh();
+      }),
       h("button", { class: "row-btn primary", "data-nav": "done", onclick: close }, "Done"),
     );
   }, { wide: true });
   void refreshDevices().then(() => rr?.());
+  if (section) requestAnimationFrame(() => document.querySelector(`.dialog [data-section="${section}"]`)?.scrollIntoView({ block: "start" }));
 }
 
 function toggle(id: string, label: string, on: boolean, fn: () => void) {
@@ -340,32 +368,48 @@ export function onlineDialog(app: App, mode: "host" | "join") {
 }
 
 export function systemMenu(app: App, newJam: () => void) {
+  const none = !app.song.tracks.length;
+  const head = (label: string): MenuItem => ({ label, heading: true });
   app.overlays.menu(`TILT · ${app.song.title}`, () => [
-    ...(app.couch ? [{ label: "End couch mode", run: () => app.endCouch() }] : []),
-    { label: "⚄ Dice: new jam…", run: newJam },
-    { label: "▤ Songs (library)…", run: () => libraryDialog(app, { onOpen: () => app.show("song") }) },
-    { label: app.couch ? "🛋 Back to the couch" : "👥 Together: couch or online…", run: () => (app.couch ? app.show("couch") : playTogetherDialog(app)) },
-    { label: "⬇ Export (WAV, stems, MIDI)…", run: () => exportDialog(app) },
-    { label: "⇪ Share song…", disabled: !app.song.tracks.length, run: () => shareSongDialog(app) },
-    { label: "🎲 Share setup code…", disabled: !app.song.tracks.length, run: () => shareCodeDialog(app) },
+    head("Song"),
+    { label: "⚄ New jam…", run: newJam },
+    { label: "▤ Songs…", hint: "your library", run: () => libraryDialog(app, { onOpen: () => app.show("song") }) },
     { label: "Open a code or link…", run: () => enterCodeDialog(app) },
+    { label: "Save version…", disabled: none, hint: "Songs → Versions", run: () => saveVersionDialog(app) },
+    { label: "Song settings…", hint: "key, tempo, swing", run: () => songSettings(app) },
+    head("Share"),
+    { label: "⇪ Share…", disabled: none, hint: "song or setup code", run: () => shareSongDialog(app) },
+    { label: "⬇ Export…", disabled: none, hint: "WAV, stems, MIDI", run: () => exportDialog(app) },
+    head("Play"),
+    app.couch ? { label: "🛋 Back to the couch", run: () => app.show("couch") } : { label: "👥 Together…", hint: "couch or online", run: () => playTogetherDialog(app) },
+    ...(app.couch ? [{ label: "End couch mode", run: () => app.endCouch() }] : []),
+    { label: "Game mode & timer…", checked: app.settings.gameMode, run: () => settingsDialog(app, "timer") },
+    head("Setup"),
     { label: "⚙ Settings…", run: () => settingsDialog(app) },
-    { label: "🎮 Game mode…", checked: app.settings.gameMode, run: () => gameModeDialog(app, () => app.refresh()) },
-    { label: "💡 Stuck? Phrase grid for this scene…", disabled: app.locked, run: () => phraseGridDialog(app, { sceneId: app.currentSceneId(), onDone: () => app.refresh() }) },
-    { label: "Song settings…", run: () => songSettings(app) },
-    { label: "Song screen", hint: "F2", run: () => app.show("song") },
-    { label: "Edit screen", hint: "F3", disabled: !app.song.tracks.length, run: () => app.show("edit") },
-    { label: "Mixer", hint: "F4", run: () => app.show("mix") },
-    { label: "Play mode: SCENE (loop the scene)", hint: "C", checked: app.songMode === "scene", run: () => app.setSongMode("scene") },
-    { label: "Play mode: SONG (scenes in order)", hint: "C", checked: app.songMode === "song", run: () => app.setSongMode("song") },
-    { label: app.songMode === "song" ? "Loop the song" : "Loop the scene", checked: app.loopOn(), keepOpen: true, run: () => app.toggleLoop() },
-    { label: "Metronome (click)", checked: app.song.metronome, keepOpen: true, run: () => app.edit("Metronome", () => (app.song.metronome = !app.song.metronome)) },
-    { label: "Auto-arrange (one-scene songs)", disabled: !canArrange(app.song), run: () => app.edit("Auto-arrange", () => autoArrange(app.song)) },
-    { label: app.learning ? "MIDI learn: finish" : "MIDI learn…", run: () => app.setLearning(!app.learning) },
-    { label: "Oscilloscope", run: () => app.toggleScope?.() },
-    { label: "Help: controls, tutorial, about…", hint: "?", run: () => helpDialog(app) },
-    { label: tutorialLabel(), run: () => app.openTutorial?.() },
+    { label: app.learning ? "MIDI learn: finish" : "MIDI learn…", hint: "a hardware knob to any control", run: () => app.setLearning(!app.learning) },
+    head("Help"),
+    { label: "Controls & tutorial…", hint: "?", run: () => helpDialog(app) },
   ]);
+}
+
+/** Save version: the song as it is now, kept in its version list (Songs → the song → Versions). */
+export function saveVersionDialog(app: App) {
+  const input = h("input", { class: "text-input", "data-nav": "name", maxlength: 40, placeholder: `Version ${new Date().toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}` }) as HTMLInputElement;
+  app.overlays.dialog("Save version", (close) => {
+    const save = async () => {
+      const name = input.value.trim().slice(0, 40) || input.placeholder;
+      close();
+      try { await saveTake(app.song, name, "saved"); app.overlays.toast(`Saved “${name}”: Songs → ${app.song.title} → Versions`, 2600); }
+      catch (e) { app.overlays.toast(`Couldn't save the version: ${e}`, 3000, { error: true }); }
+    };
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); void save(); } });
+    requestAnimationFrame(() => input.focus());
+    return h("div", { class: "form" },
+      h("p", { class: "note" }, "Keeps the song as it is now. You can open it later as a new song; this one carries on."),
+      input,
+      h("button", { class: "row-btn primary", "data-nav": "save", onclick: () => void save() }, "Save version"),
+      h("button", { class: "row-btn", "data-nav": "cancel", onclick: close }, "Cancel"));
+  });
 }
 
 type HelpPage = "controls" | "tutorial" | "about";
@@ -376,17 +420,17 @@ const CONTROLS: Record<ControlsTab, { label: string; rows: [string, string][] }>
     ["Stick / D-pad", "Move the cursor"],
     ["A", "Place / delete note, open, confirm. Hold A + left/right: note length"],
     ["B", "Back"],
-    ["X", "Context menu"],
+    ["X", "The menu for what's under the cursor (track, scene, clip; the editor's ⋯). With notes selected: the selection bar (left / right, A, B back)"],
     ["Y", "Play / stop. Hold: record. On the setup screen: NUDGE (hold: new song)"],
     ["Right stick", "Turn knob. In the roll: length (←→), velocity (↑↓), or draw the automation lane (↑↓) when one is open"],
     ["LT / ZL (hold)", "Fine adjust.  + up / down on the Song screen: move the scene.  + LB / RB: shorter / longer new notes"],
-    ["X in the piano roll", "Split, join, legato, set length, new note length"],
+    ["Selection bar (X with notes selected)", "Length, transpose (LT: an octave), quantize, legato, join, split, velocity, copy, delete"],
     ["RT / ZR (hold) + move", "Select a range"],
     ["RB / R", "Switch piano roll ↔ instrument panel. Hold: roll only / split / panel only"],
-    ["LB / L", "Jump to an instrument or phrase: hold, move, release. A quick tap leaves it open (A picks, B cancels). Couch / online: a free instrument becomes yours, another player's opens read-only (☰: ask to swap)"],
+    ["LB / L", "Jump to an instrument or phrase: hold, move, release. A quick tap leaves it open (A picks, B cancels). Up from the first scene: the Song / Edit / Mix screens. Couch / online: a free instrument becomes yours, another player's opens read-only (☰: ask to swap)"],
     ["Left stick click (L3)", "Play: SCENE (this scene) ↔ SONG (the song chain)"],
     ["Right stick click (R3)", "Tutorial: I'm ready (next step)"],
-    ["Start / +", "App menu.  Back / −: undo"],
+    ["Start / +", "TILT menu: Song, Share, Play, Setup, Help.  Back / −: undo"],
   ] },
   keyboard: { label: "Keyboard", rows: [
     ["Arrows, Enter, Esc", "Move, confirm (hold Enter + ←→: length), back"],
@@ -396,7 +440,7 @@ const CONTROLS: Record<ControlsTab, { label: string; rows: [string, string][] }>
     ["C", "Play: SCENE (this scene) ↔ SONG (all the scenes in order)"],
     ["Alt + ↑ / ↓", "Song screen: move the scene up / down"],
     ["Shift + arrows", "Select a range"],
-    ["M", "Context menu.  Tab: roll ↔ panel"],
+    ["M", "The menu for what's under the cursor; with notes selected, the selection bar.  Tab: roll ↔ panel"],
     ["` (backtick)", "Jump to an instrument or phrase: hold, arrows, release. Tap: it stays open to click or pick with Enter; Esc cancels"],
     [", .  /  - =", "Knob / note length  ·  velocity"],
     ["Ctrl+Z / Y / C / X / V / D / A", "Undo, redo, copy, cut, paste, duplicate clip, select all"],
@@ -414,14 +458,18 @@ const CONTROLS: Record<ControlsTab, { label: string; rows: [string, string][] }>
     ["A scene's ▶", "SCENE: play that scene.  SONG: play the song from there"],
     ["Scene ⋮⋮ grip / long-press + drag", "Move the scene"],
     ["A scene's name", "Intro, Verse, Chorus, Bridge, Drop, Outro: each has its colour"],
-    ["Right-click / long-press", "The menu for a scene, clip or track (a sheet from the bottom on phones)"],
+    ["Right-click / long-press / ⋯", "The menu for a track, scene or clip (⋯ shows on hover and on the selected one; a sheet from the bottom on phones)"],
+    ["Scene menu → Scene settings…", "Tempo, key change, fade in / out for that scene"],
+    ["✦ Auto-arrange (song chain)", "Grows a one-scene song into intro, verses, choruses and an outro"],
+    ["↶ ↷ (top bar)", "Undo / redo. Hold (or right-click) ↶: the history, to go back several steps"],
+    ["Selected notes", "A bar appears over the roll: length, transpose (Shift: an octave), quantize, legato, join, split, velocity, copy, delete. Right-click a note: select it"],
     ["Move / copy to… (clip menu)", "Then click or tap the cell it goes to. Cancel in the bar, or tap the clip again"],
     ["Drag a clip (mouse)", "Drop it on another cell: move, copy or swap"],
-    ["♪ 1/16 ▾ (editor toolbar)", "Length of new notes, remembered per track. Click a spot: a note that long; drag: size it by hand"],
+    ["♪ 1/16 ▾ (editor toolbar)", "Length of new notes (and of the selected ones), remembered per track. Click a spot: a note that long; drag: size it by hand"],
     ["Alt+click a note", "Split it at the grid line you clicked"],
     ["Jump to… (couch quarters, or `)", "Click a column (instrument), a scene name or a cell to go there; click outside to cancel. Couch / online: each column shows whose it is"],
     ["NUDGE / Mutate (sound panel)", "NUDGE: another sound in the same role. Mutate: push about half the knobs clearly. Undo brings either back"],
-    ["🎲 code (Song screen, top left)", "Share the song's setup code: copy it, a link that opens TILT with it, or a new song from it"],
+    ["🎲 code (Song screen, top left)", "Share → Setup code: copy it, a link that opens TILT with it, or a new song from it"],
   ] },
   setup: { label: "Setup screen", rows: [
     ["A / Enter / click on a value", "Pick it from a list (or − / + for tempo and swing). Editing a field HOLDs it"],
@@ -430,14 +478,15 @@ const CONTROLS: Record<ControlsTab, { label: string; rows: [string, string][] }>
     ["Slot ▾ → ? A role, any instrument", "Ask a slot for a role (say, any pad): NUDGE picks the instrument"],
     ["✦ sounds", "Generated from an instrument's recipe (Settings → Sounds sets how often). Saved in the song; ★ Save keeps one for every song"],
     ["Setups ▾ / Save setup…", "Save the held fields under a name; loading one brings them back held"],
-    ["Timer", "Off, 5, 10, 15 or 20 minutes. ❚❚ next to the display pauses it (phones: tap the timer). 1 MINUTE: it turns amber; the last 10 seconds flash and count down (Settings → Timer: a soft tick)"],
+    ["Timer", "Off, 5, 10, 15 or 20 minutes. ❚❚ next to the display pauses it (phones: tap the timer). 1 MINUTE: it turns amber; the last 10 seconds flash and count down (Settings → Timer & game mode: a soft tick)"],
     ["Time's up", "The bar finishes and fades, the song is kept as a timed take, then a card: Play it back, Save as-is, EXTRA BALL (+5 min), Keep working"],
-    ["Game mode…", "Challenge cards, no pausing, editing locked at zero until you choose, one extra ball, the TILT flash (off by default)"],
+    ["Game mode…", "Settings → Timer & game mode: challenge cards, no pausing, editing locked at zero until you choose, one extra ball, the TILT flash (off by default)"],
+    ["Share code: Copy / Copy link", "The setup as a code, or a link that opens TILT with it"],
   ] },
   midi: { label: "MIDI", rows: [
     ["Keyboard / pads", "Play the instrument you're on; held notes light its keys and pads"],
-    ["MIDI learn", "TILT menu → MIDI learn: touch a knob, move a hardware control"],
-    ["Transport", "Play / stop / record CCs and clock sync in Settings"],
+    ["MIDI learn", "TILT menu → MIDI learn: touch a knob, move a hardware control. Settings → Controllers & MIDI lists the bindings (remove them there)"],
+    ["Transport", "Play / stop / record CCs and clock sync: Settings → Controllers & MIDI"],
   ] },
 };
 
