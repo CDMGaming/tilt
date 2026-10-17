@@ -12,6 +12,7 @@ import { ChipDSP, FmDSP, SamplerDSP, WavetableDSP } from "../src/engine/dsp/inst
 import { buildMips, parseWav } from "../src/engine/wavetable.ts";
 import { AnthemDSP, BoomDSP, ChopDSP, GarageDSP, OrganDSP, PatchworkDSP, PianoDSP, PluckDSP, TineDSP, VoxDSP } from "../src/engine/dsp/instruments4-dsp.ts";
 import { sampleSetRefs } from "../src/engine/instruments4.ts";
+import { GuitarDSP } from "../src/engine/dsp/guitar-dsp.ts";
 import { Toolkit } from "../src/engine/dsp/toolkit-dsp.ts";
 import { makeFx } from "../src/engine/dsp/fx-dsp.ts";
 import { hasToolkit } from "../src/engine/toolkit.ts";
@@ -61,6 +62,17 @@ function phrase(params: Record<string, number>): Ev[] {
     }
     [[5, 12], [5, 13], [6, 14], [6, 15]].forEach(([part, s]) => out.push({ t: (16 + s) * step, len: step, pitch: 36 + part, vel: 100 }));
     return out;
+  }
+  if (kind === "guitar") {
+    // Power chords (open, then palm-muted chugs), a single-note line, a pinch squeal.
+    const pc = (root: number, t: number, len: number, vel: number) => [root, root + 7, root + 12].map((pitch) => ({ t, len, pitch, vel }));
+    return [
+      ...pc(40, 0, 3.6 * step, 110), ...pc(43, 4 * step, 3.6 * step, 110),
+      ...[0, 1, 2, 3, 4, 5, 6, 7].flatMap((k) => pc(40, (8 + k) * step, 0.5 * step, 44).slice(0, 2)),
+      ...[52, 55, 57, 59, 57, 55].map((pitch, i) => ({ t: (16 + i) * step, len: 0.9 * step, pitch, vel: 100 })),
+      { t: 23 * step, len: 4 * step, pitch: 76, vel: 127 },
+      ...pc(45, 28 * step, 3.6 * step, 112),
+    ];
   }
   if (kind === "pluck") {
     // An arpeggio, a held chord, then a low line (the basses play an octave down).
@@ -147,6 +159,7 @@ function dspFor(params: Record<string, number>, clock: { bpm: number; zero: numb
     }
     case "epiano": return new TineDSP(params, SR);
     case "pluck": return new PluckDSP(params, SR);
+    case "guitar": return new GuitarDSP(params, SR);
     case "organ": return new OrganDSP(params, SR);
     case "anthem": return new AnthemDSP(params, SR);
     case "patch": return new PatchworkDSP(params, SR);

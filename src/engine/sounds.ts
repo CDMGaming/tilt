@@ -13,14 +13,15 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 
 /** Instruments the dice may pick (the sampler is for sounds you bring). */
-export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "garage", "chop", "acid", "wobble", "patch", "poly", "piano", "epiano", "organ", "pluck", "pad", "vox", "fm", "wave", "lead", "anthem", "chip", "boom"];
+export const DICE_KINDS: InstrumentKind[] = ["drums", "analog", "garage", "chop", "acid", "wobble", "patch", "poly", "piano", "epiano", "organ", "pluck", "guitar", "pad", "vox", "fm", "wave", "lead", "anthem", "chip", "boom"];
 
 // Role tags per preset, by name. A preset not listed gets its instrument's default.
 const DEFAULT_ROLE: Record<InstrumentKind, Role[]> = {
   drums: ["drums"], analog: ["drums"], acid: ["bass"], wobble: ["bass"], poly: ["keys"], pad: ["pad"],
-  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"], epiano: ["keys"], pluck: ["pluck"], organ: ["keys"], anthem: ["lead"], patch: ["bass"], vox: ["pad"], boom: ["fx"], piano: ["keys"], garage: ["drums"], chop: ["drums"], midi: ["keys"],
+  fm: ["keys"], wave: ["lead"], lead: ["lead"], chip: ["lead"], sampler: ["fx"], epiano: ["keys"], pluck: ["pluck"], organ: ["keys"], anthem: ["lead"], patch: ["bass"], vox: ["pad"], boom: ["fx"], piano: ["keys"], garage: ["drums"], chop: ["drums"], midi: ["keys"], guitar: ["keys"],
 };
 const TAGS: Partial<Record<InstrumentKind, Record<string, Role[]>>> = {
+  guitar: { "Hair Lead": ["lead"], "Shred Lead": ["lead"], "Ballad Lead": ["lead"], "Singing Lead": ["lead"], "Clean Arpeggio": ["arp", "pluck"], "Clean Chime": ["keys", "pluck"], "Spanky": ["pluck", "keys"] },
   piano: { "Short Keys": ["keys", "pluck"], "Lullaby": ["keys", "pad"], "Night Felt": ["keys", "pad"], "Echo Keys": ["keys", "arp"] },
   vox: {
     "Talk Bass": ["bass"], "Yoi Bass": ["bass"], "Mouth Bass": ["bass"], "Wah Bass": ["bass"], "Grunt": ["bass", "fx"],
@@ -183,6 +184,9 @@ export const RECIPES: Partial<Record<InstrumentKind, Move[]>> = {
   organ: [
     ...Array.from({ length: 9 }, (_, k) => pick(`db${k}`, 0.3, [0, 2, 4, 6, 8])), knob("drive", 0.2, 0, 0.9), pick("rotary", 0.3, [0, 1, 2]),
     pick("vibChorus", 0.3, [0, 1, 2, 3, 4, 5, 6]), pick("perc", 0.25, [0, 1, 2]), knob("click", 0.2),
+  ],
+  guitar: [
+    pick("amp", 0.15, [0, 1, 2]), knob("gain", 0.25), knob("tone", 0.2, 0.15, 0.95), knob("width", 0.25), knob("pickup", 0.2), knob("room", 0.15, 0, 0.5),
   ],
   pluck: [
     knob("pick", 0.25), knob("metal", 0.22), knob("damp", 0.2, 0, 0.8), knob("decay", 0.15), knob("room", 0.2, 0, 0.7), knob("bright", 0.15),

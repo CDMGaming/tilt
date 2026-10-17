@@ -1,6 +1,7 @@
 // AudioWorklet entry: one "rb-instrument" node per track. Note events arrive
 // with context times and are applied at the exact sample frame.
 
+import { GuitarDSP } from "./guitar-dsp";
 import { AcidDSP, DrumsDSP, PolyDSP, type Clock, type InstrumentDSP } from "./instruments-dsp";
 import { makeFx, type Fx } from "./fx-dsp";
 import { FX_SLOTS, type InstrumentKind } from "../model";
@@ -84,6 +85,7 @@ class RbInstrument extends AudioWorkletProcessor {
     else if (o.kind === "wave") { const w = new WavetableDSP(o.params, sampleRate); if (o.mips) w.setMips(o.mips); this.dsp = w; }
     else if (o.kind === "epiano") this.dsp = new TineDSP(o.params, sampleRate);
     else if (o.kind === "pluck") this.dsp = new PluckDSP(o.params, sampleRate);
+    else if (o.kind === "guitar") this.dsp = new GuitarDSP(o.params, sampleRate);
     else if (o.kind === "organ") this.dsp = new OrganDSP(o.params, sampleRate);
     else if (o.kind === "anthem") this.dsp = new AnthemDSP(o.params, sampleRate);
     else if (o.kind === "patch") this.dsp = new PatchworkDSP(o.params, sampleRate);

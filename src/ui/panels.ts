@@ -8,7 +8,7 @@ import { chordName, noteName, scaleById, scaleDegree } from "../engine/music";
 import { decodeFile, listSamples, putSample, sampleLabel } from "./samples";
 import { CHIP_WAVES, SFX_GROUPS, WT_FRAMES, WT_SIZE } from "../engine/instruments3";
 import { WOB_RATES } from "../engine/instruments2";
-import { CHOP_LOOPS, DRAWBAR_FEET, ccLabel, GARAGE_KITS, PIANO_CATS, PLUCK_BODIES, PW_JACKS, VIB_CHORUS, sampleSetRefs } from "../engine/instruments4";
+import { CHOP_LOOPS, DRAWBAR_FEET, GUITAR_AMPS, ccLabel, GARAGE_KITS, PIANO_CATS, PLUCK_BODIES, PW_JACKS, VIB_CHORUS, sampleSetRefs } from "../engine/instruments4";
 import { computeSlices } from "../engine/slices";
 import { allPresets, applyPreset, deleteUserPreset, presetPosition, saveUserPreset, userPresets, USER_MARK, type PresetEntry } from "./presets";
 import { getParam } from "../engine/params";
@@ -233,6 +233,21 @@ export function buildPanel(app: App, track: Track): HTMLElement {
         h("div", { class: "pk-knobs" },
           h("div", { class: "pk-char" }, ctl("pick", "★ Pick", "l"), ctl("metal", "★ Wood ↔ Metal", "l"), ctl("damp", "★ Damp", "l")),
           ctl("decay", "Decay"), ctl("room", "Room"), ctl("level", "Level"))),
+      keyboard(app, track),
+    );
+  } else if (track.kind === "guitar") {
+    // Axe: a sunburst top with cream "chicken-head" knobs; the amp's three channels as switches.
+    const amp = Math.round(track.params.amp ?? 1);
+    body = h("div", { class: "panel-body axe" },
+      h("div", { class: "ax-face" },
+        h("div", { class: "ax-amps", role: "radiogroup", "aria-label": "Amp" }, GUITAR_AMPS.map((name, i) => h("button", {
+          class: "ax-amp" + (i === amp ? " on" : ""), "data-nav": `amp-${i}`, "aria-pressed": String(i === amp),
+          onclick: () => { app.edit("Amp", () => (track.params.amp = i)); previewSound(app, track); app.screens.edit.render(); },
+        }, h("span", { class: "ax-lamp" }), name))),
+        h("div", { class: "ax-knobs" },
+          h("div", { class: "ax-char" }, ctl("gain", "★ Gain", "l"), ctl("tone", "★ Tone", "l")),
+          ctl("pickup", "Neck ↔ Bridge"), ctl("palm", "Palm mute"), ctl("width", "Width"), ctl("room", "Room"), ctl("level", "Level"))),
+      h("p", { class: "note" }, "Soft notes (velocity 50 or less) are palm-muted; full velocity (127) is a pick squeal."),
       keyboard(app, track),
     );
   } else if (track.kind === "organ") {

@@ -623,3 +623,12 @@ Each step ends with a report and audio previews of every preset, plus a list of 
 - **XY pads:** only Morph (Warp) and Vox (vowels).
 - **Thump Lab:** compact per-part modules, after Tokyo and Amsterdam (above).
 - **Order:** left to me (§8).
+
+## Axe (electric guitar, added for TILT Jam)
+
+**Status: built.** Kind `guitar` (made for TILT Jam, part of TILT). Karplus-Strong strings heard through a pickup comb
+(Neck ↔ Bridge), a pick attack, then an amp with three channels (Clean, Crunch, High gain: tightened lows,
+2x-oversampled clipping, a mid scoop on high gain, a tone control), a closed-back 4x12 cab simulation, a
+doubled-take Width and a room. Playing: velocity 50 or less is palm-muted, 127 is a pick squeal (pinch
+harmonic with vibrato). The amps are balanced to the same loudness; 24 presets level-matched (-16 dB),
+worst 4-note chord peak 0.54, ~3% CPU. Panel: a sunburst top, cream knobs, ★ Gain and ★ Tone.
