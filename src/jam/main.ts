@@ -6,7 +6,10 @@ import "./jam.css";
 import { JamApp } from "./ui";
 
 const app = new JamApp(document.getElementById("jam")!);
-app.showPacks();
+// ?join=CODE: a friend's online jam.
+const join = new URLSearchParams(location.search).get("join");
+if (join) app.showJoin(join);
+else app.showPacks();
 
 // For automated checks in the browser console.
 (window as unknown as { jam: JamApp }).jam = app;

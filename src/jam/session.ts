@@ -182,6 +182,24 @@ export class JamSession {
   }
 
   stop() { this.engine.stop(); this.onChange(); }
+
+  // ------------------------------------------------------------ online guests
+
+  /**
+   * The host's state arrived: sounds change at once, notes and the section on the next bar
+   * (the host already waited for its own bar line, so this is at most a bar behind).
+   */
+  applyRemote(st: JamState, held: Section | null) {
+    const before = this.st;
+    const notesChanged = JSON.stringify([before.pick, before.prog, before.mute, before.knobs.map((k, i) => k.filter((_, j) => ROLE_MACROS[this.t.parts[i].role][j]?.render))])
+      !== JSON.stringify([st.pick, st.prog, st.mute, st.knobs.map((k, i) => k.filter((_, j) => ROLE_MACROS[this.t.parts[i].role][j]?.render))]);
+    this.st = clone(st);
+    for (let i = 0; i < this.t.parts.length; i++) updateSound(this.t, this.st, this.song, i);
+    this.engine.sync(this.song);
+    if (notesChanged) this.atNextBar("remote", () => updateSong(this.t, this.st, this.song));
+    if (held !== this.held) { if (held) this.playSection(held); else this.followSong(); }
+    this.onChange();
+  }
 }
 
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));

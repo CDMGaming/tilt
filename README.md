@@ -17,6 +17,16 @@ Needs Deno 2.x (installed at C:\deno). No Node. The first `deno install` may nee
 - Latency test: http://localhost:5178/latency.html
 - Rebuild the drum kit: `deno run -A tools/make-kit.ts`
 
+## TILT Jam (branch `jam`)
+
+A jam-first front door on the same engine, at `/jam/` (preview: https://jam.tilt-jam.pages.dev/jam/).
+Pick a genre pack and a template and a whole song plays at once. Every part is a card of big macro
+knobs (always musical, double-click: home), with dice / mute / reset; section pads and progression
+shuffle land on the next bar; a hold-to-apply FX strip; BACK TO GOOD; Open in TILT Studio; Share.
+Friends join: gamepads and MIDI controllers take a card each (couch), or online with a 4-letter code.
+Code: `src/jam/` (packs are data: `src/jam/packs/`, tropes in `docs/packs/`). The electric guitar it
+uses (Axe) is a normal TILT instrument.
+
 ## Layout
 
 - `src/engine/`: song model, timeline, instruments (AudioWorklet DSP), audio graph, dice, arranger, WAV.

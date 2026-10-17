@@ -123,7 +123,7 @@ button:focus-visible, .jk:focus-visible { outline: 3px solid #fff; outline-offse
 @keyframes home { 50% { transform: scale(1.12); } }
 
 /* ---- FX strip */
-.fx-strip { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; align-items: center; padding: 10px 16px; background: #0b0d14ee; border-top: 1px solid var(--line); backdrop-filter: blur(6px); overflow-x: auto; }
+.fx-strip { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; align-items: center; padding: 10px 16px; background: #0b0d14ee; border-top: 1px solid var(--line); backdrop-filter: blur(6px); overflow-x: auto; scrollbar-width: none; }
 .fx-pad { position: relative; min-width: 130px; padding: 14px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel2); font-weight: 800; touch-action: none; user-select: none; }
 .fx-pad.on { background: var(--text); color: #000; border-color: #fff; box-shadow: 0 0 22px #fff6; }
 .fx-key { position: absolute; top: 4px; right: 7px; font-size: 10px; color: var(--dim); }
@@ -149,3 +149,18 @@ button:focus-visible, .jk:focus-visible { outline: 3px solid #fff; outline-offse
   .fx-note { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .pend, .card-pending.on, .jam-prog.pending, .back-good.pending { animation: none; } }
+
+/* ---- players */
+.card-owner { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: var(--pc); color: #0b0d14; white-space: nowrap; }
+.card-owner .card-take { background: #0b0d1433; color: #0b0d14; border: none; }
+.card-take { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--c); background: transparent; color: var(--c); }
+.part-card.locked .card-knobs, .part-card.locked .card-pads { pointer-events: none; opacity: .55; }
+.jk.pad-focus { box-shadow: 0 0 0 3px var(--pf); }
+.jam-link.on { border-color: var(--good); color: var(--good); }
+.jam-note { color: var(--dim); font-size: 13px; margin: 0; }
+.jam-join { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; max-width: 520px; }
+.jam-join .jam-input { flex: 1; min-width: 200px; font-size: 18px; }
+.back-good.small { font-size: 16px; padding: 10px 16px; }
+.jam-input.code { width: 110px; text-transform: uppercase; letter-spacing: .2em; font-weight: 800; }
+.jam-toast { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 60; background: var(--text); color: #0b0d14; font-weight: 800; padding: 10px 16px; border-radius: 12px; box-shadow: 0 8px 30px #000a; transition: opacity .3s; }
+.jam-toast.out { opacity: 0; }
