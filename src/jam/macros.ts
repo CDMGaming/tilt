@@ -27,7 +27,7 @@ const LEVEL: MacroDef = { id: "level", label: "Level", home: 0.7, targets: { all
 const SPACE: MacroDef = {
   id: "space", label: "Space", home: 0.35, hint: "From dry and close to far back in a big room",
   targets: {
-    all: [{ key: "mix:send", a: 0.02, b: 0.55 }],
+    all: [{ key: "mix:send", a: 0.01, b: 0.32 }],
     piano: [{ key: "room", a: 0.08, b: 0.75 }],
     pluck: [{ key: "room", a: 0.05, b: 0.6 }],
     guitar: [{ key: "room", a: 0.02, b: 0.55 }],
@@ -41,12 +41,12 @@ export const ROLE_MACROS: Record<Role, MacroDef[]> = {
   drums: [
     {
       id: "energy", label: "Energy", home: 0.55, render: true, hint: "Soft and sparse to hard-hitting, with crashes",
-      targets: { garage: [{ key: "smash", a: 0.05, b: 0.75 }, { key: "p1level", a: 0.7, b: 0.95 }, { key: "p7level", a: 0.3, b: 0.6 }] },
+      targets: { garage: [{ key: "smash", a: 0, b: 0.45 }, { key: "p1level", a: 0.7, b: 0.95 }, { key: "p7level", a: 0.25, b: 0.5 }] },
     },
     { id: "feel", label: "Feel", home: 0.25, render: true, hint: "Straight (left) to a lazy shuffle (right); the whole band follows" },
     {
       id: "room", label: "Room", home: 0.45, hint: "Tight and dry to a huge hall",
-      targets: { garage: [{ key: "room", a: 0.03, b: 0.95 }], all: [{ key: "mix:send", a: 0.02, b: 0.3 }] },
+      targets: { garage: [{ key: "room", a: 0.02, b: 0.7 }], all: [{ key: "mix:send", a: 0.01, b: 0.14 }] },
     },
     {
       id: "crunch", label: "Crunch", home: 0.15, hint: "Clean to crushed, like a cheap mic pushed too hard",

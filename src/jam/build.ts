@@ -56,7 +56,7 @@ export function progressionOf(t: Template, st: JamState, s: Section): number[] {
 export function buildSong(t: Template, st: JamState): Song {
   const song: Song = {
     version: 1, title: `${t.name} jam`, tempo: st.tempo, swing: 0, key: st.key, scale: st.scale,
-    songLoop: true, sceneLoop: true, metronome: false, tracks: [], scenes: [], master: { ...defaultMaster(), limiter: true, limitDepth: 0.45, reverb: true, reverbTime: 0.5 },
+    songLoop: true, sceneLoop: true, metronome: false, tracks: [], scenes: [], master: { ...defaultMaster(), volume: 0.75, limiter: true, limitDepth: 0.08, reverb: true, reverbTime: 0.32 },
     nextId: 1,
   };
   for (const s of sectionsOf(t)) song.scenes.push({ id: newId(song), name: sceneName(s), repeat: 1, tempo: null, fadeIn: false, fadeOut: s === "outro" });
@@ -110,9 +110,19 @@ export function updateSound(t: Template, st: JamState, song: Song, i: number) {
   const def = INSTRUMENTS[p.kind];
   const pi = Math.max(0, def.presets.findIndex((x) => x.name === p.preset));
   const base = { ...presetParams(p.kind, pi), ...(p.params ?? {}) };
-  applyMacros(track, p.role, base, st.knobs[i], { vol: p.mix?.vol ?? 0.8, send: p.mix?.send ?? 0.12, pan: p.mix?.pan ?? 0 });
+  const roleSend = { drums: 0.06, bass: 0.02, guitar: 0.04, keys: 0.1, lead: 0.12 }[p.role];
+  applyMacros(track, p.role, base, st.knobs[i], { vol: (p.mix?.vol ?? 0.8) * ROLE_TRIM[p.role], send: p.mix?.send ?? roleSend, pan: p.mix?.pan ?? 0 });
+  // Rhythm guitars keep their own room small: a wet wall of distortion is the mush.
+  if (p.kind === "guitar" && p.role === "guitar") track.params.room = Math.min(track.params.room ?? 0, 0.06);
+  if (p.kind === "guitar" && p.role === "lead") track.params.room = Math.min(track.params.room ?? 0, 0.18);
   track.mute = st.mute[i];
 }
+
+/**
+ * Per role, a step back from the levels the templates were first balanced at: keys and pads sit in
+ * the guitars' range, so they go under them (the rest moves with the master).
+ */
+const ROLE_TRIM: Record<string, number> = { drums: 0.84, bass: 1, guitar: 1, keys: 0.82, lead: 0.95 };
 
 /** The knob value of a macro on a part (by id), or its home. */
 function knob(t: Template, st: JamState, i: number, id: string): number {
@@ -218,12 +228,14 @@ function digitPitch(root: number, d: string, st: JamState): number {
 }
 
 /** The chord as the part plays it: a power chord (guitar), a triad around the part's middle (keys). */
-function chordPitches(role: string, root: number, center: number, st: JamState, full: boolean, mute: boolean): number[] {
+function chordPitches(role: string, root: number, center: number, st: JamState, full: boolean, mute: boolean, clean = false): number[] {
   const fifth = digitPitch(root, "5", st);
   if (role === "guitar" || role === "bass") {
     if (mute) return [root, fifth];
     if (!full) return [root, fifth, root + 12];
-    return [root, fifth, root + 12, digitPitch(root, "3", st) + 12, fifth + 12];
+    // A full chord: open voicing on a clean guitar; distorted, the big power chord (no third: through
+    // gain a third turns to mush).
+    return clean ? [root, fifth, root + 12, digitPitch(root, "3", st) + 12, fifth + 12] : [root, fifth, root + 12, fifth + 12];
   }
   const tri = scaleChord(root, st.key, st.scale, 3);
   const notes = (full ? [...tri, tri[0] + 12] : tri).map((p) => { let q = p; while (q < center - 6) q += 12; while (q > center + 8) q -= 12; return q; });
@@ -236,6 +248,7 @@ function pitchedNotes(t: Template, st: JamState, i: number, riff: string, prog: 
   const p = t.parts[i];
   if (!riff) return [];
   const riffBars = riff.length >= 32 ? 2 : 1, rl = riffBars * 16;
+  const clean = p.kind !== "guitar" || Math.round(song.tracks[i].params.amp ?? 1) === 0;
   let octave = 0;
   if (p.role === "bass") octave = [-12, 0, 12][stepOf(ROLE_MACROS.bass[2], knob(t, st, i, "octave"))];
   const center = p.center + octave;
@@ -252,7 +265,7 @@ function pitchedNotes(t: Template, st: JamState, i: number, riff: string, prog: 
       const prio = k % 16 === 0 ? 4 : k % 8 === 0 ? 3 : k % 4 === 0 ? 2 : k % 2 === 0 ? 1 : 0;
       let pitches: number[] = [], vel = k % 4 === 0 ? 104 : 92;
       if (c === "x" || c === "X") { pitches = chordPitches(p.role, root, center, st, false, false); if (c === "X") vel = 118; }
-      else if (c === "c") { pitches = chordPitches(p.role, root, center, st, true, false); vel = 104; }
+      else if (c === "c") { pitches = chordPitches(p.role, root, center, st, true, false, clean); vel = 104; }
       else if (c === "m") { pitches = p.role === "guitar" ? chordPitches(p.role, root, center, st, false, true) : [root]; vel = 44; }
       else if (c === "s") { pitches = [p.role === "guitar" ? root + 24 : digitPitch(root, "8", st)]; vel = 127; }
       else if (DIGIT[c]) { pitches = [digitPitch(root, c, st) - (down ? 12 : 0)]; }

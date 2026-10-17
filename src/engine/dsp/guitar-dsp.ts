@@ -155,7 +155,7 @@ export class GuitarDSP implements InstrumentDSP {
     // ---- amp
     const mode = Math.round(p.amp ?? 1), gain = p.gain ?? 0.5, tone = p.tone ?? 0.55;
     const drive = [1.2 + gain * 5, 3 + gain * 40, 12 + gain * 260][mode] ?? 10;
-    const tightF = [70, 110, 160][mode] ?? 100;
+    const tightF = [90, 140, 190][mode] ?? 120; // the lows tightened before the amp, more for more gain
     this.pre.set("peak", 800, 0.7, mode === 2 ? 6 : 3, sr * 2);
     this.up.set("lp", sr * 0.45, 0.7, 0, sr * 2);
     this.down.set("lp", sr * 0.42, 0.7, 0, sr * 2);
@@ -163,8 +163,8 @@ export class GuitarDSP implements InstrumentDSP {
     this.treble.set("high", 2800, 0.7, -6 + tone * 12, sr);
     this.bassEq.set("low", 120, 0.7, mode === 2 ? 2 : 1, sr);
     // Cab: closed-back 4x12.
-    this.cabHp.set("hp", 75, 0.7, 0, sr);
-    this.cabRes.set("peak", 110, 1.4, 4, sr);
+    this.cabHp.set("hp", 100, 0.7, 0, sr);
+    this.cabRes.set("peak", 120, 1.4, 2, sr);
     this.cabPres.set("peak", 2400 + tone * 1400, 1.1, 3 + tone * 2, sr);
     this.cabLp.set("lp", 4800 + tone * 1800, 0.8, 0, sr);
     this.cabLp2.set("lp", 6500 + tone * 2000, 0.7, 0, sr);

@@ -28,7 +28,11 @@ export async function levels(id: string, section = "Chorus"): Promise<string> {
     out.push(`${t.name}: ${r.toFixed(1)} (pk ${p.toFixed(2)})`);
   }
   const [r, p] = rms(await s.engine.render(song, { tail: 0.5 }));
-  out.push(`MIX ${r.toFixed(1)} pk ${p.toFixed(2)}`);
+  // The same without the master limiter: how hard it's working (dB it takes off the peaks).
+  const raw = JSON.parse(JSON.stringify(song));
+  raw.master.limiter = false;
+  const [r2, p2] = rms(await s.engine.render(raw, { tail: 0.5 }));
+  out.push(`MIX ${r.toFixed(1)} pk ${p.toFixed(2)} | unlimited ${r2.toFixed(1)} pk ${p2.toFixed(2)} (limiter ~${Math.max(0, 20 * Math.log10(p2 / 0.9)).toFixed(1)} dB)`);
   void s.engine.ctx.close();
   return `${tpl.name} / ${section}: ${out.join(" | ")}`;
 }

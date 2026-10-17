@@ -506,7 +506,7 @@ const GRUNGE: Template = {
       { name: "Riff", by: { verse: "1--5-1--<7-1----", chorus: "1-1-1-1-1-1-1-1-", breakdown: "1---------------", bridge: "1-------1---1---", any: "1--5-1--<7-1----" } },
       { name: "Slide", by: { verse: "1-------3-2-1---", chorus: "1---1---1-1-1---", any: "1-------3-2-1---" } },
       { name: "Pulse", by: { any: "1.1.1.1.1.1.1.1.", breakdown: "1---------------" } },
-    ], { drive: 0.65, follow: 0.45 }, { vol: 0.87 }),
+    ], { drive: 0.55, follow: 0.45 }, { vol: 0.78 }),
     axe("guitar", "Clean guitar", "Round Neck", 55, [
       { name: "Murky figure", by: { any: "1-3-5---4-3-1---", bridge: "1-------3-------", breakdown: "1-------5-------" } },
       { name: "Chord pick", by: { any: "1.5.8.5.1.5.8.5." } },
@@ -516,7 +516,7 @@ const GRUNGE: Template = {
       { name: "Wall", by: { chorus: "X-------x---x---", bridge: "X-------X-------", solo: "x---x---x---x---", outro: "X---------------", any: "X-------x---x---" } },
       { name: "Slur", by: { chorus: "X-----x-X-----x-", any: "X-----x-X-----x-" } },
       { name: "Grind", by: { chorus: "x.x.x.x.x.x.x.x.", any: "x.x.x.x.x.x.x.x." } },
-    ], { rests: ["intro", "verse", "breakdown"], home: { gain: 0.65, width: 0.85 }, mix: { vol: 0.75 } }),
+    ], { rests: ["intro", "verse", "breakdown"], home: { gain: 0.65, width: 0.85 }, mix: { vol: 0.9 } }),
     axe("lead", "Lead guitar", "Fuzzy Garage", 64, [
       { name: "Restated", by: { solo: "1-3-5---4-3-1---1-3-5---7-8-----", bridge: "8-------7-------" } },
       { name: "Noise", by: { solo: "8.7.8.7.5-3-1---s---------------", bridge: "5-------4-------" } },
