@@ -33,6 +33,7 @@ export function bindTopbar(app: App, el: HTMLElement) {
           title: app.timer.paused ? "Resume the timer" : "Pause the timer", "aria-label": app.timer.paused ? "Resume the timer" : "Pause the timer" }, app.timer.paused ? "▶" : "❚❚") : "",
         h("button", { class: "dmd-bulb", onclick: () => app.stuck?.(), disabled: app.locked || none, title: "Stuck? Ideas for this scene (phrase grid)", "aria-label": "Stuck?" }, "💡")),
       screenSwitch(),
+      h("div", { class: "transport undo-group" }, undoButton(), h("button", { class: "tp-btn", onclick: () => app.redo(), title: "Redo (Ctrl+Y)", "aria-label": "Redo" }, "↷")),
       h("div", { class: "transport" },
         h("button", { class: "tp-btn" + (playing ? " on" : ""), "data-coach": "play", onclick: () => app.togglePlay(), title: "Play / stop (Y, Space)" }, playing ? "■" : "▶"),
         h("button", { class: "tp-btn rec" + (app.recording ? " on" : ""), onclick: () => app.toggleRecord(), title: "Record (hold Y, Shift+Space)" }, "●"),
@@ -48,6 +49,24 @@ export function bindTopbar(app: App, el: HTMLElement) {
       })() : "",
     );
     updateTimer();
+  };
+
+  /** Undo: click undoes; a long press (or right-click) lists the history to go back several steps. */
+  const undoButton = () => {
+    let timer = 0, held = false;
+    const history = (b: HTMLElement) => {
+      const r = b.getBoundingClientRect();
+      app.overlays.menu("Undo history", () => app.history.labels().slice(0, 20).map((l, i) => ({ label: l, hint: i ? `${i + 1} steps` : "last", run: () => { for (let k = 0; k <= i; k++) app.undo(); } })), { x: r.left, y: r.bottom + 4 });
+    };
+    const b = h("button", {
+      class: "tp-btn", "aria-label": "Undo",
+      title: "Undo (Ctrl+Z). Hold or right-click: the history",
+      onpointerdown: () => { held = false; timer = setTimeout(() => { held = true; history(b); }, 500) as unknown as number; },
+      onpointerup: () => clearTimeout(timer), onpointerleave: () => clearTimeout(timer),
+      oncontextmenu: (e: Event) => { e.preventDefault(); clearTimeout(timer); history(b); },
+      onclick: () => { if (!held) app.undo(); held = false; },
+    }, "↶");
+    return b;
   };
 
   /** SCENE | SONG: what Play does. SONG mode adds the loop switch (play the song again at its end). */
@@ -191,12 +210,13 @@ export function bindTopbar(app: App, el: HTMLElement) {
         h("div", { class: "rail-gap" }),
         icon("↶", "Undo", () => app.undo()),
         icon("↷", "Redo", () => app.redo()),
-        // SCENE / SONG (the metronome lives in the menu on phones), and the song loop in SONG mode.
+        // SCENE / SONG, the loop, the metronome.
         // What Play plays (one scene / the whole song) and whether it repeats: both always shown.
         h("button", { class: "rail-btn mode-rail", onclick: () => app.setSongMode(app.songMode === "scene" ? "song" : "scene"), title: "Play: this scene, or the whole song (C)", "aria-label": `Play mode: ${app.songMode}` },
           h("span", { class: "mode-mini" + (app.songMode === "scene" ? " on" : "") }, "SCENE"),
           h("span", { class: "mode-mini" + (app.songMode === "song" ? " on" : "") }, "SONG")),
         icon("⟳", app.loopOn() ? "Loop" : "Once", () => app.toggleLoop(), "loop-rail" + (app.loopOn() ? " on" : ""), false, "Loop on: repeat. Off: play once"),
+        icon("♩", "Click", () => app.edit("Metronome", () => (s.metronome = !s.metronome)), s.metronome ? "on" : "", false, "Metronome"),
         icon("●", "Rec", () => app.toggleRecord(), "rec" + (app.recording ? " on" : "")),
         icon(playing ? "■" : "▶", playing ? "Stop" : "Play", () => app.togglePlay(), "play" + (playing ? " on" : ""))),
       screenRail(),

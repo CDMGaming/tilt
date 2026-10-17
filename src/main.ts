@@ -47,6 +47,7 @@ app.onRemoteChoice = (choice) => remoteChoice(app, choice);
 app.openShortcut = () => openShortcut(app);
 const scope = new Scope(app);
 app.toggleScope = () => scope.toggle();
+app.scopeOpen = () => scope.open;
 app.stuck = () => phraseGridDialog(app, { sceneId: app.currentSceneId(), onDone: () => app.refresh() });
 
 app.engine.userSampleLoader = async (id) => { const s = await getSample(id); return s && { data: s.data, rate: s.rate }; };

@@ -21,7 +21,8 @@ const OLD_FORMATS = ["rollbox-song"];
 
 export interface LibraryEntry { id: string; title: string; updated: number; tracks: number; scenes: number; code?: string; song: Song }
 /** A kept version of a song: `songId` is the song's library id. */
-export interface Take { id: string; songId: string; name: string; at: number; kind: "timed"; song: Song }
+/** A kept version of a song: timed (the timer ran out) or saved (Save version). */
+export interface Take { id: string; songId: string; name: string; at: number; kind: "timed" | "saved"; song: Song }
 
 let dbp: Promise<IDBDatabase> | null = null;
 function db(): Promise<IDBDatabase> {
@@ -71,10 +72,10 @@ export async function deleteFromLibrary(id: string) {
 // ------------------------------------------------------------ versions (takes)
 
 /** Keep a copy of the song as it is now in its version list (saving the song first, so it has a library id). */
-export async function saveTake(song: Song, name: string): Promise<Take> {
+export async function saveTake(song: Song, name: string, kind: Take["kind"] = "timed"): Promise<Take> {
   await saveToLibrary(song);
   const copy = JSON.parse(JSON.stringify(song)) as Song;
-  const take: Take = { id: newLibId(), songId: song.libId!, name, at: Date.now(), kind: "timed", song: copy };
+  const take: Take = { id: newLibId(), songId: song.libId!, name, at: Date.now(), kind, song: copy };
   await tx("readwrite", (s) => s.put(take), TAKES);
   return take;
 }
@@ -221,7 +222,7 @@ function versionsDialog(app: App, e: LibraryEntry, open: (song: Song) => void) {
     rr = rerender;
     return h("div", { class: "form library" },
       takes === null ? h("p", { class: "note" }, "Loading…")
-        : !takes.length ? h("p", { class: "note" }, "No versions yet. When a timer runs out, TILT keeps the song as it was then (a timed take) here.")
+        : !takes.length ? h("p", { class: "note" }, "No versions yet. TILT menu → Save version keeps the song as it is now; when a timer runs out, TILT keeps a timed take here too.")
         : h("div", { class: "lib-list" },
           h("p", { class: "note" }, "Opening a version makes it a new song; this one stays as it is."),
           takes.map((t) => h("div", { class: "take-row" },

@@ -366,8 +366,10 @@ export class PianoRoll {
       if (fs >= 7) {
         g.font = `${root || la ? "700 " : ""}${fs}px system-ui`;
         g.fillStyle = la ? ink : root ? col("--roll-key-root-ink") : deg ? col("--roll-key-in-ink") : col("--roll-key-out-ink");
-        g.fillText(noteName(pitch), 6, y + hh / 2);
-        if (deg && hh >= 12) {
+        const labels = app.settings.rollLabels ?? "both";
+        // Settings → Display: note names, scale degrees (out-of-key rows keep their name), or both.
+        g.fillText(labels === "degrees" && deg ? String(deg) : noteName(pitch), 6, y + hh / 2);
+        if (deg && hh >= 12 && labels === "both") {
           g.font = `${root ? "700 " : ""}${Math.min(10, fs - 1)}px system-ui`;
           g.textAlign = "right";
           g.fillStyle = la ? ink : root ? color : col("--roll-key-deg");

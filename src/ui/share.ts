@@ -24,6 +24,18 @@ export function openWithSetup(app: App, s: Setup) {
 }
 
 /** Share dialog: the code for the song as it is now, and the one it started from if that differs. */
+/**
+ * The two kinds of sharing as tabs at the top of both dialogs: the whole song (notes and all) or the
+ * setup code (key, tempo, instruments: a fresh start). Picking the other tab swaps the dialog.
+ */
+export function shareTabs(app: App, active: "song" | "setup", close: () => void, song: Song = app.song): HTMLElement {
+  const tab = (id: "song" | "setup", label: string) => h("button", {
+    class: "share-tab" + (id === active ? " on" : ""), "data-nav": `tab-${id}`, "aria-pressed": String(id === active),
+    onclick: () => { if (id === active) return; close(); if (id === "setup") shareCodeDialog(app, song); else void import("./sharesong").then((m) => m.shareSongDialog(app, song)); },
+  }, label);
+  return h("div", { class: "share-tabs", role: "tablist" }, tab("song", "⇪ Song"), tab("setup", "🎲 Setup code"));
+}
+
 export function shareCodeDialog(app: App, song: Song = app.song) {
   const now = setupFromSong(song);
   const nowCode = now ? encodeSetup(now) : "";
@@ -37,9 +49,10 @@ export function shareCodeDialog(app: App, song: Song = app.song) {
       "share" in navigator ? h("button", { class: "small-btn", "data-nav": `share-${label}`, onclick: () => navigator.share({ title: `TILT: ${song.title}`, text: `Start a TILT song from my setup: ${code}`, url: codeLink(code) }).catch(() => {}) }, "Share…") : "",
       h("button", { class: "small-btn", "data-nav": `new-${label}`, title: "Open the setup screen with this code, ready for NEW SONG", onclick: () => { close(); const s = decodeSetup(code); if (s) openWithSetup(app, s); } }, "New song from it")));
   let close = () => {};
-  app.overlays.dialog("Share setup code", (c) => {
+  app.overlays.dialog("Share", (c) => {
     close = c;
     return h("div", { class: "form share" },
+      shareTabs(app, "setup", c, song),
       now ? block(started ? "This song now" : "This song", nowCode, true) : h("p", { class: "note" }, "Add an instrument first: the code is built from the song's instruments."),
       started ? block("Started from", started, false) : "",
       h("p", { class: "note" }, "A code (or the link) brings back the key, scale, tempo, swing, instruments and their sounds. Not the notes: to send the whole song, use Songs… → Export song file."),

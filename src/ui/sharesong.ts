@@ -14,7 +14,7 @@ import { h } from "./dom";
 import { newLibId, saveToLibrary } from "./library";
 import { makeQr, qrSvg } from "./qr";
 import { getSample, putSample } from "./samples";
-import { openWithSetup } from "./share";
+import { openWithSetup, shareTabs } from "./share";
 
 const RETRY_FOR_MS = 60_000;
 const RETRY_EVERY_MS = 3_000;
@@ -92,14 +92,14 @@ export function songLength(song: Song): string {
  * It always opens ready to play the whole song (the chain, in order, with its repeats).
  */
 export function shareSongDialog(app: App, song: Song = app.song) {
-  const wait = app.overlays.dialog("Share song", () => h("div", { class: "form share" }, h("p", { class: "note big share-wait" }, "Uploading…")));
+  const wait = app.overlays.dialog("Share", (c) => h("div", { class: "form share" }, shareTabs(app, "song", c, song), h("p", { class: "note big share-wait" }, "Uploading…")));
   void (async () => {
     let res: Shared | null = null, err = "";
     try { res = await upload({ ...song, playAs: "song" }); } catch (e) { err = e instanceof Error ? e.message : String(e); }
     if (res?.kind === "server") remember(app, song, res.code);
     app.overlays.remove(wait);
-    app.overlays.dialog("Share song", (close) => res ? renderResult(app, song, res, close)
-      : h("div", { class: "form share" }, h("p", { class: "note big" }, err || "Something went wrong"), h("button", { class: "row-btn", "data-nav": "ok", onclick: close }, "Close")));
+    app.overlays.dialog("Share", (close) => res ? renderResult(app, song, res, close)
+      : h("div", { class: "form share" }, shareTabs(app, "song", close, song), h("p", { class: "note big" }, err || "Something went wrong"), h("button", { class: "row-btn", "data-nav": "ok", onclick: close }, "Close")));
   })();
 }
 
@@ -115,6 +115,7 @@ function renderResult(app: App, song: Song, res: Shared, close: () => void): HTM
   if (qr) qrBox.innerHTML = qrSvg(qr, 5);
   const older = (song.shares ?? []).filter((x) => x.code !== res.code);
   return h("div", { class: "form share song-share" },
+    shareTabs(app, "song", close, song),
     res.kind === "server"
       ? h("div", { class: "share-block main" }, h("div", { class: "die-label" }, "Song code"), h("code", { class: "share-code big" }, showCode(res.code)))
       : h("div", { class: "share-block main" }, h("div", { class: "die-label" }, "Offline link"), h("p", { class: "note" }, `Couldn't upload (${res.why}), so here's a link with the whole song inside it. It works without the server; it's just long.`)),

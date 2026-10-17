@@ -42,12 +42,18 @@ export class EditorScreen implements Screen {
     if (el) this.nav.set(el);
   }
   private heldKey: HTMLElement | null = null;
+  /** The selection bar: over the top of the roll while notes are selected. */
+  private selBar = h("div", { class: "sel-bar", role: "toolbar", "aria-label": "Selected notes" });
+  private selNav = new SpatialNav(() => this.selBar);
+  /** A gamepad / keyboard is in the selection bar (X / M with notes selected). */
+  private inSelBar = false;
+  private selKey = "";
   private meter = h("div", { class: "meter" }, h("div", { class: "meter-fill" }));
   private peak = 0;
 
   constructor(private app: App, private couch?: CouchEditorOpts) {
     this.roll = new PianoRoll(app, (x, y) => this.openMenu({ x, y }), (n, tick, x, y) => this.noteMenu(n, tick, { x, y }));
-    this.rollWrap.appendChild(this.roll.canvas);
+    this.rollWrap.append(this.roll.canvas, this.selBar);
     this.el.append(this.toolbar, this.rollWrap, this.panelWrap);
     this.el.append(this.mixWrap); // the mix view (couch quarters, phones)
     this.panelWrap.addEventListener("pointerdown", () => { if (app.ed.focus === "roll" && !couch) { app.ed.focus = "panel"; this.paintFocus(); } });
@@ -120,7 +126,7 @@ export class EditorScreen implements Screen {
       h("div", { class: "spacer" }),
       h("div", { class: "tb-group layout-seg", title: "Roll only / split / panel only (\\ key, or hold RB)" },
         layBtn("roll", "Roll", "Piano roll only"), layBtn("split", "Split", "Piano roll and instrument panel"), layBtn("panel", "Sound", "The instrument's sound panel only")),
-      h("button", { class: "tb-btn menu-btn", onclick: () => this.openMenu(), title: "More: quantize, duplicate, zoom, hide out-of-key... (X / M)" }, "⋯"),
+      h("button", { class: "tb-btn menu-btn", onclick: () => this.openMenu(), title: "Clip, view and this session's options (X / M; with notes selected, X / M goes to the selection bar)" }, "⋯"),
     );
     this.el.classList.toggle("layout-roll", lay === "roll");
     this.el.classList.toggle("layout-panel", lay === "panel");
@@ -210,6 +216,8 @@ export class EditorScreen implements Screen {
 
   frame() {
     this.roll.frame();
+    const key = `${this.app.ed.trackId}:${this.app.ed.sceneId}:${this.roll.selectedNotes().map((n) => n.id).join(",")}`;
+    if (key !== this.selKey) { this.selKey = key; this.renderSelBar(); }
     if (this.couch && this.app.ed.focus === "mix") {
       const raw = this.app.engine.meter(this.app.ed.trackId);
       this.peak = Math.max(raw, this.peak * 0.92);
@@ -369,40 +377,111 @@ export class EditorScreen implements Screen {
   private lengthButton(): HTMLElement {
     const app = this.app, track = app.track();
     const own = track?.noteLen !== undefined;
-    return h("button", { class: "tb-btn len-btn" + (own ? " own" : ""), "data-coach": "length", title: "Length of new notes (B / N). A drag still sets it by hand", onclick: (e: Event) => {
-      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      app.overlays.menu("New note length", () => this.lengthItems(), { x: r.left, y: r.bottom + 4 });
-    } }, h("span", { class: "len-note", "aria-hidden": "true" }, "♪"), ` ${lengthLabel(app.noteLength(track))} ▾`);
+    return h("button", { class: "tb-btn len-btn" + (own ? " own" : ""), "data-coach": "length", title: "Note length: new notes, and the selected notes when there are some (B / N). A drag still sets it by hand", onclick: (e: Event) => this.lengthMenu(e.currentTarget as HTMLElement) },
+      h("span", { class: "len-note", "aria-hidden": "true" }, "♪"), ` ${lengthLabel(app.noteLength(track))} ▾`);
+  }
+
+  /** The length picker's list (toolbar ♪ and the selection bar's Length). */
+  private lengthMenu(anchor: HTMLElement) {
+    const r = anchor.getBoundingClientRect(), n = this.roll.selectedNotes().length;
+    this.app.overlays.menu(n ? `Note length: new notes + the ${n} selected` : "Length of new notes", () => this.lengthItems(), { x: r.left, y: r.bottom + 4 });
   }
 
   private lengthItems(): MenuItem[] {
     const app = this.app, track = app.track(), cur = app.noteLength(track);
     const parts = splitLength(cur) ?? { base: cur, mod: "" as LengthMod };
-    const set = (ticks: number | undefined) => { app.setNoteLength(ticks, track); this.render(); };
+    const sel = this.roll.selectedNotes(), clip = this.clip;
+    const set = (ticks: number | undefined) => {
+      app.setNoteLength(ticks, track);
+      if (sel.length && clip) app.edit("Set length", () => setNoteLength(sel, app.noteLength(track)));
+      this.render();
+    };
     return [
       ...NOTE_LENGTHS.map((l) => ({ label: l.label, checked: track?.noteLen !== undefined && parts.base === l.ticks, keepOpen: true, run: () => set(makeLength(l.ticks, parts.mod)) })),
       { label: "Dotted (x1.5)", checked: parts.mod === "dot", keepOpen: true, run: () => set(makeLength(parts.base, parts.mod === "dot" ? "" : "dot")) },
       { label: "Triplet (x2/3)", checked: parts.mod === "tri", keepOpen: true, run: () => set(makeLength(parts.base, parts.mod === "tri" ? "" : "tri")) },
       { label: "Same as the grid", checked: track?.noteLen === undefined, keepOpen: true, run: () => set(undefined) },
-      { label: `Set the selected notes to ${lengthLabel(cur)}`, disabled: !this.roll.selectedNotes().length, run: () => this.noteOp("setLen"), hint: "Ctrl+K" },
     ];
   }
 
-  /** Right-click on a note: what to do with it (or with the selection, when it's part of one). */
-  private noteMenu(n: Note, tick: number, at: { x: number; y: number }) {
-    const app = this.app, ed = app.ed, clip = this.clip;
-    if (!clip || app.locked) return;
-    const group = ed.sel.has(n.id) ? this.roll.selectedNotes() : [n];
-    const many = group.length > 1, what = many ? `${group.length} notes` : "Note";
-    const inside = tick > n.start && tick < n.start + n.len;
-    app.overlays.menu(many ? `${group.length} selected notes` : `Note ${noteName(n.pitch)}`, () => [
-      { label: "Split here", disabled: !inside, hint: inside ? "at the grid line you clicked" : "click inside the note", run: () => app.edit("Split note", () => splitNote(app.song, clip, n, tick)) },
-      { label: "Length", sub: () => NOTE_LENGTHS.flatMap((l) => [l.ticks, l.ticks * 1.5]).map((t) => ({ label: lengthLabel(t), checked: group.every((x) => x.len === t), run: () => app.edit(`${what}: length`, () => setNoteLength(group, t)) })) },
-      { label: "Velocity", sub: () => [127, 110, 100, 80, 60, 40].map((v) => ({ label: String(v), checked: group.every((x) => x.vel === v), run: () => app.edit(`${what}: velocity`, () => group.forEach((x) => (x.vel = v))) })) },
-      { label: "Legato: to the next note", hint: "Ctrl+G", run: () => app.edit("Legato", () => legatoNotes(clip, group)) },
-      { label: "Join with the notes it touches", hint: "same pitch", run: () => app.edit("Join notes", () => joinNotes(clip, clip.notes.filter((x) => x.pitch === n.pitch))) },
-      { label: many ? "Delete these notes" : "Delete note", hint: "Delete", run: () => app.edit("Delete note", () => { const gone = new Set(group); clip.notes = clip.notes.filter((x) => !gone.has(x)); group.forEach((x) => ed.sel.delete(x.id)); }) },
-    ], at);
+  /**
+   * Right-click (long-press) on a note: select it (or keep the selection it's part of) and put the
+   * cursor where it was clicked, so the selection bar's Split splits there.
+   */
+  private noteMenu(n: Note, tick: number, _at: { x: number; y: number }) {
+    const app = this.app, ed = app.ed;
+    if (!this.clip || app.locked) return;
+    if (!ed.sel.has(n.id)) ed.sel = new Set([n.id]);
+    ed.tick = Math.max(n.start, Math.min(n.start + n.len - 1, Math.round(tick / app.grid()) * app.grid()));
+    ed.pitch = n.pitch;
+    this.roll.invalidate();
+    this.renderSelBar();
+  }
+
+  // ------------------------------------------------------------ the selection bar
+
+  /** Over the roll while notes are selected: length, transpose, quantize, legato, join, split, velocity, copy, delete. */
+  private renderSelBar() {
+    const sel = this.roll.selectedNotes(), track = this.app.track();
+    this.selBar.classList.toggle("on", sel.length > 0 && !!track);
+    if (!sel.length || !track) { this.inSelBar = false; this.selBar.replaceChildren(); return; }
+    const drums = isDrumKind(track.kind);
+    const b = (id: string, label: string, title: string, fn: (e: MouseEvent | null) => void, disabled = false) =>
+      h("button", { class: "sb-btn", "data-nav": id, title, disabled, onclick: (e: MouseEvent) => fn(e) }, label);
+    const big = (e: MouseEvent | null) => !!e?.shiftKey || mods.fine;
+    this.selBar.replaceChildren(
+      h("span", { class: "sb-count" }, `${sel.length} note${sel.length > 1 ? "s" : ""}`),
+      h("button", { class: "sb-btn", "data-nav": "sb-len", title: "Length of the selected notes (and new ones)", onclick: (e: MouseEvent) => this.lengthMenu(e.currentTarget as HTMLElement) }, `♪ ${lengthLabel(this.app.noteLength(track))} ▾`),
+      h("span", { class: "sb-group" },
+        b("sb-down", "−", "Transpose down (Shift / LT: an octave)", (e) => this.transposeSel(-1, big(e)), drums),
+        h("span", { class: "sb-label" }, "Transpose"),
+        b("sb-up", "+", "Transpose up (Shift / LT: an octave)", (e) => this.transposeSel(1, big(e)), drums)),
+      b("sb-q", "Quantize", "Snap the selected notes to the grid", () => this.quantize()),
+      b("sb-leg", "Legato", "Each note up to the next (Ctrl+G)", () => this.noteOp("legato")),
+      b("sb-join", "Join", "Join touching notes of the same pitch (Ctrl+J)", () => this.noteOp("join"), sel.length < 2),
+      b("sb-split", "Split", "Split the note at the cursor (Ctrl+E, Alt+click)", () => this.noteOp("split")),
+      h("span", { class: "sb-group" },
+        b("sb-vdown", "−", "Softer (Shift / LT: a little)", (e) => this.velSel(big(e) ? -2 : -10)),
+        h("span", { class: "sb-label" }, `Vel ${Math.round(sel.reduce((a, n) => a + n.vel, 0) / sel.length)}`),
+        b("sb-vup", "+", "Louder (Shift / LT: a little)", (e) => this.velSel(big(e) ? 2 : 10))),
+      b("sb-copy", "Copy", "Copy (Ctrl+C; Ctrl+X cuts)", () => this.copy(false)),
+      b("sb-del", "Delete", "Delete the selected notes (Delete)", () => this.handleRoll({ type: "delete" })),
+      h("button", { class: "sb-btn sb-close", "data-nav": "sb-close", title: "Deselect (Esc / B)", onclick: () => { this.app.ed.sel.clear(); this.roll.invalidate(); this.renderSelBar(); } }, "✕"),
+    );
+    if (this.inSelBar) this.selNav.paint();
+  }
+
+  /** A gamepad / keyboard in the selection bar: left / right moves, A presses, B or X back to the notes. */
+  private handleSelBar(a: Action): boolean {
+    switch (a.type) {
+      case "dir": if (a.dir === "left" || a.dir === "right") this.selNav.move(a.dir); else this.leaveSelBar(); return true;
+      case "confirm": (this.selNav.focused as HTMLElement | null)?.click(); if (!this.roll.selectedNotes().length) this.leaveSelBar(); return true;
+      case "back": case "menu": this.leaveSelBar(); return true;
+    }
+    this.leaveSelBar();
+    return false;
+  }
+
+  private leaveSelBar() { this.inSelBar = false; this.selNav.clearPaint(); }
+
+  /** Transpose the selection: a scale step (scale lock) or a semitone; an octave with Shift / LT. */
+  private transposeSel(dir: 1 | -1, octave: boolean) {
+    const app = this.app, sel = this.roll.selectedNotes();
+    if (!sel.length) return;
+    app.edit("Transpose", () => {
+      for (const n of sel) {
+        n.pitch = octave ? n.pitch + dir * 12 : app.settings.scaleLock ? stepInScale(n.pitch, dir, app.song.key, app.song.scale) : n.pitch + dir;
+        n.pitch = Math.max(12, Math.min(108, n.pitch));
+      }
+    });
+    if (app.settings.notePreview && sel[0]) app.engine.preview(app.ed.trackId, sel[0].pitch, sel[0].vel, 0.15);
+  }
+
+  private velSel(d: number) {
+    const sel = this.roll.selectedNotes();
+    if (!sel.length) return;
+    this.app.edit("Velocity", () => sel.forEach((n) => (n.vel = Math.max(1, Math.min(127, n.vel + d)))));
+    this.renderSelBar();
   }
 
   /** Split (at the cursor), join, legato, set length: on the selection, or the note under the cursor. */
@@ -460,7 +539,13 @@ export class EditorScreen implements Screen {
       if ((ed.layout ?? "split") !== "split") return true; // one half showing: nothing to swap to
       ed.focus = ed.focus === "roll" ? "panel" : "roll"; this.paintFocus(); return true;
     }
-    if (a.type === "menu") { this.openMenu(); return true; }
+    if (this.inSelBar) return this.handleSelBar(a);
+    if (a.type === "menu") {
+      // Notes selected: X / M goes into the selection bar; otherwise the ⋯ menu.
+      if (this.roll.selectedNotes().length && this.app.ed.focus === "roll") { this.inSelBar = true; this.selNav.focusId("sb-len"); this.selNav.paint(); return true; }
+      this.openMenu();
+      return true;
+    }
     if (a.type === "layout") { if (!this.compact) this.setLayout(); return true; }
     if (a.type === "shortcut") return false;
     if (a.type === "noteOp") { this.noteOp(a.op); return true; } // the notes, whichever side has the focus
@@ -686,66 +771,34 @@ export class EditorScreen implements Screen {
     }
     const items = (): MenuItem[] => {
       const clip = this.clip;
-      const sel = this.roll.selectedNotes().length;
       // Couch: looking at someone else's instrument, the seat's own choices (swap, back) come first.
       const extra = this.couch?.extraMenu() ?? [];
       const own = app.actor?.viewing != null;
+      const head = (label: string): MenuItem => ({ label, heading: true });
+      const st = app.settings, flip = (k: "countIn" | "recQuantize" | "notePreview") => { st[k] = !st[k]; app.saveSettings(); };
       return [
         ...(own ? extra : []),
-        { label: "Quantize notes", run: () => this.quantize(), hint: "snap to the grid" },
-        { label: "Split note at the cursor", run: () => this.noteOp("split"), hint: "Ctrl+E · Alt+click" },
-        { label: "Join selected notes", disabled: sel < 2, run: () => this.noteOp("join"), hint: "Ctrl+J" },
-        { label: "Legato: to the next note", run: () => this.noteOp("legato"), hint: "Ctrl+G" },
-        { label: `Set length: ${lengthLabel(app.noteLength(track))}`, run: () => this.noteOp("setLen"), hint: "Ctrl+K" },
-        { label: `New note length: ${lengthLabel(app.noteLength(track))}`, sub: () => this.lengthItems(), hint: "B / N" },
-        { label: "Duplicate clip (x2)", run: () => this.duplicate(), hint: "Ctrl+D" },
-        { label: "Zoom in", keepOpen: true, run: () => { this.roll.zoom(1); this.render(); }, hint: "Ctrl+wheel" },
-        { label: "Zoom out", keepOpen: true, run: () => { this.roll.zoom(-1); this.render(); }, hint: this.roll.zoomLabel() },
-        { label: "Hide out-of-key rows", checked: app.settings.fold, keepOpen: true, disabled: isDrumKind(track.kind), run: () => this.toggleFold() },
+        head("Clip"),
+        { label: "Duplicate (x2)", hint: "Ctrl+D", disabled: !clip || clip.bars * 2 > MAX_BARS, run: () => this.duplicate() },
         { label: "Paste", disabled: !ed.clipboard.length, run: () => this.paste(), hint: "Ctrl+V" },
-        { label: "Copy selection", disabled: !sel, run: () => this.copy(false), hint: "Ctrl+C" },
-        { label: "Cut selection", disabled: !sel, run: () => this.copy(true), hint: "Ctrl+X" },
-        { label: "Delete selection", disabled: !sel, run: () => this.handleRoll({ type: "delete" }) },
         { label: "Select all", run: () => { if (clip) ed.sel = new Set(clip.notes.map((n) => n.id)); this.roll.invalidate(); }, hint: "Ctrl+A" },
-        { label: "Clip length", sub: () => Array.from({ length: MAX_BARS }, (_, i) => ({ label: `${i + 1} bar${i ? "s" : ""}`, checked: (clip?.bars ?? 1) === i + 1, run: () => this.setBars(i + 1) })) },
-        { label: `Zoom: ${this.roll.zoomLabel()}`, sub: () => [0, 4, 2, 1].map((b) => ({
+        { label: "Clear notes", disabled: !clip?.notes.length, run: () => app.edit("Clear notes", () => { clip!.notes = []; ed.sel.clear(); }) },
+        { label: "Clear automation", disabled: !Object.values(clip?.auto ?? {}).some((l) => l.length), run: () => app.edit("Clear automation", () => { clip!.auto = {}; }) },
+        head("View"),
+        { label: `Zoom: ${this.roll.zoomLabel()}`, hint: "Ctrl+wheel", sub: () => [0, 4, 2, 1].map((b) => ({
           label: b ? `${b} bar${b > 1 ? "s" : ""}` : "Fit the whole clip",
           checked: (ed.viewBars || 0) === b,
           run: () => { ed.viewBars = b; this.roll.scrollToTick(ed.tick); this.render(); },
         })) },
-        { label: "Grid", sub: () => [
-          { label: "1/8", checked: ed.grid === 48, run: () => this.setGrid(48) },
-          { label: "1/16", checked: ed.grid === 24, run: () => this.setGrid(24) },
-          { label: "1/32", checked: ed.grid === 12, run: () => this.setGrid(12) },
-          { label: "Triplets", checked: ed.triplet, run: () => { ed.triplet = !ed.triplet; this.snapCursor(); this.render(); } },
-        ] },
-        { label: "Velocity view", checked: ed.velView && !ed.autoKey, keepOpen: true, run: () => { ed.velView = !(ed.velView && !ed.autoKey); ed.autoKey = null; this.render(); } },
-        { label: "Automation lane…", run: () => this.lanePicker() },
-        { label: "Step input", checked: ed.stepInput, keepOpen: true, run: () => this.toggleStep() },
-        { label: "Scale lock", checked: app.settings.scaleLock, keepOpen: true, run: () => this.toggleLock() },
-        { label: "Note preview", checked: app.settings.notePreview, keepOpen: true, run: () => { app.settings.notePreview = !app.settings.notePreview; app.saveSettings(); } },
-        { label: "Count-in before recording", checked: app.settings.countIn, keepOpen: true, run: () => { app.settings.countIn = !app.settings.countIn; app.saveSettings(); } },
-        { label: "Record quantize", checked: app.settings.recQuantize, keepOpen: true, run: () => { app.settings.recQuantize = !app.settings.recQuantize; app.saveSettings(); } },
-        { label: "Transpose", disabled: isDrumKind(track.kind), sub: () => [12, 1, -1, -12].map((d) => ({ label: d > 0 ? `+${d}` : String(d), run: () => this.transpose(d) })) },
-        { label: "Clear clip", disabled: !clip?.notes.length, run: () => app.edit("Clear clip", () => { clip!.notes = []; ed.sel.clear(); }) },
-        { label: ed.autoKey ? `Clear lane: ${paramInfo(track, ed.autoKey)?.label ?? ed.autoKey}` : "Clear lane (open one first)", disabled: !ed.autoKey || !clip?.auto?.[ed.autoKey]?.length, run: () => app.edit("Clear lane", () => { delete clip!.auto![ed.autoKey!]; }) },
-        { label: "Clear all automation in this clip", disabled: !Object.values(clip?.auto ?? {}).some((l) => l.length), run: () => app.edit("Clear automation", () => { clip!.auto = {}; }) },
-        { label: app.learning ? "MIDI learn: finish" : "MIDI learn…", run: () => app.setLearning(!app.learning) },
-        { label: "Undo", disabled: !app.history.canUndo, run: () => app.undo(), hint: app.history.undoLabel ?? "" },
-        { label: "Redo", disabled: !app.history.canRedo, run: () => app.redo() },
-        { label: "Undo history…", disabled: !app.history.canUndo, sub: () => app.history.labels().slice(0, 20).map((l, i) => ({ label: l, run: () => { for (let k = 0; k <= i; k++) app.undo(); } })) },
-        { label: `Key: ${NOTE_NAMES[app.song.key]} ${scaleById(app.song.scale).name}`, disabled: true },
-        ...(own ? [] : extra),
+        { label: "Hide out-of-key rows", checked: st.fold, keepOpen: true, disabled: isDrumKind(track.kind), run: () => this.toggleFold() },
+        head("This session"),
+        { label: "Count-in before recording", checked: st.countIn, keepOpen: true, run: () => flip("countIn") },
+        { label: "Record quantize", checked: st.recQuantize, keepOpen: true, run: () => flip("recQuantize") },
+        { label: "Note preview", checked: st.notePreview, keepOpen: true, run: () => flip("notePreview") },
+        ...(own ? [] : extra.length ? [head("Player"), ...extra] : []),
       ];
     };
     app.overlays.menu(`${INSTRUMENTS[track.kind].name} · clip`, items, at);
   }
 
-  private transpose(d: number) {
-    const app = this.app, clip = this.clip;
-    if (!clip) return;
-    const sel = this.roll.selectedNotes();
-    const notes = sel.length ? sel : clip.notes;
-    app.edit("Transpose", () => { for (const n of notes) n.pitch = Math.max(12, Math.min(108, n.pitch + d)); });
-  }
 }

@@ -19,7 +19,7 @@ import type { App, Screen } from "./app";
 import { instrumentPicker } from "./dialogs";
 import { h } from "./dom";
 import { trackColor } from "./theme";
-import type { MenuItem } from "./overlay";
+import { stepper, type MenuItem } from "./overlay";
 import { shareCodeDialog } from "./share";
 import { shareSongDialog } from "./sharesong";
 import { isPhone } from "./phone";
@@ -112,6 +112,7 @@ export class SongScreen implements Screen {
   private trackHeader(t: Track, c: number): HTMLElement {
     const def = INSTRUMENTS[t.kind];
     return h("div", { class: "track-head" + (t.mute ? " muted" : ""), style: `--track:${trackColor(t)}` },
+      isPhone() ? "" : this.more(-1, c),
       h("div", { class: "th-name" }, `${c + 1} ${def.name}`),
       h("div", { class: "th-preset" }, t.preset),
       h("div", { class: "th-btns" },
@@ -131,16 +132,19 @@ export class SongScreen implements Screen {
         h("button", { class: "sh-name", title: "Name it: Intro, Verse, Chorus…", onclick: (e: Event) => { e.stopPropagation(); this.nameMenu(s, e.currentTarget as HTMLElement); } }, `${r + 1} ${s.name}`),
         h("div", { class: "sh-meta" },
           s.tempo ? `${s.tempo} bpm ` : "", s.transpose ? `key ${s.transpose > 0 ? "+" : ""}${s.transpose} ` : "", s.fadeIn ? "◢ " : "", s.fadeOut ? "◣" : "")),
-      h("div", { class: "sh-progress" }));
+      h("div", { class: "sh-progress" }),
+      isPhone() ? "" : this.more(r, -1));
   }
 
   private cell(t: Track, s: Scene): HTMLElement {
     const clip = t.clips[s.id];
     const carrying = this.carry && this.carry.trackId === t.id && this.carry.sceneId === s.id;
+    const song = this.app.song;
     const el = h("div", {
       class: "cell" + (clip ? "" : " empty") + (clip?.muted ? " muted" : "") + (carrying ? " carry-src" : ""),
       style: `--track:${trackColor(t)}`, "data-scene": s.id, "data-track": t.id,
     });
+    if (!isPhone()) el.appendChild(this.more(song.scenes.indexOf(s), song.tracks.indexOf(t)));
     if (!clip) return el;
     el.addEventListener("pointerdown", (e) => { if (e.button === 0 && e.pointerType === "mouse") this.startDrag(e, t, s); });
     const cv = h("canvas", { class: "cell-preview" });
@@ -332,7 +336,8 @@ export class SongScreen implements Screen {
       return el;
     });
     const add = h("button", { class: "chain-add" + (cursorAt(chain.length) ? " cursor" : ""), title: "Add a scene to the end of the song", disabled: chain.length >= MAX_CHAIN, onclick: (e: Event) => { cur.row = -2; cur.col = chain.length; const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); this.chainMenu(chain.length, { x: r.left, y: r.bottom + 4 }); } }, "+");
-    this.strip.replaceChildren(label, h("div", { class: "chain-chips" }, ...chips, add));
+    const arrange = canArrange(song) ? h("button", { class: "chain-arrange", "data-nav": "arrange", title: "Auto-arrange: grow this one-scene song into intro, verses, choruses and an outro (undo brings it back)", onclick: () => { app.edit("Auto-arrange", () => autoArrange(song)); app.overlays.toast("Arranged: intro, verses, choruses, outro. Undo to go back", 2000); } }, "✦ Auto-arrange") : "";
+    this.strip.replaceChildren(label, h("div", { class: "chain-chips" }, ...chips, add), arrange);
     if (cur.row === -2) requestAnimationFrame(() => this.strip.querySelector(".cursor")?.scrollIntoView({ block: "nearest", inline: "nearest" }));
   }
 
@@ -614,16 +619,20 @@ export class SongScreen implements Screen {
 
   private trackMenu(t: Track, i: number): MenuItem[] {
     const app = this.app, song = app.song;
+    const head = (label: string): MenuItem => ({ label, heading: true });
     return [
+      head("Sound"),
       { label: "Edit sound", run: () => this.openEditor(t, song.scenes[Math.max(0, app.songCur.row)] ?? song.scenes[0], "panel") },
       { label: "Change instrument", sub: () => [
         ...ALL_KINDS.map((k) => ({ label: INSTRUMENTS[k].name, checked: t.kind === k, run: () => app.edit("Change instrument", () => changeInstrument(t, k)) })),
         { label: "🎲 Random, same role", hint: ROLE_LABEL[soundRoles(trackSound(t))[0]], run: () => this.randomInstrument(t) },
       ] },
       { label: "🎲 Random sound, same role", run: () => nudgePreset(app, t) },
-      { label: "Volume", sub: () => [100, 80, 60, 40, 20].map((v) => ({ label: String(v), checked: Math.round(t.volume * 100) === v, run: () => app.edit("Volume", () => (t.volume = v / 100)) })) },
+      head("Mix"),
+      { label: `Volume ${Math.round(t.volume * 100)}`, sub: () => [100, 80, 60, 40, 20].map((v) => ({ label: String(v), checked: Math.round(t.volume * 100) === v, run: () => app.edit("Volume", () => (t.volume = v / 100)) })) },
       { label: "Mute", checked: t.mute, keepOpen: true, run: () => app.edit("Mute", () => (t.mute = !t.mute)) },
       { label: "Solo", checked: t.solo, keepOpen: true, run: () => app.edit("Solo", () => (t.solo = !t.solo)) },
+      head("Track"),
       { label: "Duplicate track", run: () => app.edit("Duplicate track", () => duplicateTrack(song, i)) },
       { label: "Delete track", run: () => app.edit("Delete track", () => { deleteTrack(song, i); app.fixCursors(); }) },
       { label: "Add track…", run: () => this.addTrack() },
@@ -632,11 +641,13 @@ export class SongScreen implements Screen {
 
   private sceneMenu(s: Scene, i: number): MenuItem[] {
     const app = this.app, song = app.song;
-    const setTempo = (v: number | null) => app.edit("Scene tempo", () => (s.tempo = v));
-    const cur = s.tempo ?? song.tempo;
+    const head = (label: string): MenuItem => ({ label, heading: true });
+    const settings = [s.tempo ? `${s.tempo} bpm` : "", s.transpose ? `key ${s.transpose > 0 ? "+" : ""}${s.transpose}` : "", s.fadeIn ? "fade in" : "", s.fadeOut ? "fade out" : ""].filter(Boolean).join(", ");
     return [
+      head("Play"),
       app.songMode === "song" ? { label: "Play the song from here", run: () => this.playScene(i) } : { label: app.song.sceneLoop === false ? "Play this scene once" : "Loop this scene", run: () => this.playScene(i) },
-      { label: "Name", sub: () => [
+      head("Name & repeat"),
+      { label: `Name: ${s.name}`, sub: () => [
         ...SCENE_NAMES.map((n) => ({ label: n, color: sceneColor(n) ?? undefined, checked: s.name === n, run: () => app.edit("Rename scene", () => (s.name = n)) })),
         { label: "Custom…", run: () => { const n = prompt("Scene name", s.name); if (n) app.edit("Rename scene", () => (s.name = n.slice(0, 24))); } },
       ] },
@@ -644,38 +655,78 @@ export class SongScreen implements Screen {
         s.repeat = n;
         songChain(song).forEach((x, k) => { if (x.sceneId === s.id) setChainRepeat(song, k, n); });
       }) })) },
+      head("Scene settings"),
+      { label: "Scene settings…", hint: settings || "tempo, key change, fades", run: () => this.sceneSettings(s) },
+      head("Arrange"),
       { label: "Add to the song chain", hint: `in it ×${songChain(song).filter((x) => x.sceneId === s.id).length}`, disabled: songChain(song).length >= MAX_CHAIN, run: () => app.edit("Add to chain", () => addChainStep(song, s.id)) },
-      { label: `Tempo: ${s.tempo ? `${s.tempo} bpm` : "song tempo"}`, sub: () => [
-        { label: "Song tempo", checked: s.tempo === null, run: () => setTempo(null) },
-        ...[-20, -10, -5, 5, 10, 20].map((d) => ({ label: `${d > 0 ? "+" : ""}${d} → ${cur + d}`, run: () => setTempo(Math.max(40, Math.min(250, cur + d))) })),
-      ] },
-      { label: `Key change: ${s.transpose ? (s.transpose > 0 ? "+" : "") + s.transpose + " st" : "none"}`, sub: () => [0, 1, 2, 3, 5, 7, -1, -2, -3, -5].map((d) => ({ label: d === 0 ? "None" : `${d > 0 ? "+" : ""}${d} semitone${Math.abs(d) > 1 ? "s" : ""}`, checked: (s.transpose ?? 0) === d, run: () => app.edit("Key change", () => (s.transpose = d || undefined)) })) },
-      { label: "Fade in", checked: s.fadeIn, keepOpen: true, run: () => app.edit("Fade in", () => (s.fadeIn = !s.fadeIn)) },
-      { label: "Fade out", checked: s.fadeOut, keepOpen: true, run: () => app.edit("Fade out", () => (s.fadeOut = !s.fadeOut)) },
       { label: "Move up", hint: "Alt+↑", disabled: i === 0, run: () => this.nudgeScene(i, -1) },
       { label: "Move down", hint: "Alt+↓", disabled: i >= song.scenes.length - 1, run: () => this.nudgeScene(i, 1) },
-      { label: "Add scene at end", run: () => app.edit("Add scene", () => addScene(song)) },
-      { label: "Insert blank after", run: () => app.edit("Insert scene", () => insertBlankScene(song, i)) },
       { label: "Duplicate scene", run: () => app.edit("Duplicate scene", () => duplicateScene(song, i)) },
+      { label: "Insert blank after", run: () => app.edit("Insert scene", () => insertBlankScene(song, i)) },
+      { label: "Add scene at end", run: () => app.edit("Add scene", () => addScene(song)) },
       { label: "Delete scene", disabled: song.scenes.length <= 1, run: () => app.edit("Delete scene", () => { deleteScene(song, i); app.fixCursors(); }) },
-      { label: "Auto-arrange song", disabled: !canArrange(song), hint: song.scenes.length > 1 ? "one-scene songs" : "", run: () => app.edit("Auto-arrange", () => autoArrange(song)) },
     ];
+  }
+
+  /** Scene settings: tempo, key change, fade in / out, in one dialog. */
+  private sceneSettings(s: Scene) {
+    const app = this.app, song = app.song;
+    app.overlays.dialog(`Scene settings · ${s.name}`, (close, rerender) => {
+      const cur = s.tempo ?? song.tempo;
+      const keyOpts = [-5, -3, -2, -1, 0, 1, 2, 3, 5, 7];
+      return h("div", { class: "form" },
+        stepper("tempo", "Tempo", s.tempo ? `${s.tempo} bpm` : `Song tempo (${song.tempo})`, (d) => {
+          const next = Math.max(40, Math.min(250, cur + d * 2));
+          app.edit("Scene tempo", () => (s.tempo = next === song.tempo ? null : next));
+          rerender();
+        }),
+        s.tempo ? h("button", { class: "row-btn", "data-nav": "song-tempo", onclick: () => { app.edit("Scene tempo", () => (s.tempo = null)); rerender(); } }, "Back to the song tempo") : null,
+        stepper("key", "Key change", s.transpose ? `${s.transpose > 0 ? "+" : ""}${s.transpose} semitone${Math.abs(s.transpose) > 1 ? "s" : ""}` : "None", (d) => {
+          const i = Math.max(0, keyOpts.indexOf(s.transpose ?? 0));
+          const v = keyOpts[Math.max(0, Math.min(keyOpts.length - 1, i + d))];
+          app.edit("Key change", () => (s.transpose = v || undefined));
+          rerender();
+        }),
+        h("button", { class: "row-btn" + (s.fadeIn ? " on" : ""), "data-nav": "fadein", onclick: () => { app.edit("Fade in", () => (s.fadeIn = !s.fadeIn)); rerender(); } }, `Fade in: ${s.fadeIn ? "on" : "off"}`),
+        h("button", { class: "row-btn" + (s.fadeOut ? " on" : ""), "data-nav": "fadeout", onclick: () => { app.edit("Fade out", () => (s.fadeOut = !s.fadeOut)); rerender(); } }, `Fade out: ${s.fadeOut ? "on" : "off"}`),
+        h("p", { class: "note" }, "A key change moves every instrument but the drums, for this scene."),
+        h("button", { class: "row-btn primary", "data-nav": "done", onclick: close }, "Done"));
+    });
   }
 
   private clipMenu(t: Track, s: Scene): MenuItem[] {
     const app = this.app, song = app.song;
     const clip = t.clips[s.id];
+    const head = (label: string): MenuItem => ({ label, heading: true });
     return [
+      head("Clip"),
       { label: "Edit clip", run: () => this.openEditor(t, s, "roll") },
-      { label: "Move / copy to…", disabled: !clip, run: () => { this.carry = { trackId: t.id, sceneId: s.id }; this.render(); } },
+      { label: `Length: ${clip?.bars ?? 1} bar${(clip?.bars ?? 1) > 1 ? "s" : ""}`, sub: () => Array.from({ length: MAX_BARS }, (_, i) => ({ label: `${i + 1} bar${i ? "s" : ""}`, checked: clip?.bars === i + 1, run: () => app.edit("Clip length", () => setClipBars(ensureClip(song, t, s.id), i + 1)) })) },
       { label: "Duplicate (x2 length)", disabled: !clip || clip.bars * 2 > MAX_BARS, run: () => app.edit("Duplicate clip", () => duplicateClip(song, clip!)) },
-      { label: "Clip length", sub: () => Array.from({ length: MAX_BARS }, (_, i) => ({ label: `${i + 1} bar${i ? "s" : ""}`, checked: clip?.bars === i + 1, run: () => app.edit("Clip length", () => setClipBars(ensureClip(song, t, s.id), i + 1)) })) },
-      { label: "Mute clip", disabled: !clip, checked: !!clip?.muted, keepOpen: true, run: () => app.edit("Mute clip", () => (clip!.muted = !clip!.muted)) },
+      head("Move & copy"),
+      { label: "Move / copy to…", disabled: !clip, run: () => { this.carry = { trackId: t.id, sceneId: s.id }; this.render(); } },
       { label: "Copy clip", disabled: !clip, run: () => { this.clipboard = JSON.parse(JSON.stringify(clip)); } },
       { label: "Paste clip", disabled: !this.clipboard, run: () => this.pasteClip() },
+      head("Clear"),
+      { label: "Mute clip", disabled: !clip, checked: !!clip?.muted, keepOpen: true, run: () => app.edit("Mute clip", () => (clip!.muted = !clip!.muted)) },
       { label: "Clear clip", disabled: !clip, run: () => this.deleteAtCursor() },
       { label: "Clear automation", disabled: !Object.values(clip?.auto ?? {}).some((l) => l.length), run: () => app.edit("Clear automation", () => { clip!.auto = {}; }) },
     ];
+  }
+
+  /** The small ⋯ on a track header, scene header or clip (desktop: shown on hover and on the cursor). */
+  private more(r: number, c: number): HTMLElement {
+    return h("button", {
+      class: "more-btn", title: "Options (right-click, long-press, X / M)", "aria-label": "Options",
+      onpointerdown: (e: Event) => e.stopPropagation(),
+      onclick: (e: MouseEvent) => {
+        e.stopPropagation();
+        this.app.songCur = { row: r, col: c };
+        const b = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        this.render();
+        this.openMenu({ x: b.left, y: b.bottom + 2 });
+      },
+    }, "⋯");
   }
 }
 

@@ -96,6 +96,10 @@ export interface Settings {
   timerTick?: boolean;
   /** After "Save as-is" on the time's-up card: open Songs, or stay ("" = ask the first time). */
   afterTimedSave?: "" | "library" | "stay";
+  /** Length of new notes on tracks that haven't picked their own (ticks; missing: the grid step). */
+  defaultNoteLen?: number;
+  /** The piano roll's key column: note names, scale degrees, or both. */
+  rollLabels?: "both" | "names" | "degrees";
 }
 
 import { STORE_PREFIX } from "./storage";
@@ -808,7 +812,7 @@ export class App {
 
   /** How long a new note is on this track: the picker's length, remembered per track (else the grid step). */
   noteLength(track = this.track()): number {
-    return track?.noteLen ?? this.grid();
+    return track?.noteLen ?? this.settings.defaultNoteLen ?? this.grid();
   }
 
   /** The note-length picker: set this track's length for new notes (a preference: saved, not an undo step). */
@@ -1095,6 +1099,7 @@ export class App {
   openShortcut?: () => void;
   stuck?: () => void;
   toggleScope?: () => void;
+  scopeOpen?: () => boolean;
   songSettings?: () => void;
 
   addTrackOf(kind: Track["kind"], preset: number): Track | null {
