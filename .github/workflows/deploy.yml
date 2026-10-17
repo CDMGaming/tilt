@@ -1,13 +1,16 @@
 # Every push to main: run the tests, build, deploy the relay and the app to Cloudflare.
+# Pushes to jam (TILT Jam): tests, build, and a Pages *preview* only (https://jam.tilt-jam.pages.dev):
+# no relay deploy and nothing created, so the live site and the shared relay stay as they are (the
+# preview gets the same song-sharing bindings as production).
 # Needs two repository secrets: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
 name: Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [main, jam]
   workflow_dispatch:
 
-concurrency: deploy
+concurrency: deploy-${{ github.ref_name }}
 
 jobs:
   deploy:
@@ -41,10 +44,10 @@ jobs:
         with:
           node-version: 22
       - name: Relay
-        if: env.RAW_TOKEN != ''
+        if: env.RAW_TOKEN != '' && github.ref_name == 'main'
         run: npx --yes wrangler@4 deploy --config cloud/wrangler.toml
       - name: Pages project (made on the first run)
-        if: env.RAW_TOKEN != ''
+        if: env.RAW_TOKEN != '' && github.ref_name == 'main'
         run: npx --yes wrangler@4 pages project list | grep -q "tilt-jam " || npx --yes wrangler@4 pages project create tilt-jam --production-branch=main
       - name: Song sharing storage (KV tilt-shares, R2 tilt-samples), when they exist
         if: env.RAW_TOKEN != ''
@@ -62,7 +65,8 @@ jobs:
             echo "::warning::No KV namespace named tilt-shares: Share song falls back to self-contained #song= links"
           fi
           # Missing in an account where R2 is on: make it (it's the bucket the app is built for).
-          if ! npx --yes wrangler@4 r2 bucket info tilt-samples >/dev/null 2>&1 && ! npx --yes wrangler@4 r2 bucket info tilt-samples --jurisdiction eu >/dev/null 2>&1; then
+          # (main only: a preview branch never creates anything.)
+          if [ "${{ github.ref_name }}" = "main" ] && ! npx --yes wrangler@4 r2 bucket info tilt-samples >/dev/null 2>&1 && ! npx --yes wrangler@4 r2 bucket info tilt-samples --jurisdiction eu >/dev/null 2>&1; then
             npx --yes wrangler@4 r2 bucket create tilt-samples 2>&1 | grep -iE "created|error|exists" | head -3 || true
           fi
           # Ask for the bucket by name (also finds it in another jurisdiction such as EU).
@@ -76,4 +80,4 @@ jobs:
           fi
       - name: App
         if: env.RAW_TOKEN != ''
-        run: npx --yes wrangler@4 pages deploy dist --project-name=tilt-jam --branch=main
+        run: npx --yes wrangler@4 pages deploy dist --project-name=tilt-jam --branch=${{ github.ref_name }}

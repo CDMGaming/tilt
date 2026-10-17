@@ -51,7 +51,10 @@ app.stuck = () => phraseGridDialog(app, { sceneId: app.currentSceneId(), onDone:
 
 app.engine.userSampleLoader = async (id) => { const s = await getSample(id); return s && { data: s.data, rate: s.rate }; };
 await app.boot(App.savedSong() ?? newSong());
-app.show("dice");
+// From TILT Jam ("Open in TILT Studio"): the jam's song is already the saved song; go straight to it.
+const fromJam = new URLSearchParams(location.search).has("from-jam");
+if (fromJam) history.replaceState(null, "", location.pathname + location.search.replace(/[?&]from-jam/, "").replace(/^&/, "?"));
+app.show(fromJam && app.song.tracks.length ? "song" : "dice");
 takeCodeFromUrl(app);
 takeSharedFromUrl(app); // /s/CODE or #song=…: a whole shared song
 // New here: a card on the setup screen offers the tutorial (never a forced dialog).

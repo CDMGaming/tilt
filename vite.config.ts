@@ -23,6 +23,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, "index.html"),
         latency: resolve(__dirname, "latency.html"),
+        jam: resolve(__dirname, "jam/index.html"),
       },
     },
   },

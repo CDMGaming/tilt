@@ -38,10 +38,10 @@ async function userSamples(song: Song) {
   return out.sort((a, b) => a.bytes.length - b.bytes.length);
 }
 
-type Shared = { kind: "server"; code: string; url: string; left: string[] } | { kind: "link"; code: string; url: string; left: string[]; why: string };
+export type Shared = { kind: "server"; code: string; url: string; left: string[] } | { kind: "link"; code: string; url: string; left: string[]; why: string };
 
 /** Upload the song (and the samples that fit in 5 MB); no server: a self-contained link. */
-async function upload(song: Song): Promise<Shared> {
+export async function upload(song: Song): Promise<Shared> {
   const clean = shareable(song);
   const json = JSON.stringify(clean);
   if (new TextEncoder().encode(json).length > SONG_MAX_BYTES) throw new Error("This song is too big to share (512 KB max). Try deleting unused scenes or automation.");

@@ -1,0 +1,151 @@
+/* TILT Jam: a stage. Dark, big type, every control large enough to hit while the music plays. */
+
+@font-face { font-family: "Tilt Display"; src: url("/fonts/display.woff2") format("woff2"); font-weight: 400 600; font-display: swap; }
+@font-face { font-family: "Tilt Display"; src: url("/fonts/display-bold.woff2") format("woff2"); font-weight: 700 900; font-display: swap; }
+
+:root {
+  --bg: #0b0d14;
+  --panel: #151925;
+  --panel2: #1c2131;
+  --line: #2a3145;
+  --text: #eef1f8;
+  --dim: #8d96ad;
+  --pack: #ff5a3c;
+  --good: #3ddc84;
+  --drums: #ff7a45;
+  --bass: #4fb3ff;
+  --guitar: #ffd23f;
+  --keys: #b28dff;
+  --lead: #ff5fa2;
+  --font: "Segoe UI", system-ui, sans-serif;
+  --display: "Tilt Display", "Bahnschrift", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); }
+body { overflow-x: hidden; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, .jk:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+.spacer { flex: 1; }
+
+/* ---- logo */
+.jam-logo { display: inline-flex; align-items: baseline; gap: 6px; font-family: var(--display); font-weight: 800; letter-spacing: .06em; }
+.jam-logo-tilt { color: #ffa62b; font-size: 22px; }
+.jam-logo-jam { color: var(--text); background: var(--pack); padding: 0 7px; border-radius: 5px; font-size: 18px; transform: rotate(-4deg); }
+
+/* ---- start: packs and templates */
+.jam-start { max-width: 1040px; margin: 0 auto; padding: 48px 16px; }
+.jam-start .jam-logo-tilt { font-size: 64px; }
+.jam-start .jam-logo-jam { font-size: 48px; padding: 0 14px; border-radius: 10px; }
+.jam-tag { color: var(--dim); font-size: 18px; margin: 10px 0 32px; }
+.pack-grid, .tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.pack-card, .tpl-card { text-align: left; background: var(--panel); border: 2px solid var(--line); border-radius: 18px; padding: 22px; min-height: 150px; display: flex; flex-direction: column; gap: 8px; transition: transform .1s, border-color .1s; }
+.pack-card:hover, .tpl-card:hover, .pack-card:focus-visible, .tpl-card:focus-visible { border-color: var(--pack); transform: translateY(-2px); }
+.pack-card { background: linear-gradient(160deg, color-mix(in srgb, var(--pack) 30%, var(--panel)), var(--panel) 70%); }
+.pack-name, .tpl-name { font-family: var(--display); font-weight: 800; font-size: 30px; }
+.tpl-name { font-size: 24px; }
+.pack-blurb, .tpl-blurb { color: var(--dim); line-height: 1.4; flex: 1; }
+.pack-count, .tpl-meta { font-size: 13px; color: var(--pack); font-weight: 700; }
+.jam-crumbs { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+.jam-crumb { font-family: var(--display); font-weight: 800; font-size: 34px; }
+.jam-studio-link { display: inline-block; margin-top: 40px; color: var(--dim); }
+
+/* ---- the jam */
+.jam { min-height: 100vh; display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 96px; max-width: 1500px; margin: 0 auto; }
+.jam-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.jam-back { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.jam-info { display: flex; flex-direction: column; }
+.jam-title { font-family: var(--display); font-weight: 800; font-size: 20px; }
+.jam-key { color: var(--dim); font-size: 13px; }
+.jam-play { width: 52px; height: 52px; border-radius: 50%; border: none; background: var(--panel2); font-size: 22px; }
+.jam-play.on { background: var(--good); color: #062; }
+.jam-link { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-weight: 600; }
+.jam-link:hover { border-color: var(--text); }
+.back-good { background: var(--good); color: #04210f; border: none; border-radius: 14px; padding: 14px 22px; font-family: var(--display); font-weight: 900; font-size: 20px; letter-spacing: .06em; box-shadow: 0 4px 0 #1f8a4f, 0 0 24px #3ddc8444; }
+.back-good:active { transform: translateY(3px); box-shadow: 0 1px 0 #1f8a4f; }
+.back-good.pending { animation: pend .5s infinite alternate; }
+
+.jam-sections { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; background: var(--panel); border-radius: 16px; padding: 12px; }
+.sec-pads { display: flex; flex-wrap: wrap; gap: 8px; }
+.sec-pad { min-width: 104px; padding: 16px 14px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel2); font-family: var(--display); font-weight: 700; font-size: 17px; }
+.sec-pad.on { background: var(--pack); border-color: var(--pack); color: #120400; }
+.sec-pad.held { border-color: #fff; }
+.sec-pad.song.on { background: var(--good); border-color: var(--good); }
+.jam-now { display: flex; align-items: center; gap: 14px; margin-left: auto; flex-wrap: wrap; }
+.jam-chord { display: flex; align-items: baseline; gap: 8px; min-width: 120px; }
+.chord-name { font-family: var(--display); font-weight: 900; font-size: 38px; line-height: 1; }
+.chord-name.dim { color: var(--dim); }
+.chord-roman { color: var(--dim); font-weight: 700; }
+.chord-up { color: var(--good); font-weight: 800; font-size: 13px; }
+.jam-prog { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; background: var(--panel2); border: 2px solid var(--line); border-radius: 12px; padding: 8px 14px; }
+.jam-prog.pending { border-color: var(--pack); animation: pend .5s infinite alternate; }
+.prog-label { font-size: 12px; color: var(--dim); }
+.prog-chords { font-family: var(--display); font-weight: 700; font-size: 18px; }
+.jam-bar { display: flex; gap: 5px; }
+.bar-dot { width: 12px; height: 12px; border-radius: 3px; background: var(--line); }
+.bar-dot.on { background: var(--text); }
+
+/* ---- part cards */
+.part-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+.part-card { --c: var(--pack); --lv: 0; background: var(--panel); border-radius: 18px; border: 2px solid color-mix(in srgb, var(--c) 35%, var(--line)); padding: 12px 12px 14px; display: flex; flex-direction: column; gap: 10px; position: relative; }
+.part-card.role-drums { --c: var(--drums); } .part-card.role-bass { --c: var(--bass); } .part-card.role-guitar { --c: var(--guitar); }
+.part-card.role-keys { --c: var(--keys); } .part-card.role-lead { --c: var(--lead); }
+.part-card.muted { opacity: .45; }
+.card-head { display: flex; align-items: center; gap: 10px; }
+.card-ico { font-size: 26px; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: color-mix(in srgb, var(--c) 22%, transparent); }
+.card-title { flex: 1; min-width: 0; }
+.card-name { font-family: var(--display); font-weight: 800; font-size: 19px; color: var(--c); }
+.card-sub { color: var(--dim); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-led { width: 14px; height: 14px; border-radius: 50%; background: var(--c); opacity: calc(.15 + var(--lv) * .85); box-shadow: 0 0 calc(var(--lv) * 14px) var(--c); }
+.card-pending { font-size: 11px; font-weight: 800; color: var(--c); opacity: 0; }
+.card-pending.on { opacity: 1; animation: pend .5s infinite alternate; }
+.card-knobs { display: flex; justify-content: space-around; gap: 4px; flex-wrap: wrap; }
+.card-pads { display: flex; gap: 8px; }
+.card-pad { flex: 1; padding: 12px 6px; border-radius: 10px; border: 2px solid var(--line); background: var(--panel2); font-weight: 700; }
+.card-pad:hover { border-color: var(--c); }
+.card-pad.dice { background: color-mix(in srgb, var(--c) 25%, var(--panel2)); border-color: color-mix(in srgb, var(--c) 50%, var(--line)); }
+.card-pad.on { background: var(--c); color: #111; }
+@keyframes pend { from { opacity: 1; } to { opacity: .45; } }
+
+/* ---- big knob */
+.jk { --c2: var(--c, var(--pack)); width: 84px; display: flex; flex-direction: column; align-items: center; gap: 2px; touch-action: none; user-select: none; cursor: ns-resize; border-radius: 12px; padding: 2px; }
+.jk-svg { width: 70px; height: 70px; }
+.jk-track { fill: none; stroke: var(--line); stroke-width: 6; stroke-linecap: round; }
+.jk-val { fill: none; stroke: var(--c2); stroke-width: 6; stroke-linecap: round; }
+.jk-home { stroke: #fff9; stroke-width: 2; }
+.jk-cap { fill: #232a3c; stroke: #0007; stroke-width: 2; }
+.jk-dot { stroke: #fff; stroke-width: 3.5; stroke-linecap: round; }
+.jk-label { font-weight: 700; font-size: 13px; }
+.jk-value { font-size: 11px; color: var(--dim); min-height: 1.2em; }
+.jk.at-home .jk-value { color: var(--good); }
+.jk.turning .jk-cap { fill: #2d3650; }
+.jk.homing .jk-svg { animation: home .25s; }
+@keyframes home { 50% { transform: scale(1.12); } }
+
+/* ---- FX strip */
+.fx-strip { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; align-items: center; padding: 10px 16px; background: #0b0d14ee; border-top: 1px solid var(--line); backdrop-filter: blur(6px); overflow-x: auto; }
+.fx-pad { position: relative; min-width: 130px; padding: 14px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel2); font-weight: 800; touch-action: none; user-select: none; }
+.fx-pad.on { background: var(--text); color: #000; border-color: #fff; box-shadow: 0 0 22px #fff6; }
+.fx-key { position: absolute; top: 4px; right: 7px; font-size: 10px; color: var(--dim); }
+.fx-note { color: var(--dim); font-size: 12px; white-space: nowrap; }
+
+/* ---- modal */
+.jam-modal-wrap { position: fixed; inset: 0; background: #000a; display: grid; place-items: center; z-index: 50; }
+.jam-modal { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; width: min(480px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 10px; }
+.jam-modal h3 { margin: 0; font-family: var(--display); }
+.jam-input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; }
+.jam-modal-btns { display: flex; gap: 8px; }
+
+@media (max-width: 640px) {
+  .jam { padding: 10px 12px 150px; }
+  .jam-start { padding: 28px 16px; }
+  .jam-start .jam-logo-tilt { font-size: 44px; }
+  .part-grid { grid-template-columns: 1fr; }
+  .sec-pad { min-width: 0; flex: 1 1 28%; padding: 12px 8px; font-size: 15px; }
+  .jam-now { margin-left: 0; }
+  .back-good { padding: 10px 14px; font-size: 16px; }
+  .fx-strip { flex-wrap: wrap; }
+  .fx-pad { min-width: 0; flex: 1 1 30%; padding: 12px 6px; font-size: 13px; }
+  .fx-note { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .pend, .card-pending.on, .jam-prog.pending, .back-good.pending { animation: none; } }

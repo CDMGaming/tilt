@@ -57,6 +57,9 @@ export class AudioEngine {
     this.sync(song);
   }
 
+  /** TILT Jam's performance FX hooks on the master bus. */
+  get perf(): PerfNodes { return this.master.perf; }
+
   /** Output delay the listener hears on top of the context clock. */
   get latency(): number {
     return (this.ctx.baseLatency || 0) + (this.ctx.outputLatency || 0);
@@ -683,7 +686,11 @@ interface MasterNodes {
   makeup: GainNode;
   analyser: AnalyserNode;
   irTime: number;
+  /** Performance FX (TILT Jam): a sweepable low-pass and a gate after the master volume, and a dry-to-reverb send. Transparent at rest. */
+  perf: PerfNodes;
 }
+
+export interface PerfNodes { filter: BiquadFilterNode; gate: GainNode; wet: GainNode; input: GainNode; reverbReturn: GainNode }
 
 function buildMaster(ctx: BaseAudioContext): MasterNodes {
   const input = ctx.createGain();
@@ -708,10 +715,17 @@ function buildMaster(ctx: BaseAudioContext): MasterNodes {
   }
   clip.curve = curve;
   clip.oversample = "2x";
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = 22000;
+  filter.Q.value = 0.7;
+  const gate = ctx.createGain(), wet = ctx.createGain();
+  wet.gain.value = 0;
   input.connect(volume);
+  input.connect(wet).connect(reverbIn);
   reverbIn.connect(convolver).connect(reverbReturn).connect(volume);
-  volume.connect(fade).connect(limiter).connect(makeup).connect(clip).connect(analyser).connect(ctx.destination);
-  return { ctx, input, reverbIn, convolver, reverbReturn, volume, fade, limiter, makeup, analyser, irTime: -1 };
+  volume.connect(filter).connect(gate).connect(fade).connect(limiter).connect(makeup).connect(clip).connect(analyser).connect(ctx.destination);
+  return { ctx, input, reverbIn, convolver, reverbReturn, volume, fade, limiter, makeup, analyser, irTime: -1, perf: { filter, gate, wet, input, reverbReturn } };
 }
 
 /** Apply the song's master section: volume, limiter on/depth, reverb on/time. */
