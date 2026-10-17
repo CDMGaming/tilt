@@ -45,7 +45,12 @@ export interface Seat {
   mods: typeof mods;
   /** The conductor's controller can visit the shared strip. */
   inStrip: boolean;
+  /** Looking at another player's instrument (read-only, Jump to…): its track id. */
+  viewing?: number | null;
 }
+
+/** "P2" (couch) or the player's name (online). */
+export const seatName = (s: Seat) => (s.device.kind === "net" ? s.device.name : s.id.toUpperCase());
 
 export const MAX_SEATS = 4;
 export const SEAT_COLORS = ["var(--cyan)", "var(--coral)", "var(--mint)", "var(--purple)"];
@@ -109,6 +114,29 @@ export class Couch {
     app.owners.conductor = this.seats.length ? this.conductor : null;
   }
 
+  /** Who plays this track (a seat), if anyone. */
+  ownerOf(trackId: number): Seat | undefined { return this.seats.find((s) => s.trackId === trackId); }
+
+  /** Sit `seat` at a track nobody plays (its old one is free again). */
+  moveSeat(seat: Seat, trackId: number) {
+    const owners = this.app.owners.tracks;
+    if (this.ownerOf(trackId)) return;
+    owners.delete(seat.trackId);
+    owners.set(trackId, seat.id);
+    seat.trackId = trackId;
+    seat.viewing = null;
+    seat.ed.trackId = trackId;
+    seat.ed.sel = new Set();
+  }
+
+  /** Two players trade instruments (both agreed). */
+  swap(a: Seat, b: Seat) {
+    const owners = this.app.owners.tracks, ta = a.trackId, tb = b.trackId;
+    a.trackId = tb; b.trackId = ta;
+    owners.set(tb, a.id); owners.set(ta, b.id);
+    for (const s of [a, b]) { s.viewing = null; s.ed.trackId = s.trackId; s.ed.sel = new Set(); }
+  }
+
   /** Hand the shared strip to the next player round the table. */
   pass() {
     if (this.seats.length < 2) return;
@@ -139,7 +167,9 @@ export class Couch {
     this.seats = specs.map((r) => {
       const s = keep.get(r.id) ?? { id: r.id, slot: r.slot, device: r.device, trackId: r.trackId, ed: cloneEd(app.ed), scratch: newScratch(), mods: freshMods(), inStrip: false };
       Object.assign(s, { slot: r.slot, device: r.device, trackId: r.trackId });
-      s.ed.trackId = r.trackId;
+      // Still looking at someone else's instrument? Keep looking (unless it's now yours).
+      if (s.viewing === r.trackId) s.viewing = null;
+      s.ed.trackId = s.viewing ?? r.trackId;
       s.ed.sceneId = this.sceneId;
       return s;
     });

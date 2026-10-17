@@ -15,10 +15,11 @@ import { EditorScreen } from "./editor";
 import { SpatialNav } from "./nav";
 import type { MenuItem } from "./overlay";
 import type { Patch } from "../engine/patches";
-import { MAX_SEATS, SEAT_COLORS, deviceName, type Seat } from "./seats";
+import { MAX_SEATS, SEAT_COLORS, deviceName, seatName, type Seat } from "./seats";
+import { askSwap, backToMine } from "./shortcut";
 import { trackColor } from "./theme";
 
-interface Quad { root: HTMLElement; head: HTMLElement; editor: EditorScreen }
+interface Quad { root: HTMLElement; head: HTMLElement; hint: HTMLElement; editor: EditorScreen }
 
 export class CouchScreen implements Screen {
   el = h("div", { class: "couch" });
@@ -64,7 +65,8 @@ export class CouchScreen implements Screen {
     const app = this.app;
     const editor = new EditorScreen(app, { extraMenu: () => this.seatMenu(seat) });
     const head = h("div", { class: "quad-head" });
-    const root = h("div", { class: "quad" }, head, editor.el);
+    const hint = h("div", { class: "quad-hint" });
+    const root = h("div", { class: "quad" }, head, hint, editor.el);
     const guard = (e: Event) => {
       const as = this.mouseSeat(seat);
       if (as) { app.focusSeat(as); return; }
@@ -74,7 +76,7 @@ export class CouchScreen implements Screen {
       if (me) app.as(me, () => app.overlays.toast(`That's ${seat.device.kind === "net" ? seat.device.name : seat.id.toUpperCase()}'s quarter`, 900));
     };
     for (const ev of ["pointerdown", "wheel", "contextmenu"]) root.addEventListener(ev, guard, { capture: true, passive: false });
-    q = { root, head, editor };
+    q = { root, head, hint, editor };
     this.quads.set(seat.id, q);
     app.as(seat, () => editor.enter());
     return q;
@@ -107,23 +109,40 @@ export class CouchScreen implements Screen {
 
   /** A quarter's colours and title line. False if the seat's track is gone. */
   private renderHead(seat: Seat, q: Quad): boolean {
-    const app = this.app, c = this.couch, track = app.song.tracks.find((t) => t.id === seat.trackId);
+    const app = this.app, c = this.couch;
+    // Looking at someone else's instrument (Jump to…): its track, read-only. Gone or now yours: back to your own.
+    let viewed = seat.viewing != null ? c.ownerOf(seat.viewing) : undefined;
+    if (seat.viewing != null && (!viewed || viewed === seat)) { seat.viewing = null; seat.ed.trackId = seat.trackId; viewed = undefined; }
+    const track = app.song.tracks.find((t) => t.id === (seat.viewing ?? seat.trackId));
     if (!track) return false;
+    const local = c.isLocal(seat), mouse = this.mouseSeat(seat) === seat;
+    const jump = mouse ? h("button", { class: "quad-jump", title: "Jump to an instrument or phrase (` / LB)", onclick: () => app.as(seat, () => app.openShortcut?.()) }, "Jump to… ", h("kbd", null, "`")) : "";
     {
       q.root.style.cssText = `--seat:${SEAT_COLORS[seat.slot]};--track:${trackColor(track)}`;
       q.root.classList.toggle("is-conductor", c.isConductor(seat));
       q.root.classList.toggle("remote", !c.isLocal(seat));
       q.root.classList.toggle("mine", !!c.online && c.isLocal(seat));
       q.root.classList.toggle("unheard", app.localMutes.has(seat.id));
+      q.root.classList.toggle("viewing", !!viewed);
       q.head.replaceChildren(
         h("span", { class: "seat-badge" }, seat.id.toUpperCase()),
+        viewed ? h("span", { class: "quad-viewing", style: `--owner:${SEAT_COLORS[viewed.slot]}`, title: "Read-only: it's their instrument" }, `👁 ${seatName(viewed)}'s instrument`) : "",
         h("span", { class: "quad-inst" }, INSTRUMENTS[track.kind].name),
-        h("span", { class: "quad-preset" }, track.preset),
+        h("span", { class: "quad-preset" }, viewed ? "read-only" : track.preset),
+        viewed && local && mouse ? h("button", { class: "quad-jump", onclick: () => app.as(seat, () => askSwap(app, seat)), title: `Ask ${seatName(viewed)} to trade instruments` }, "Ask to swap") : "",
+        viewed && local && mouse ? h("button", { class: "quad-jump", onclick: () => app.as(seat, () => backToMine(app, seat)) }, "Back to mine") : "",
         c.isConductor(seat) ? h("span", { class: "conductor-badge", title: "Has the shared controls" }, "★ conductor") : "",
         h("span", { class: "spacer" }),
         app.localMutes.has(seat.id) ? h("span", { class: "muted-badge" }, `🔇 muted here${this.unheard(seat) ? ` · +${this.unheard(seat)} notes` : ""}`) : "",
         h("span", { class: "quad-device" }, deviceName(seat.device) + (c.online && c.isLocal(seat) ? " (you)" : "")),
+        local ? jump : "",
       );
+      const scene = seat.ed.sceneId !== c.sceneId ? app.song.scenes.find((x) => x.id === seat.ed.sceneId) : undefined;
+      q.hint.replaceChildren(
+        h("span", null, h("kbd", null, "`"), " / ", h("kbd", null, "LB"), ": jump to an instrument or phrase"),
+        viewed && local ? h("span", null, ` · ☰ menu: ask ${seatName(viewed)} to swap, or back to yours`) : "",
+        scene ? h("span", { class: "quad-scene-note" }, ` · showing ${scene.name} (the band is on another scene)`) : "");
+      q.hint.hidden = !local;
     }
     return true;
   }
@@ -295,7 +314,13 @@ export class CouchScreen implements Screen {
     const track = app.song.tracks.find((t) => t.id === seat.trackId);
     if (!track) return [];
     const kinds = Object.keys(INSTRUMENTS) as InstrumentKind[];
+    const viewed = seat.viewing != null ? c.ownerOf(seat.viewing) : undefined;
     return [
+      { label: "Jump to an instrument or phrase…", hint: "` / LB", run: () => app.as(seat, () => app.openShortcut?.()) },
+      ...(viewed && viewed !== seat ? [
+        { label: `Ask ${seatName(viewed)} to swap instruments`, run: () => askSwap(app, seat) },
+        { label: "Back to my instrument", run: () => backToMine(app, seat) },
+      ] : []),
       { label: "Change my instrument", sub: () => kinds.map((k) => ({
         label: INSTRUMENTS[k].name, hint: INSTRUMENTS[k].group, checked: track.kind === k,
         run: () => { app.edit("Change instrument", () => changeInstrument(track, k)); app.refresh(); },

@@ -11,7 +11,8 @@
 import { idLanes, type Song } from "../engine/model";
 import type { Patch } from "../engine/patches";
 import type { App } from "./app";
-import type { Seat } from "./seats";
+import { seatName, type Seat } from "./seats";
+import { swapPrompt } from "./shortcut";
 
 export interface RosterSeat { id: string; slot: number; trackId: number; peer: string; name: string }
 
@@ -152,7 +153,7 @@ export class Online {
     return c ? c.seats.map((s) => ({ id: s.id, slot: s.slot, trackId: s.trackId, peer: s.device.kind === "net" ? s.device.peer : this.myId, name: s.device.kind === "net" ? s.device.name : this.name })) : [];
   }
 
-  private sendRoster() {
+  sendRoster() {
     if (!this.isHost) return;
     const c = this.app.couch!;
     this.send({ t: "roster", seats: this.roster(), conductor: c.conductor });
@@ -249,7 +250,40 @@ export class Online {
       }
       case "scene": if (seat && c.isConductor(seat)) { c.setScene(m.id as number, false); app.refresh(); } return;
       case "conductor": if (seat && (c.isConductor(seat) || from === this.hostId)) { c.setConductor(m.id as string); app.refresh(); } return;
+      // Host: a guest jumped to an instrument nobody plays.
+      case "seat-move": {
+        if (!this.isHost || !seat) return;
+        const t = app.song.tracks.find((x) => x.id === m.trackId);
+        if (!t || c.ownerOf(t.id)) return;
+        c.moveSeat(seat, t.id);
+        this.sendRoster();
+        app.refresh();
+        return;
+      }
+      // Someone asks the player at this computer to trade instruments.
+      case "swap-ask": {
+        const me = c.localSeat, asker = c.seat(m.from as string);
+        if (!me || !asker || asker !== seat || me.id !== m.to) return;
+        swapPrompt(app, asker, me, (yes) => {
+          const answer = { t: yes ? "swap-yes" : "swap-no", a: asker.id, b: me.id };
+          this.send(answer);
+          if (yes && this.isHost) this.doSwap(asker.id, me.id);
+        });
+        return;
+      }
+      case "swap-yes": if (this.isHost && seat && seat.id === m.b) this.doSwap(m.a as string, m.b as string); return;
+      case "swap-no": if (c.localId === m.a && seat) app.as(c.localSeat!, () => app.overlays.toast(`${seatName(seat)} would rather keep theirs`, 1500)); return;
     }
+  }
+
+  /** Host: two players agreed to trade instruments. */
+  private doSwap(a: string, b: string) {
+    const c = this.app.couch, sa = c?.seat(a), sb = c?.seat(b);
+    if (!c || !sa || !sb) return;
+    c.swap(sa, sb);
+    this.sendRoster();
+    this.app.overlays.toast(`${seatName(sa)} and ${seatName(sb)} swapped instruments`, 1600);
+    this.app.refresh();
   }
 
   /** Called every frame: send our cursor when it moved (at most ~12 times a second). */

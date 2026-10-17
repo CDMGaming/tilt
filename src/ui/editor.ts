@@ -687,7 +687,11 @@ export class EditorScreen implements Screen {
     const items = (): MenuItem[] => {
       const clip = this.clip;
       const sel = this.roll.selectedNotes().length;
+      // Couch: looking at someone else's instrument, the seat's own choices (swap, back) come first.
+      const extra = this.couch?.extraMenu() ?? [];
+      const own = app.actor?.viewing != null;
       return [
+        ...(own ? extra : []),
         { label: "Quantize notes", run: () => this.quantize(), hint: "snap to the grid" },
         { label: "Split note at the cursor", run: () => this.noteOp("split"), hint: "Ctrl+E · Alt+click" },
         { label: "Join selected notes", disabled: sel < 2, run: () => this.noteOp("join"), hint: "Ctrl+J" },
@@ -731,7 +735,7 @@ export class EditorScreen implements Screen {
         { label: "Redo", disabled: !app.history.canRedo, run: () => app.redo() },
         { label: "Undo history…", disabled: !app.history.canUndo, sub: () => app.history.labels().slice(0, 20).map((l, i) => ({ label: l, run: () => { for (let k = 0; k <= i; k++) app.undo(); } })) },
         { label: `Key: ${NOTE_NAMES[app.song.key]} ${scaleById(app.song.scale).name}`, disabled: true },
-        ...(this.couch?.extraMenu() ?? []),
+        ...(own ? [] : extra),
       ];
     };
     app.overlays.menu(`${INSTRUMENTS[track.kind].name} · clip`, items, at);

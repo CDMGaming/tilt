@@ -336,10 +336,18 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 /* ---------------------------------------------------------------- shortcut overlay */
 .shortcut { background: var(--panel); border-radius: 14px; padding: 10px 16px 16px; max-width: 94vw; max-height: 90vh; overflow: auto; }
 .sc-grid { display: grid; gap: 4px; margin-top: 4px; }
-.sc-head { font-size: 12px; font-weight: 700; border-bottom: 3px solid var(--track); padding: 2px 4px; }
+.sc-head { font: inherit; font-size: 12px; font-weight: 700; color: inherit; background: none; border: none; border-bottom: 3px solid var(--track); border-radius: 0; box-shadow: none; padding: 2px 4px; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; cursor: pointer; text-align: left; }
+.sc-head:hover, .sc-scene:hover { color: var(--yellow); }
+.sc-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc-owner { font-size: 10px; font-weight: 800; letter-spacing: .04em; padding: 0 5px; border-radius: 4px; background: var(--seat, var(--well)); color: #0b0e16; }
+.sc-head.free .sc-owner { background: transparent; color: var(--dim); border: 1px dashed var(--line); }
+.sc-head.mine .sc-owner { outline: 2px solid #fff6; }
+.sc-keys { font-size: 11px; text-transform: none; letter-spacing: 0; opacity: .8; }
+.sc-what { min-height: 1.3em; color: var(--text); }
 .sc-head.on, .sc-scene.on { color: var(--yellow); }
-.sc-scene { font-size: 12px; padding: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sc-cell { height: 26px; border-radius: 6px; background: var(--well); border-left: 3px solid var(--line); }
+.sc-scene { font: inherit; font-size: 12px; color: inherit; background: none; border: none; box-shadow: none; text-align: left; padding: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.sc-cell { height: 26px; padding: 0; border: none; box-shadow: none; border-radius: 6px; background: var(--well); border-left: 3px solid var(--line); cursor: pointer; }
+.sc-cell:hover { outline: 2px solid color-mix(in srgb, var(--focus) 55%, transparent); }
 .sc-cell.has { background: color-mix(in srgb, var(--track) 35%, transparent); border-left-color: var(--track); }
 .sc-cell.cursor { outline: 3px solid var(--focus); }
 
@@ -1650,3 +1658,13 @@ body.phone .timer.on { cursor: pointer; }
 @media (max-width: 520px) { .take-row { grid-template-columns: 1fr 1fr; } .take-row .lib-meta, .take-row .lib-date { grid-column: span 1; } }
 body.phone .timeup-pill { bottom: 76px; gap: 8px; padding: 6px 6px 6px 12px; }
 @media (max-width: 480px) { .timeup-pill { font-size: 11px; } .timeup-pill .small-btn { white-space: nowrap; } }
+
+/* ---- Couch quarters: Jump to…, looking at someone else's instrument, the key hint */
+.quad-jump { flex: none; font-size: 11px; padding: 2px 8px; border-radius: 6px; }
+.quad-viewing { font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 5px; background: var(--owner); color: #0b0e16; white-space: nowrap; }
+.quad.viewing .quad-preset { color: var(--yellow); font-weight: 700; }
+.quad.viewing { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--yellow) 40%, transparent); }
+.quad-hint { font-size: 11px; color: var(--dim); padding: 0 8px 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quad-jump kbd, .quad-hint kbd { font: inherit; font-weight: 700; padding: 0 4px; border-radius: 3px; background: var(--well); color: var(--text); }
+.quad-scene-note { color: var(--yellow); }
+.quad-jump kbd { margin-left: 2px; padding: 0 5px; font-size: 13px; line-height: 1; }
