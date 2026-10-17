@@ -134,7 +134,7 @@ export function couchJump(app: App, seat: Seat, t: Track, s: Scene) {
     seat.ed.trackId = t.id;
   } else if (!owner) {
     if (c.online && !c.online.isHost) {
-      c.online.send({ t: "seat-move", trackId: t.id });
+      c.online.requestSeatMove(t.id);
       app.overlays.toast(`Moving to ${INSTRUMENTS[t.kind].name}…`, 1200);
     } else {
       c.moveSeat(seat, t.id);

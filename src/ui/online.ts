@@ -13,6 +13,9 @@ import type { Patch } from "../engine/patches";
 import type { App } from "./app";
 import { seatName, type Seat } from "./seats";
 import { swapPrompt } from "./shortcut";
+import { INSTRUMENTS } from "../engine/instruments";
+
+declare const __BUILD__: string;
 
 export interface RosterSeat { id: string; slot: number; trackId: number; peer: string; name: string }
 
@@ -77,6 +80,7 @@ export class Online {
   close() {
     this.closed = true;
     for (const t of this.timers) clearInterval(t);
+    for (const t of this.unheardFrom.values()) clearTimeout(t);
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.close();
   }
 
@@ -167,10 +171,12 @@ export class Online {
     if (!seat) { this.send({ t: "full" }, peer); return; }
     this.send({
       t: "snapshot", song: app.song, seats: this.roster(), conductor: c.conductor, sceneId: c.sceneId,
-      playing: app.engine.playing,
+      playing: app.engine.playing, build: __BUILD__,
     }, peer);
     this.sendRoster();
     app.overlays.toast(`${name} joined`);
+    // A guest on the same version answers with its build at once; silence means an older TILT.
+    this.unheardFrom.set(peer, setTimeout(() => { this.unheardFrom.delete(peer); this.checkBuild(undefined, name); }, 4000) as unknown as number);
     app.refresh();
   }
 
@@ -191,6 +197,33 @@ export class Online {
     const app = this.app;
     app.joinedOnline(this, m.song as Song, m.seats as RosterSeat[], m.conductor as string, m.sceneId as number);
     if (m.playing) app.playLocal();
+    this.send({ t: "hello", build: __BUILD__ }, this.hostId);
+    this.checkBuild(m.build as string | undefined, "The host");
+  }
+
+  /**
+   * Different TILT versions don't fully understand each other (a tab left open before an update
+   * keeps the old one): say so, so everyone reloads.
+   */
+  private checkBuild(theirs: string | undefined, who: string) {
+    if (theirs === __BUILD__) return;
+    this.app.overlays.toast(`${who} is on a different TILT version${theirs ? ` (${theirs})` : " (an older one)"}; this is ${__BUILD__}. Reload both pages so everything works together.`, 9000, { error: true });
+  }
+
+  /** Host: guests that haven't said which TILT version they run yet (peer -> warning timer). */
+  private unheardFrom = new Map<string, number>();
+
+  /** Guest: a seat move asked of the host (Jump to…), until the seating plan shows it happened. */
+  private moving: { trackId: number; timer: number } | null = null;
+  requestSeatMove(trackId: number) {
+    if (this.moving) clearTimeout(this.moving.timer);
+    this.send({ t: "seat-move", trackId });
+    const timer = setTimeout(() => {
+      if (this.moving?.trackId !== trackId) return;
+      this.moving = null;
+      this.app.overlays.toast("The host didn't move you. Their TILT may be an older version: ask them to reload the page", 6000, { error: true });
+    }, 2500) as unknown as number;
+    this.moving = { trackId, timer };
   }
 
   /** Who sits where (from the host). Keeps each seat's editor state across updates. */
@@ -201,6 +234,12 @@ export class Online {
     const mine = c.seats.find((s) => s.device.kind === "net" && s.device.peer === this.myId);
     c.localId = mine?.id ?? null;
     if (mine) { idLanes.lanes = 8; idLanes.lane = mine.slot; }
+    if (this.moving && mine?.trackId === this.moving.trackId) {
+      clearTimeout(this.moving.timer);
+      const t = app.song.tracks.find((x) => x.id === mine.trackId);
+      if (t) app.overlays.toast(`You now play ${INSTRUMENTS[t.kind].name}`, 1400);
+      this.moving = null;
+    }
     app.refresh();
   }
 
@@ -250,6 +289,13 @@ export class Online {
       }
       case "scene": if (seat && c.isConductor(seat)) { c.setScene(m.id as number, false); app.refresh(); } return;
       case "conductor": if (seat && (c.isConductor(seat) || from === this.hostId)) { c.setConductor(m.id as string); app.refresh(); } return;
+      case "hello": {
+        if (!this.isHost) return;
+        clearTimeout(this.unheardFrom.get(from));
+        this.unheardFrom.delete(from);
+        this.checkBuild(m.build as string | undefined, seat ? seatName(seat) : "A player");
+        return;
+      }
       // Host: a guest jumped to an instrument nobody plays.
       case "seat-move": {
         if (!this.isHost || !seat) return;
