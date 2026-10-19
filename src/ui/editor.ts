@@ -62,7 +62,10 @@ export class EditorScreen implements Screen {
   /** Desktop editor layout: piano roll only, both, or the instrument panel only (\\ key, RB held). */
   setLayout(v?: EditorLayout) {
     const ed = this.app.ed, order: EditorLayout[] = ["split", "roll", "panel"];
-    ed.layout = v ?? order[(order.indexOf(ed.layout ?? "split") + 1) % order.length];
+    const was = ed.layout ?? "split";
+    ed.layout = v ?? order[(order.indexOf(was) + 1) % order.length];
+    // Opening the sound from Roll only: Split, so the notes stay in view (Sound again: the panel alone).
+    if (v === "panel" && was === "roll") { ed.layout = "split"; ed.focus = "panel"; }
     if (ed.layout === "roll" && ed.focus !== "roll") ed.focus = "roll";
     if (ed.layout === "panel") ed.focus = "panel";
     if (ed.layout === "split" && ed.focus === "mix") ed.focus = "roll";
@@ -84,6 +87,8 @@ export class EditorScreen implements Screen {
     if (this.compact) { this.renderCouch(); return; }
     this.el.classList.remove("couch-ed", "view-roll", "view-panel", "view-mix");
     if (ed.focus === "mix") ed.focus = "roll";
+    // Asked for the sound (Edit sound, the tutorial) while only the roll shows: Split.
+    if (ed.focus === "panel" && ed.layout === "roll") ed.layout = "split";
     const scene = app.song.scenes.find((s) => s.id === ed.sceneId);
     const clip = this.clip;
     const ti = app.song.tracks.indexOf(track);
@@ -148,6 +153,8 @@ export class EditorScreen implements Screen {
       return b;
     };
     const roll = ed.focus === "roll";
+    const phoneRow = !this.couch && isPhone();
+    const scene = app.song.scenes.find((x) => x.id === ed.sceneId), si = app.song.scenes.indexOf(scene!);
     this.el.classList.add("couch-ed");
     // A phone (not a couch seat) can still move between instruments.
     const ti = app.song.tracks.indexOf(track);
@@ -160,7 +167,18 @@ export class EditorScreen implements Screen {
       h("div", { class: "tb-group tabs" }, tab("roll", "Notes"), tab("panel", "Sound"), tab("mix", "Mix")),
       this.outKeyButton() ?? "",
       h("button", { class: "tb-btn menu-btn", onclick: () => this.openMenu() }, "☰"),
-      roll ? h("div", { class: "tb-tools" },
+      // Phones: Bars, the length and the scene on the second row (zoom, grid and Step live in ☰ → View).
+      roll && phoneRow ? h("div", { class: "tb-tools phone-tools" },
+        h("div", { class: "tb-group" },
+          btn("−", null, () => this.setBars((clip?.bars ?? 1) - 1), "Shorter clip"),
+          h("span", { class: "tb-value" }, `${clip?.bars ?? "—"} bar${(clip?.bars ?? 1) > 1 ? "s" : ""}`),
+          btn("+", null, () => this.setBars((clip?.bars ?? 1) + 1), "Longer clip")),
+        this.lengthButton(),
+        h("div", { class: "tb-scene" },
+          h("button", { class: "tb-arrow", onclick: () => this.switchScene(-1), title: "Previous scene" }, "‹"),
+          h("span", null, `${si + 1} · ${scene?.name ?? ""}`),
+          h("button", { class: "tb-arrow", onclick: () => this.switchScene(1), title: "Next scene" }, "›")))
+      : roll ? h("div", { class: "tb-tools" },
         h("div", { class: "tb-group" },
           h("span", { class: "tb-label" }, "Bars"),
           btn("−", null, () => this.setBars((clip?.bars ?? 1) - 1)),
@@ -277,10 +295,18 @@ export class EditorScreen implements Screen {
     if (this.lastTrack !== undefined && this.lastTrack !== track.id) this.rows.set(this.lastTrack, { pitch: ed.pitch, octave: ed.octave });
     if (this.lastTrack !== track.id) {
       const saved = this.rows.get(track.id);
-      if (saved) { ed.pitch = saved.pitch; ed.octave = saved.octave; }
+      if (saved) { ed.pitch = saved.pitch; ed.octave = saved.octave; ed.topPitch = ed.pitch + 12; }
       else if (isDrumKind(track.kind)) ed.pitch = DRUM_BASE_NOTE;
-      else { const bass = INSTRUMENTS[track.kind].group === "bass"; ed.pitch = (bass ? 36 : 60) + app.song.key; ed.octave = bass ? 2 : 4; }
-      ed.topPitch = ed.pitch + 8;
+      else {
+        // Centred on the track's notes (any scene), or on where the instrument naturally sits.
+        const ps = Object.values(track.clips).flatMap((c) => c.notes.map((n) => n.pitch));
+        const group = INSTRUMENTS[track.kind].group;
+        const natural = (group === "bass" ? 36 : group === "lead" ? 67 : 60) + app.song.key;
+        const mid = ps.length ? Math.round((Math.min(...ps) + Math.max(...ps)) / 2) : natural;
+        ed.pitch = ps.length ? ps.reduce((a, p) => (Math.abs(p - mid) < Math.abs(a - mid) ? p : a), ps[0]) : natural;
+        ed.octave = Math.max(0, Math.min(7, Math.floor(mid / 12) - 1));
+        ed.topPitch = mid + 12;
+      }
       this.lastTrack = track.id;
     }
     if (isDrumKind(track.kind)) ed.pitch = Math.max(DRUM_BASE_NOTE, Math.min(DRUM_BASE_NOTE + drumCount(track.kind) - 1, ed.pitch));
@@ -536,7 +562,8 @@ export class EditorScreen implements Screen {
     const app = this.app, ed = app.ed;
     if (a.type === "focusSwap") {
       if (this.compact) { this.setView(ed.focus === "roll" ? "panel" : ed.focus === "panel" ? "mix" : "roll"); return true; }
-      if ((ed.layout ?? "split") !== "split") return true; // one half showing: nothing to swap to
+      if ((ed.layout ?? "split") === "roll") { ed.layout = "split"; ed.focus = "panel"; this.render(); return true; } // the sound, beside the notes
+      if ((ed.layout ?? "split") !== "split") return true; // the panel alone: nothing to swap to
       ed.focus = ed.focus === "roll" ? "panel" : "roll"; this.paintFocus(); return true;
     }
     if (this.inSelBar) return this.handleSelBar(a);
@@ -791,6 +818,15 @@ export class EditorScreen implements Screen {
           run: () => { ed.viewBars = b; this.roll.scrollToTick(ed.tick); this.render(); },
         })) },
         { label: "Hide out-of-key rows", checked: st.fold, keepOpen: true, disabled: isDrumKind(track.kind), run: () => this.toggleFold() },
+        ...(!this.couch && isPhone() ? [
+          { label: `Grid ${ed.grid === 48 ? "1/8" : ed.grid === 12 ? "1/32" : "1/16"}${ed.triplet ? " triplets" : ""}`, sub: () => [
+            { label: "1/8", checked: ed.grid === 48, run: () => this.setGrid(48) },
+            { label: "1/16", checked: ed.grid === 24, run: () => this.setGrid(24) },
+            { label: "1/32", checked: ed.grid === 12, run: () => this.setGrid(12) },
+            { label: "Triplets", checked: ed.triplet, run: () => { ed.triplet = !ed.triplet; this.snapCursor(); this.render(); } },
+          ] } as MenuItem,
+          { label: "Step input", checked: ed.stepInput, keepOpen: true, run: () => this.toggleStep() } as MenuItem,
+        ] : []),
         head("This session"),
         { label: "Count-in before recording", checked: st.countIn, keepOpen: true, run: () => flip("countIn") },
         { label: "Record quantize", checked: st.recQuantize, keepOpen: true, run: () => flip("recQuantize") },

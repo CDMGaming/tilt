@@ -60,6 +60,8 @@ export interface EditorState {
   octave: number; // computer/on-screen keyboard octave (MIDI octave number)
   drumPart: number;
   topPitch: number; // highest visible row
+  /** Piano roll row height, as a factor of the fitted size (Alt+wheel; 1 = about two octaves fill the view). */
+  rowZoom?: number;
   layout?: EditorLayout; // desktop editor layout (default split)
 }
 
