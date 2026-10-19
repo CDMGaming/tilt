@@ -60,6 +60,8 @@ export interface EditorState {
   octave: number; // computer/on-screen keyboard octave (MIDI octave number)
   drumPart: number;
   topPitch: number; // highest visible row
+  /** Piano roll row height, as a factor of the fitted size (Alt+wheel; 1 = about two octaves fill the view). */
+  rowZoom?: number;
   layout?: EditorLayout; // desktop editor layout (default split)
 }
 
@@ -113,11 +115,11 @@ export interface DiceState { setup: Setup; holds: Holds; spec: LineupSpec; minut
 
 /** The setup screen's timer choices (0 = off) and the one a new player starts with. */
 export const TIMER_CHOICES = [0, 5, 10, 15, 20];
-const DEFAULT_MINUTES = 10;
+const DEFAULT_MINUTES = 0; // the timer starts Off; after that, whatever the player picked last
 
 /** The last setup screen (holds and lineup choices included), or a fresh one: timer off, nothing held. */
 function loadDice(): DiceState {
-  const fresh = (): DiceState => ({ setup: nudgeSetup(null, NO_HOLDS, defaultSpec()), holds: { ...NO_HOLDS }, spec: defaultSpec(), minutes: DEFAULT_MINUTES, cards: 0, v: 2 });
+  const fresh = (): DiceState => ({ setup: nudgeSetup(null, NO_HOLDS, defaultSpec()), holds: { ...NO_HOLDS }, spec: defaultSpec(), minutes: DEFAULT_MINUTES, cards: 0, v: 3 });
   try {
     const raw = localStorage.getItem(DICE_KEY);
     if (!raw) return fresh();
@@ -127,9 +129,10 @@ function loadDice(): DiceState {
     const spec = { ...f.spec, ...(d.spec ?? {}) };
     spec.slots = [...(spec.slots ?? []), ...f.spec.slots].slice(0, f.spec.slots.length);
     spec.presets = [...(spec.presets ?? []), ...f.spec.presets].slice(0, f.spec.presets.length);
-    // Before v2 the timer was off by default and offered 10 / 20 / 30: start those at the new default.
-    const minutes = d.v === 2 && TIMER_CHOICES.includes(d.minutes ?? -1) ? d.minutes! : DEFAULT_MINUTES;
-    return { setup: d.setup, holds: { ...f.holds, ...(d.holds ?? {}) }, spec, minutes, cards: d.cards ?? 0, v: 2 };
+    // v3: the default is Off. A v2 save still on the old default (10) goes Off too; any other pick stays.
+    const picked = TIMER_CHOICES.includes(d.minutes ?? -1) ? d.minutes! : DEFAULT_MINUTES;
+    const minutes = d.v === 3 ? picked : d.v === 2 && picked !== 10 ? picked : DEFAULT_MINUTES;
+    return { setup: d.setup, holds: { ...f.holds, ...(d.holds ?? {}) }, spec, minutes, cards: d.cards ?? 0, v: 3 };
   } catch { return fresh(); }
 }
 

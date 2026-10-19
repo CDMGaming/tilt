@@ -5,6 +5,7 @@
 // sits on the target, and the hints follow the input you last used (mouse, keyboard,
 // gamepad, touch). Skip does a step for you; Later keeps your place (TILT menu → Controls & tutorial picks it up).
 
+import { shareSongDialog } from "./sharesong";
 import { songFromSetup } from "../engine/dice";
 import { formatParam } from "../engine/instruments";
 import { PPQ, chainIndexOf, songChain, type Song, type Track } from "../engine/model";
@@ -345,13 +346,11 @@ export class Tutorial {
     const done = () => { store({ step: STEPS.length, libId: app.song.libId, finished: true }); this.teardown(); app.overlays.toast(`Saved as “${app.song.title}”`, 2500); };
     this.card = h("div", { class: "coach-card finale", role: "status" },
       h("div", { class: "coach-head" }, h("span", { class: "coach-badge" }, "YOU MADE A SONG")),
-      h("p", { class: "coach-text" }, "Two scenes, three instruments, playing on a loop. A few things for next time:"),
-      h("ul", { class: "coach-list" },
-        h("li", null, h("b", null, "Saved: "), `it's in Songs as “${app.song.title}”. Every song saves itself.`),
-        h("li", null, h("b", null, "Share: "), "TILT menu → Share gives you a code, a link and a QR code."),
-        h("li", null, h("b", null, "Export: "), "TILT menu → Export: WAV, stems or MIDI."),
-        h("li", null, h("b", null, "NUDGE: "), "on the setup screen (Dice), a new key, tempo and lineup in one press.")),
-      h("div", { class: "coach-btns" }, h("button", { class: "small-btn primary", onclick: done }, "Done")));
+      h("p", { class: "coach-text" }, `Two scenes, three instruments, playing on a loop. It's saved in Songs as “${app.song.title}”.`),
+      h("div", { class: "coach-btns" },
+        h("button", { class: "small-btn primary", "data-nav": "keep", onclick: done }, "Keep playing"),
+        h("button", { class: "small-btn", "data-nav": "share", onclick: () => { done(); shareSongDialog(app); } }, "Share it"),
+        h("button", { class: "small-btn", "data-nav": "new", onclick: () => { done(); app.stopLocal(); app.openDice?.(); } }, "Roll a new one")));
     document.body.appendChild(this.card);
     store({ step: STEPS.length, libId: app.song.libId });
     app.refresh();
@@ -405,12 +404,38 @@ export class Tutorial {
     if (!r || !r.width) { this.spot.style.display = "none"; return; }
     const pad = 6;
     Object.assign(this.spot.style, { display: "block", left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
-    // Keep the card off the target: a small target low on the screen sends it to the top;
-    // a big one (the piano roll) follows the step's choice.
-    const big = r.width * r.height > innerWidth * innerHeight * 0.3;
-    const top = big ? cardAt === "top" : r.top + r.height / 2 > innerHeight / 2;
-    this.card?.classList.toggle("at-top", top);
+    if (this.card) placeCard(this.card, r, cardAt);
   }
+}
+
+/**
+ * Put a tutorial card in the screen corner farthest from what it points at, never on top of it or
+ * of NUDGE / NEW SONG. A big target (the piano roll) can't be avoided: then the step's choice (top or
+ * bottom) and the corner away from the controls that matter.
+ */
+export function placeCard(card: HTMLElement, target: DOMRect | null, prefer?: "top" | "bottom") {
+  if (document.body.classList.contains("phone")) { card.classList.toggle("at-top", !!target && target.top + target.height / 2 > innerHeight / 2); return; }
+  const w = card.offsetWidth || 330, hgt = card.offsetHeight || 140, m = 16;
+  const bar = document.querySelector(".topbar")?.getBoundingClientRect().bottom ?? 56;
+  const keep = [target, ...[".nudge-btn", ".go-btn"].map((q) => document.querySelector(q)?.getBoundingClientRect())]
+    .filter((x): x is DOMRect => !!x && x.width > 0 && x.width * x.height < innerWidth * innerHeight * 0.3);
+  const spots = [
+    { x: m, y: innerHeight - hgt - m }, { x: innerWidth - w - m, y: innerHeight - hgt - m },
+    { x: innerWidth - w - m, y: bar + m }, { x: m, y: bar + m },
+    { x: (innerWidth - w) / 2, y: bar + m }, { x: (innerWidth - w) / 2, y: innerHeight - hgt - m },
+  ];
+  const hits = (p: { x: number; y: number }) => keep.some((k) => p.x < k.right + 8 && p.x + w > k.left - 8 && p.y < k.bottom + 8 && p.y + hgt > k.top - 8);
+  const cx = target ? target.left + target.width / 2 : innerWidth / 2, cy = target ? target.top + target.height / 2 : innerHeight / 2;
+  const big = !!target && target.width * target.height > innerWidth * innerHeight * 0.3;
+  const score = (p: { x: number; y: number }) => {
+    let d = Math.hypot(p.x + w / 2 - cx, p.y + hgt / 2 - cy);
+    if (big && prefer) d += (prefer === "top" ? p.y < innerHeight / 2 : p.y > innerHeight / 2) ? 10000 : 0;
+    return d;
+  };
+  const free = spots.filter((p) => !hits(p));
+  const best = (free.length ? free : spots).reduce((a, b) => (score(b) > score(a) ? b : a));
+  card.classList.remove("at-top");
+  Object.assign(card.style, { left: `${Math.max(m, best.x)}px`, top: `${Math.max(bar + 4, best.y)}px`, right: "auto", bottom: "auto" });
 }
 
 /** New here? A card on the setup screen offering the tutorial (never a forced dialog). */
@@ -427,6 +452,10 @@ export async function offerTutorial(app: App, tut: Tutorial, host: HTMLElement) 
       h("button", { class: "small-btn primary", "data-nav": "tutorial", onclick: () => { card.remove(); void tut.start(true); } }, saved ? "Continue" : "Start"),
       h("button", { class: "small-btn", "data-nav": "tutorial-no", onclick: () => { card.remove(); store({ ...(saved ?? { step: 0 }), dismissed: true }); } }, "No thanks")));
   host.appendChild(card);
+  // Clear of NUDGE and NEW SONG (it used to sit on them in small windows).
+  const keepOut = () => { if (card.isConnected) placeCard(card, null); else removeEventListener("resize", keepOut); };
+  requestAnimationFrame(keepOut);
+  addEventListener("resize", keepOut);
 }
 
 /** For the TILT menu: what the item says. */

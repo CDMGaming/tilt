@@ -22,6 +22,7 @@ import { phraseGridDialog } from "./phrasegrid";
 import { dmdText } from "./dmd";
 import { settingsDialog } from "./dialogs";
 import { codeLink } from "./share";
+import { jamOfTheDay } from "../engine/daily";
 import type { MenuItem } from "./overlay";
 import { ROLES, ROLE_LABEL, generatePreset, type Role, type SoundRef } from "../engine/sounds";
 import { noteRoll, pickOptions } from "./sounds";
@@ -120,16 +121,11 @@ export class DiceScreen implements Screen {
             ? h("div", { class: "cards" }, s.cards.map((c) => h("div", { class: "card" }, challengeById(c)?.text ?? c)))
             : h("div", { class: "die-value small" }, "none"))) : "",
       ),
+      // Songs stays in sight; the rest of the setup tools live in More ▾.
       h("div", { class: "dice-foot" },
-        h("button", { class: "link-btn", "data-nav": "release", onclick: () => this.releaseAll(), title: "Release every HOLD and chosen slot" }, "Release all"),
-        h("button", { class: "small-btn", "data-nav": "setups", onclick: (e: Event) => app.overlays.menu("Setups", () => this.setupsMenu(), anchor(e)), title: "Load a saved setup (its fields come back held)" }, "Setups ▾"),
-        h("button", { class: "small-btn", "data-nav": "save-setup", onclick: () => this.saveSetup(), title: "Save the held fields and lineup slots under a name" }, "Save setup…"),
-        h("div", { class: "code" }, h("span", { class: "die-label" }, "Share code "), h("code", null, encodeSetup(s))),
-        h("button", { class: "small-btn", "data-nav": "copy", onclick: () => this.copyCode() }, "Copy"),
-        h("button", { class: "small-btn", "data-nav": "copy-link", title: "A link that opens TILT with this setup", onclick: () => { void navigator.clipboard?.writeText(codeLink(encodeSetup(s))); app.overlays.toast("Link copied", 1200); } }, "Copy link"),
-        h("button", { class: "small-btn", "data-nav": "enter", onclick: () => this.enterCode() }, "Enter code…"),
-        h("button", { class: "small-btn", "data-nav": "library", onclick: () => libraryDialog(app, { onOpen: () => app.show("song") }) }, "Songs…"),
-        h("button", { class: "small-btn", "data-nav": "blank", onclick: () => this.blank() }, "Blank song"),
+        h("button", { class: "small-btn", "data-nav": "library", onclick: () => libraryDialog(app, { onOpen: () => app.show("song") }) }, "▤ Songs…"),
+        h("button", { class: "small-btn", "data-nav": "more", title: "Holds, saved setups, the share code, a blank song", onclick: (e: Event) => app.overlays.menu("More", () => this.moreMenu(), anchor(e)) }, "More ▾"),
+        this.dailyCard(),
       ),
       // Always on screen: nudge, timer (and game mode), new song.
       h("div", { class: "dice-bar" },
@@ -217,6 +213,37 @@ export class DiceScreen implements Screen {
     if (soundsHeld(spec, n)) { spec.presets = spec.presets.map(() => null); spec.gens = gensOf(spec).map(() => null); }
     else d.setup.lineup.forEach((l, i) => { spec.presets[i] = l.preset; gensOf(spec)[i] = l.gen ?? null; spec.slots[i] = l.kind; });
     this.changed();
+  }
+
+  /** Jam of the day: everyone gets the same setup today. Load it onto the reels (then NEW SONG). */
+  private dailyCard(): HTMLElement {
+    const app = this.app, j = jamOfTheDay(), s = j.setup;
+    const today = new Date(`${j.day}T12:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const on = encodeSetup(this.d.setup) === j.code;
+    return h("div", { class: "daily-card" + (on ? " on" : "") },
+      h("span", { class: "daily-title" }, `Jam of the day · ${today}`),
+      h("span", { class: "daily-meta" }, `${NOTE_NAMES[s.key]} ${scaleById(s.scale).name} · ${s.tempo} bpm · ${s.lineup.map((l) => INSTRUMENTS[l.kind].name).join(", ")}`),
+      on ? h("span", { class: "daily-note" }, "on the reels: NEW SONG")
+        : h("button", { class: "small-btn", "data-nav": "daily", title: `The same setup for everyone today (code ${j.code})`, onclick: () => { this.d.setup = j.setup; this.d.holds = { ...NO_HOLDS }; this.changed(); app.overlays.toast("Jam of the day on the reels: NEW SONG to play it", 2000); } }, "Load it"));
+  }
+
+  /** The setup screen's More ▾: what used to crowd the row under the reels. */
+  private moreMenu(): MenuItem[] {
+    const app = this.app, code = encodeSetup(this.shown);
+    const head = (label: string): MenuItem => ({ label, heading: true });
+    return [
+      head("Holds"),
+      { label: "Release all", hint: "every HOLD and chosen slot", run: () => this.releaseAll() },
+      head("Setups"),
+      { label: "Load a setup", sub: () => this.setupsMenu() },
+      { label: "Save setup…", hint: "the held fields", run: () => this.saveSetup() },
+      head(`Share code ${code}`),
+      { label: "Copy code", run: () => this.copyCode() },
+      { label: "Copy link", hint: "opens TILT with this setup", run: () => { void navigator.clipboard?.writeText(codeLink(code)); app.overlays.toast("Link copied", 1200); } },
+      { label: "Enter a code…", run: () => this.enterCode() },
+      head("Start"),
+      { label: "Blank song", hint: "no instruments yet", run: () => this.blank() },
+    ];
   }
 
   private releaseAll() {

@@ -463,3 +463,23 @@ Deno.test("note lengths: labels, dotted / triplet, split, join, legato, set leng
   ops.setNoteLength([a, c], 36);
   assertEquals([a.len, c.len], [36, 36]);
 });
+
+Deno.test("a duplicated scene takes the next free number", async () => {
+  const { newSong } = await import("../src/engine/model.ts");
+  const { duplicateScene: dup } = await import("../src/engine/songops.ts");
+  const song = newSong();
+  assertEquals(dup(song, 0)?.name, "Scene 2");
+  assertEquals(dup(song, 0)?.name, "Scene 3");
+  song.scenes[0].name = "Verse";
+  assertEquals(dup(song, 0)?.name, "Verse 2");
+  assertEquals(dup(song, 1)?.name, "Verse 3");
+});
+
+Deno.test("jam of the day: the same setup all day, a new one tomorrow, a working code", async () => {
+  const { jamOfTheDay } = await import("../src/engine/daily.ts");
+  const a = jamOfTheDay(new Date("2026-10-19T01:00:00Z")), b = jamOfTheDay(new Date("2026-10-19T23:00:00Z"));
+  const c = jamOfTheDay(new Date("2026-10-20T01:00:00Z"));
+  assertEquals(a.code, b.code);
+  assert(a.code !== c.code);
+  assertEquals(encodeSetup(decodeSetup(a.code)!), a.code);
+});

@@ -73,6 +73,7 @@ export class PianoRoll {
         return;
       }
       if (this.isDrums()) return;
+      if (e.altKey) { this.zoomRows(e.deltaY < 0 ? 1 : -1); return; }
       const rows = this.allRows();
       const i = Math.max(0, Math.min(this.maxTop(), this.topIdx() + Math.sign(e.deltaY) * 2));
       this.app.ed.topPitch = rows[i];
@@ -123,9 +124,22 @@ export class PianoRoll {
   private inKey(pitch: number) { return inScale(pitch, this.app.song.key, this.app.song.scale); }
 
   /** An in-key row's height (drums: one pad's row). */
-  rowH() { return this.isDrums() ? Math.max(14, Math.min(60, this.laneH() / this.parts())) : rowPx(); }
+  rowH() {
+    if (this.isDrums()) return Math.max(14, this.laneH() / this.parts()); // the pads fill the height
+    // About two octaves in view: 15 in-key rows, plus the shorter out-of-key ones unless folded away.
+    const span = this.folded() ? 15 : 15 + 10 * OUT_ROW;
+    const fit = Math.max(rowPx(), Math.min(34, this.laneH() / span));
+    return Math.max(8, Math.min(60, fit * (this.app.ed.rowZoom ?? 1)));
+  }
   /** This pitch's row height: out-of-key rows are shorter unless they're folded away. */
-  private hOf(pitch: number) { return this.isDrums() || this.inKey(pitch) ? this.rowH() : Math.round(rowPx() * OUT_ROW); }
+  private hOf(pitch: number) { return this.isDrums() || this.inKey(pitch) ? this.rowH() : Math.round(this.rowH() * OUT_ROW); }
+
+  /** Alt+wheel: taller or shorter rows (more or fewer octaves in view). */
+  zoomRows(d: 1 | -1) {
+    const ed = this.app.ed;
+    ed.rowZoom = Math.max(0.5, Math.min(2.5, (ed.rowZoom ?? 1) * (d > 0 ? 1.15 : 1 / 1.15)));
+    this.invalidate();
+  }
 
   /** How many rows fit in the lane starting at row `top`. */
   private fitFrom(top: number): number {

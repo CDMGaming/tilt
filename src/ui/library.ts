@@ -9,7 +9,8 @@ import type { App } from "./app";
 import { STORE_PREFIX } from "./storage";
 import { download, h } from "./dom";
 import { shareCodeDialog } from "./share";
-import { shareSongDialog } from "./sharesong";
+import { shareSongDialog, songLength } from "./sharesong";
+import { INSTRUMENTS } from "../engine/instruments";
 
 const DB_NAME = STORE_PREFIX + "library";
 const STORE = "songs";
@@ -165,50 +166,86 @@ export function pickMidiFile(): Promise<Song | null> {
 export function libraryDialog(app: App, opts: { onOpen: () => void }) {
   let entries: LibraryEntry[] | null = null;
   let rr: (() => void) | null = null;
+  /** The song being previewed (its first scene loops), and deletes waiting out their Undo. */
+  let previewing: string | null = null;
+  const pending = new Map<string, { e: LibraryEntry; timer: number }>();
   const refresh = async () => { entries = await listLibrary(); rr?.(); };
+  const stopPreview = () => {
+    if (!previewing) return;
+    previewing = null;
+    app.engine.stop();
+    app.engine.sync(app.song); // back to the open song
+    rr?.();
+  };
+  const preview = (e: LibraryEntry) => {
+    if (previewing === e.id) { stopPreview(); return; }
+    stopPreview();
+    app.stopLocal();
+    const song = JSON.parse(JSON.stringify(e.song)) as Song;
+    if (!song.scenes.length || !song.tracks.length) return;
+    app.engine.sync(song);
+    app.engine.play({ kind: "scene", sceneId: song.scenes[0].id });
+    previewing = e.id;
+    rr?.();
+  };
   const open = (song: Song) => {
+    stopPreview();
     app.engine.stop();
     app.replaceSong(JSON.parse(JSON.stringify(song)));
     app.startTimer(0);
     app.overlays.closeAll();
     opts.onOpen();
   };
+  /** Delete: gone from the list at once, for real after a few seconds unless Undo. */
+  const del = (e: LibraryEntry) => {
+    if (previewing === e.id) stopPreview();
+    const timer = setTimeout(() => { pending.delete(e.id); void deleteFromLibrary(e.id); rr?.(); }, 7000) as unknown as number;
+    pending.set(e.id, { e, timer });
+    rr?.();
+  };
+  const undo = (id: string) => { const p = pending.get(id); if (!p) return; clearTimeout(p.timer); pending.delete(id); rr?.(); };
+  const commitDeletes = () => { for (const [id, p] of pending) { clearTimeout(p.timer); void deleteFromLibrary(id); } pending.clear(); };
   const fmt = (t: number) => new Date(t).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-  const actions = (e: LibraryEntry, anchor: HTMLElement) => {
+  const more = (e: LibraryEntry, anchor: HTMLElement) => {
     const r = anchor.getBoundingClientRect();
     app.overlays.menu(e.title, () => [
-      { label: "Open", run: () => open(e.song) },
-      { label: "Duplicate", run: async () => { const s = JSON.parse(JSON.stringify(e.song)) as Song; s.libId = newLibId(); s.title = `${e.title} copy`; await saveToLibrary(s); await refresh(); } },
-      { label: "Rename…", run: async () => { const t = prompt("Song title", e.title); if (!t) return; e.song.title = t.slice(0, 40); await saveToLibrary(e.song); if (app.song.libId === e.id) { app.song.title = e.song.title; app.renderHeader(); } await refresh(); } },
       { label: "Versions…", run: () => versionsDialog(app, e, open) },
       { label: "Export song file", run: () => exportSongFile(e.song) },
-      { label: "Share song…", disabled: !e.song.tracks.length, run: () => shareSongDialog(app, e.song) },
-      { label: "Share setup code…", disabled: !e.song.tracks.length, run: () => shareCodeDialog(app, e.song) },
-      { label: "Delete", disabled: app.song.libId === e.id, hint: app.song.libId === e.id ? "open now" : "", run: async () => { if (confirm(`Delete "${e.title}"? This can't be undone.`)) { await deleteFromLibrary(e.id); await refresh(); } } },
-    ], { x: r.left + 40, y: r.top + 10 });
+      { label: "Share…", disabled: !e.song.tracks.length, run: () => shareSongDialog(app, e.song) },
+    ], { x: r.left, y: r.bottom + 4 });
   };
+  const lineup = (song: Song) => song.tracks.map((t) => INSTRUMENTS[t.kind]?.name ?? t.kind).join(", ");
   app.overlays.dialog("Songs", (close, rerender) => {
     rr = rerender;
+    const shown = (entries ?? []).filter((e) => !pending.has(e.id));
     return h("div", { class: "form library" },
       h("div", { class: "lib-actions" },
         h("button", { class: "row-btn", "data-nav": "import", onclick: async () => { const s = await pickSongFile(); if (s) { await saveToLibrary(s); open(s); } } }, "Import song file…"),
         h("button", { class: "row-btn", "data-nav": "import-midi", onclick: async () => { const s = await pickMidiFile(); if (s) { await saveToLibrary(s); open(s); app.overlays.toast(`Imported ${s.tracks.length} parts, key guessed: ${NOTE_NAMES[s.key]} ${s.scale}`); } } }, "Import MIDI file…"),
-        h("button", { class: "row-btn", "data-nav": "export-cur", disabled: !app.song.tracks.length, onclick: () => exportSongFile(app.song) }, "Export this song"),
         h("button", { class: "row-btn", "data-nav": "close", onclick: close }, "Close")),
+      [...pending.values()].map(({ e }) => h("div", { class: "lib-undo", role: "status" },
+        h("span", null, `Deleted “${e.title}”`), h("button", { class: "small-btn", "data-nav": `undo-${e.id}`, onclick: () => undo(e.id) }, "Undo"))),
       entries === null ? h("p", { class: "note" }, "Loading…")
-        : !entries.length ? h("p", { class: "note" }, "No saved songs yet. Songs save themselves as soon as they have a track.")
+        : !shown.length ? h("p", { class: "note" }, "No saved songs yet. Songs save themselves as soon as they have a track.")
         : h("div", { class: "lib-list" },
-          h("p", { class: "note" }, `${entries.length} song${entries.length === 1 ? "" : "s"}, newest first. A / click a song for options.`),
-          entries.map((e) => h("button", {
-            class: "lib-row" + (app.song.libId === e.id ? " current" : ""), "data-nav": `song-${e.id}`,
-            onclick: (ev: Event) => actions(e, ev.currentTarget as HTMLElement),
-          },
-          h("span", { class: "lib-title" }, e.title),
-          h("span", { class: "lib-meta" }, `${e.tracks} tracks · ${e.scenes} scene${e.scenes === 1 ? "" : "s"}`,
-            e.song.sharedFrom ? h("span", { class: "lib-shared" }, ` · Shared · TILT-${e.song.sharedFrom}`) : e.code ? h("span", { class: "lib-code" }, ` · 🎲 ${e.code}`) : ""),
-          h("span", { class: "lib-date" }, fmt(e.updated))))),
+          h("p", { class: "note" }, `${shown.length} song${shown.length === 1 ? "" : "s"}, newest first. ▶ plays the first scene.`),
+          shown.map((e) => {
+            const cur = app.song.libId === e.id, playing = previewing === e.id;
+            return h("div", { class: "lib-row" + (cur ? " current" : "") + (playing ? " playing" : "") },
+              h("button", { class: "lib-play" + (playing ? " on" : ""), "data-nav": `play-${e.id}`, title: playing ? "Stop" : "Play its first scene", "aria-label": playing ? "Stop" : `Play ${e.title}`, disabled: !e.song.tracks.length, onclick: () => preview(e) }, playing ? "■" : "▶"),
+              h("div", { class: "lib-info" },
+                h("span", { class: "lib-title" }, e.title, cur ? h("span", { class: "lib-open" }, " · open now") : ""),
+                h("span", { class: "lib-meta" }, [e.song.tracks.length ? songLength(e.song) : "", lineup(e.song) || "no instruments", `${e.scenes} scene${e.scenes === 1 ? "" : "s"}`].filter(Boolean).join(" · ")),
+                h("span", { class: "lib-date" }, fmt(e.updated), e.song.sharedFrom ? ` · shared TILT-${e.song.sharedFrom}` : "")),
+              h("div", { class: "lib-btns" },
+                h("button", { class: "small-btn primary", "data-nav": `open-${e.id}`, onclick: () => open(e.song) }, "Open"),
+                h("button", { class: "small-btn", "data-nav": `dup-${e.id}`, title: "A copy as a new song", onclick: async () => { const s = JSON.parse(JSON.stringify(e.song)) as Song; s.libId = newLibId(); s.title = `${e.title} 2`.slice(0, 40); delete s.shares; await saveToLibrary(s); await refresh(); } }, "Duplicate"),
+                h("button", { class: "small-btn", "data-nav": `ren-${e.id}`, onclick: async () => { const t = prompt("Song title", e.title); if (!t) return; e.song.title = t.slice(0, 40); await saveToLibrary(e.song); if (cur) { app.song.title = e.song.title; app.renderHeader(); } await refresh(); } }, "Rename"),
+                h("button", { class: "small-btn", "data-nav": `del-${e.id}`, disabled: cur, title: cur ? "It's open now" : "Delete (Undo for a few seconds)", onclick: () => del(e) }, "Delete"),
+                h("button", { class: "small-btn", "data-nav": `more-${e.id}`, title: "Versions, export, share", onclick: (ev: Event) => more(e, ev.currentTarget as HTMLElement) }, "⋯")));
+          })),
     );
-  }, { wide: true });
+  }, { wide: true, onClose: () => { stopPreview(); commitDeletes(); } });
   void refresh();
 }
 

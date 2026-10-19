@@ -393,7 +393,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 /* song library */
 .lib-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .lib-list { display: flex; flex-direction: column; gap: 4px; max-height: 60vh; overflow: auto; }
-.lib-row { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: center; text-align: left; padding: 9px 12px; }
+.lib-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; text-align: left; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--well); }
 .lib-row.current { border-color: var(--yellow); }
 .lib-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lib-meta, .lib-date { color: var(--dim); font-size: 12px; white-space: nowrap; }
@@ -1721,3 +1721,59 @@ body.phone .timeup-pill { bottom: 76px; gap: 8px; padding: 6px 6px 6px 12px; }
 .sc-screen { flex: 1; padding: 6px 10px; border-radius: 8px; font-weight: 700; }
 .sc-screen.now { color: var(--yellow); }
 .sc-screen.cursor { outline: 3px solid var(--focus); }
+/* ---- Axe: a sunburst guitar top, cream knobs, the amp channels as lit switches */
+.panel-body.axe { padding: 10px; border-top-color: #ffd23f; background: radial-gradient(ellipse at 50% 60%, #f2b33d 0%, #c8661e 38%, #5a1f0c 72%, #1d0905 100%); }
+.axe .ax-face { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 8px; }
+.axe .ax-amps { display: flex; flex-direction: column; gap: 6px; }
+.axe .ax-amp { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 6px; background: #1b1310; border: 1px solid #000; color: #e8d9b8; font: 700 12px system-ui; letter-spacing: .08em; text-transform: uppercase; }
+.axe .ax-lamp { width: 9px; height: 9px; border-radius: 50%; background: #3a2a1a; }
+.axe .ax-amp.on { color: #fff3d6; border-color: #ffb347; }
+.axe .ax-amp.on .ax-lamp { background: #ff5a2a; box-shadow: 0 0 8px #ff5a2a; }
+.axe .ax-knobs { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 14px; }
+.axe .ax-char { display: flex; gap: 10px; padding: 6px 10px; border-radius: 10px; background: #0003; }
+.panel.kind-guitar .panel-body.axe { --cap-fill: #efe6cf; --cap-edge: #6e5a3a; --knob-dot: #2a1a0c; }
+.panel-body.axe .knob-label { color: #1c0b04; opacity: 1; font-weight: 800; }
+.panel-body.axe .knob-value { color: #3a1a08; }
+.panel-body.axe .knob-val { stroke: #1c0b04; }
+.panel-body.axe .knob-track { stroke: #00000033; }
+.panel-body.axe .note { color: #2a1206; font-weight: 600; }
+
+/* ---- top bar under 1000px: the display keeps its room and never draws over its neighbours */
+.dmd-wrap, .dmd-wrap .dmd-display { overflow: hidden; }
+@media (max-width: 1000px) {
+  .dmd-info { min-width: 0; flex: 1 1 auto; }
+  .deskbar .dmd-wrap { flex: 1 1 auto; }
+  .dmd-wrap .dmd-display { gap: 8px; padding: 5px 8px; }
+  .dmd-timer { min-width: 52px; }
+  .deskbar .scr-glyph { display: none; }
+  .deskbar .scr-tab { padding-left: 8px; padding-right: 8px; }
+  .deskbar .mode-one { min-width: 58px; }
+  .dmd-timer.idle { display: none; }
+}
+
+/* ---- setup screen: Jam of the day (a slim strip in the row under the reels) */
+.daily-card { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 4px 6px 4px 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); max-width: 100%; }
+.daily-card.on { border-color: var(--dmd); }
+.daily-title { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--dmd); white-space: nowrap; }
+.daily-meta { font-size: 12px; color: var(--text); }
+.daily-note { font-size: 11px; color: var(--dim); }
+
+/* ---- welcome back (a returning player lands on their song) */
+.welcome-back { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 44; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 32px);
+  padding: 8px 10px 8px 16px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 10px 30px #000a; transition: opacity .3s; }
+.welcome-back.out { opacity: 0; }
+.wb-text { display: flex; flex-direction: column; min-width: 0; }
+.wb-label { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.wb-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.phone .welcome-back { bottom: calc(80px + env(safe-area-inset-bottom)); }
+
+/* ---- library rows: preview, info, actions */
+.lib-row.playing { border-color: var(--accent); }
+.lib-play { width: 36px; height: 36px; border-radius: 50%; padding: 0; font-size: 14px; }
+.lib-play.on { background: var(--accent); color: #0b0d14; }
+.lib-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lib-info .lib-meta, .lib-info .lib-date { overflow: hidden; text-overflow: ellipsis; }
+.lib-open { color: var(--yellow); font-weight: 600; font-size: 12px; }
+.lib-btns { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.lib-undo { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px; border-radius: 8px; background: var(--well); border: 1px dashed var(--line); font-size: 13px; }
+@media (max-width: 640px) { .lib-row { grid-template-columns: auto minmax(0, 1fr); } .lib-btns { grid-column: 1 / -1; justify-content: flex-start; } }
