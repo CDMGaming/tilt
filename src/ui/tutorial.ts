@@ -5,6 +5,7 @@
 // sits on the target, and the hints follow the input you last used (mouse, keyboard,
 // gamepad, touch). Skip does a step for you; Later keeps your place (TILT menu → Controls & tutorial picks it up).
 
+import { shareSongDialog } from "./sharesong";
 import { songFromSetup } from "../engine/dice";
 import { formatParam } from "../engine/instruments";
 import { PPQ, chainIndexOf, songChain, type Song, type Track } from "../engine/model";
@@ -345,13 +346,11 @@ export class Tutorial {
     const done = () => { store({ step: STEPS.length, libId: app.song.libId, finished: true }); this.teardown(); app.overlays.toast(`Saved as “${app.song.title}”`, 2500); };
     this.card = h("div", { class: "coach-card finale", role: "status" },
       h("div", { class: "coach-head" }, h("span", { class: "coach-badge" }, "YOU MADE A SONG")),
-      h("p", { class: "coach-text" }, "Two scenes, three instruments, playing on a loop. A few things for next time:"),
-      h("ul", { class: "coach-list" },
-        h("li", null, h("b", null, "Saved: "), `it's in Songs as “${app.song.title}”. Every song saves itself.`),
-        h("li", null, h("b", null, "Share: "), "TILT menu → Share gives you a code, a link and a QR code."),
-        h("li", null, h("b", null, "Export: "), "TILT menu → Export: WAV, stems or MIDI."),
-        h("li", null, h("b", null, "NUDGE: "), "on the setup screen (Dice), a new key, tempo and lineup in one press.")),
-      h("div", { class: "coach-btns" }, h("button", { class: "small-btn primary", onclick: done }, "Done")));
+      h("p", { class: "coach-text" }, `Two scenes, three instruments, playing on a loop. It's saved in Songs as “${app.song.title}”.`),
+      h("div", { class: "coach-btns" },
+        h("button", { class: "small-btn primary", "data-nav": "keep", onclick: done }, "Keep playing"),
+        h("button", { class: "small-btn", "data-nav": "share", onclick: () => { done(); shareSongDialog(app); } }, "Share it"),
+        h("button", { class: "small-btn", "data-nav": "new", onclick: () => { done(); app.stopLocal(); app.openDice?.(); } }, "Roll a new one")));
     document.body.appendChild(this.card);
     store({ step: STEPS.length, libId: app.song.libId });
     app.refresh();

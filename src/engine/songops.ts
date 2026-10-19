@@ -120,11 +120,18 @@ export function insertBlankScene(song: Song, afterIndex: number): Scene | null {
   return s;
 }
 
+/** A copy's name: the next free number of the same name ("Scene 1" -> "Scene 2", "Verse" -> "Verse 2"). */
+export function nextSceneName(song: Song, name: string): string {
+  const base = name.replace(/( copy)+$/i, "").replace(/\s*\d+$/, "").trim() || "Scene";
+  const taken = new Set(song.scenes.map((x) => x.name.toLowerCase()));
+  for (let n = 2; ; n++) if (!taken.has(`${base} ${n}`.toLowerCase())) return `${base} ${n}`;
+}
+
 export function duplicateScene(song: Song, index: number): Scene | null {
   if (song.scenes.length >= MAX_SCENES) return null;
   const follows = chainFollowsRows(song);
   const src = song.scenes[index];
-  const s: Scene = { ...clone(src), id: newId(song), name: src.name.replace(/( copy)?$/, " copy") };
+  const s: Scene = { ...clone(src), id: newId(song), name: nextSceneName(song, src.name) };
   for (const t of song.tracks) if (t.clips[src.id]) t.clips[s.id] = clone(t.clips[src.id]);
   song.scenes.splice(index + 1, 0, s);
   chainNewScene(song, s, follows, src.id);
