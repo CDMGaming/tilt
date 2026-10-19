@@ -84,8 +84,7 @@ export class DiceScreen implements Screen {
     this.el.replaceChildren(
       h("div", { class: "dice-head" },
         h("div", { class: "logo" }, dmdText("TILT", { height: 48, slant: 7 })),
-        h("div", { class: "tagline" }, "Just a Nudge"),
-        this.dailyCard()),
+        h("div", { class: "tagline" }, "Just a Nudge")),
       h("div", { class: "reels" },
         field("key", "Key", NOTE_NAMES[s.key], () => NOTE_NAMES.map((nm, i) => ({ label: nm, checked: s.key === i, run: () => set("key", () => (d.setup = { ...d.setup, key: i })) }))),
         field("scale", "Scale", scaleById(s.scale).name, () => SCALES.map((sc) => ({ label: sc.name, checked: s.scale === sc.id, run: () => set("scale", () => (d.setup = { ...d.setup, scale: sc.id })) }))),
@@ -126,6 +125,7 @@ export class DiceScreen implements Screen {
       h("div", { class: "dice-foot" },
         h("button", { class: "small-btn", "data-nav": "library", onclick: () => libraryDialog(app, { onOpen: () => app.show("song") }) }, "▤ Songs…"),
         h("button", { class: "small-btn", "data-nav": "more", title: "Holds, saved setups, the share code, a blank song", onclick: (e: Event) => app.overlays.menu("More", () => this.moreMenu(), anchor(e)) }, "More ▾"),
+        this.dailyCard(),
       ),
       // Always on screen: nudge, timer (and game mode), new song.
       h("div", { class: "dice-bar" },
@@ -221,9 +221,9 @@ export class DiceScreen implements Screen {
     const today = new Date(`${j.day}T12:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
     const on = encodeSetup(this.d.setup) === j.code;
     return h("div", { class: "daily-card" + (on ? " on" : "") },
-      h("div", { class: "daily-title" }, `Jam of the day · ${today}`),
-      h("div", { class: "daily-meta" }, `${NOTE_NAMES[s.key]} ${scaleById(s.scale).name} · ${s.tempo} bpm · ${s.lineup.map((l) => INSTRUMENTS[l.kind].name).join(", ")}`),
-      on ? h("div", { class: "daily-note" }, "On the reels: NEW SONG to play it. Same for everyone today.")
+      h("span", { class: "daily-title" }, `Jam of the day · ${today}`),
+      h("span", { class: "daily-meta" }, `${NOTE_NAMES[s.key]} ${scaleById(s.scale).name} · ${s.tempo} bpm · ${s.lineup.map((l) => INSTRUMENTS[l.kind].name).join(", ")}`),
+      on ? h("span", { class: "daily-note" }, "on the reels: NEW SONG")
         : h("button", { class: "small-btn", "data-nav": "daily", title: `The same setup for everyone today (code ${j.code})`, onclick: () => { this.d.setup = j.setup; this.d.holds = { ...NO_HOLDS }; this.changed(); app.overlays.toast("Jam of the day on the reels: NEW SONG to play it", 2000); } }, "Load it"));
   }
 
