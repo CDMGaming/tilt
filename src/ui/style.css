@@ -393,7 +393,7 @@ button.on:hover:not(:disabled) { background-color: var(--accent); filter: bright
 /* song library */
 .lib-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .lib-list { display: flex; flex-direction: column; gap: 4px; max-height: 60vh; overflow: auto; }
-.lib-row { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: center; text-align: left; padding: 9px 12px; }
+.lib-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; text-align: left; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--well); }
 .lib-row.current { border-color: var(--yellow); }
 .lib-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lib-meta, .lib-date { color: var(--dim); font-size: 12px; white-space: nowrap; }
@@ -1734,3 +1734,33 @@ body.phone .timeup-pill { bottom: 76px; gap: 8px; padding: 6px 6px 6px 12px; }
   .deskbar .mode-one { min-width: 58px; }
   .dmd-timer.idle { display: none; }
 }
+
+/* ---- setup screen: Jam of the day */
+.dice-head { position: relative; }
+.daily-card { position: absolute; right: 0; top: 50%; transform: translateY(-50%); max-width: 300px; padding: 8px 12px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; text-align: left; }
+.daily-card.on { border-color: var(--dmd); }
+.daily-title { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--dmd); }
+.daily-meta { font-size: 12px; color: var(--text); }
+.daily-note { font-size: 11px; color: var(--dim); }
+.daily-card .small-btn { align-self: flex-start; }
+@media (max-width: 1000px) { .daily-card { position: static; transform: none; margin: 8px auto 0; } }
+
+/* ---- welcome back (a returning player lands on their song) */
+.welcome-back { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 44; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 32px);
+  padding: 8px 10px 8px 16px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 10px 30px #000a; transition: opacity .3s; }
+.welcome-back.out { opacity: 0; }
+.wb-text { display: flex; flex-direction: column; min-width: 0; }
+.wb-label { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.wb-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.phone .welcome-back { bottom: calc(80px + env(safe-area-inset-bottom)); }
+
+/* ---- library rows: preview, info, actions */
+.lib-row.playing { border-color: var(--accent); }
+.lib-play { width: 36px; height: 36px; border-radius: 50%; padding: 0; font-size: 14px; }
+.lib-play.on { background: var(--accent); color: #0b0d14; }
+.lib-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lib-info .lib-meta, .lib-info .lib-date { overflow: hidden; text-overflow: ellipsis; }
+.lib-open { color: var(--yellow); font-weight: 600; font-size: 12px; }
+.lib-btns { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.lib-undo { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px; border-radius: 8px; background: var(--well); border: 1px dashed var(--line); font-size: 13px; }
+@media (max-width: 640px) { .lib-row { grid-template-columns: auto minmax(0, 1fr); } .lib-btns { grid-column: 1 / -1; justify-content: flex-start; } }

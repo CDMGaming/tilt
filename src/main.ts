@@ -1,6 +1,7 @@
 import "./ui/style.css";
 import { newSong } from "./engine/model";
 import { App, STORE_PREFIX } from "./ui/app";
+import { welcomeBack } from "./ui/welcome";
 import { DiceScreen } from "./ui/dice";
 import { helpDialog, songSettings, systemMenu } from "./ui/dialogs";
 import { remoteChoice, remoteTimeUp, timeUp } from "./ui/timeup";
@@ -51,8 +52,31 @@ app.scopeOpen = () => scope.open;
 app.stuck = () => phraseGridDialog(app, { sceneId: app.currentSceneId(), onDone: () => app.refresh() });
 
 app.engine.userSampleLoader = async (id) => { const s = await getSample(id); return s && { data: s.data, rate: s.rate }; };
-await app.boot(App.savedSong() ?? newSong());
-app.show("dice");
+const saved = App.savedSong();
+await app.boot(saved ?? newSong());
+// Coming back: the song you left, on the screen / track / scene you left it (New song one click
+// away). The first visit ever (no song yet) starts on the setup screen.
+const PLACE_KEY = STORE_PREFIX + "place.v1";
+type Place = { libId?: string; screen: "song" | "edit" | "mix"; trackId: number; sceneId: number; row: number; col: number };
+if (saved?.tracks.length) {
+  let place: Place | null = null;
+  try { place = JSON.parse(localStorage.getItem(PLACE_KEY) ?? "null"); } catch { /* none */ }
+  const song = app.song, p = place && place.libId === song.libId ? place : null;
+  if (p && song.tracks.some((t) => t.id === p.trackId)) app.ed.trackId = p.trackId;
+  if (p && song.scenes.some((x) => x.id === p.sceneId)) app.ed.sceneId = p.sceneId;
+  if (p) app.songCur = { row: p.row, col: p.col };
+  app.show(p?.screen ?? "song");
+  welcomeBack(app);
+} else app.show("dice");
+let lastPlace = "";
+app.frameHooks.push(() => {
+  if (app.couch || !["song", "edit", "mix"].includes(app.screenName) || !app.song.tracks.length) return;
+  const p: Place = { libId: app.song.libId, screen: app.screenName as Place["screen"], trackId: app.ed.trackId, sceneId: app.ed.sceneId, row: app.songCur.row, col: app.songCur.col };
+  const key = JSON.stringify(p);
+  if (key === lastPlace) return;
+  lastPlace = key;
+  try { localStorage.setItem(PLACE_KEY, key); } catch { /* storage blocked */ }
+});
 takeCodeFromUrl(app);
 takeSharedFromUrl(app); // /s/CODE or #song=…: a whole shared song
 // New here: a card on the setup screen offers the tutorial (never a forced dialog).

@@ -474,3 +474,12 @@ Deno.test("a duplicated scene takes the next free number", async () => {
   assertEquals(dup(song, 0)?.name, "Verse 2");
   assertEquals(dup(song, 1)?.name, "Verse 3");
 });
+
+Deno.test("jam of the day: the same setup all day, a new one tomorrow, a working code", async () => {
+  const { jamOfTheDay } = await import("../src/engine/daily.ts");
+  const a = jamOfTheDay(new Date("2026-10-19T01:00:00Z")), b = jamOfTheDay(new Date("2026-10-19T23:00:00Z"));
+  const c = jamOfTheDay(new Date("2026-10-20T01:00:00Z"));
+  assertEquals(a.code, b.code);
+  assert(a.code !== c.code);
+  assertEquals(encodeSetup(decodeSetup(a.code)!), a.code);
+});
