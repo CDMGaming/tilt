@@ -1721,3 +1721,16 @@ body.phone .timeup-pill { bottom: 76px; gap: 8px; padding: 6px 6px 6px 12px; }
 .panel-body.axe .knob-val { stroke: #1c0b04; }
 .panel-body.axe .knob-track { stroke: #00000033; }
 .panel-body.axe .note { color: #2a1206; font-weight: 600; }
+
+/* ---- top bar under 1000px: the display keeps its room and never draws over its neighbours */
+.dmd-wrap, .dmd-wrap .dmd-display { overflow: hidden; }
+@media (max-width: 1000px) {
+  .dmd-info { min-width: 0; flex: 1 1 auto; }
+  .deskbar .dmd-wrap { flex: 1 1 auto; }
+  .dmd-wrap .dmd-display { gap: 8px; padding: 5px 8px; }
+  .dmd-timer { min-width: 52px; }
+  .deskbar .scr-glyph { display: none; }
+  .deskbar .scr-tab { padding-left: 8px; padding-right: 8px; }
+  .deskbar .mode-one { min-width: 58px; }
+  .dmd-timer.idle { display: none; }
+}

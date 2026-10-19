@@ -26,7 +26,7 @@ export function bindTopbar(app: App, el: HTMLElement) {
     const playing = app.engine.playing, none = !s.tracks.length;
     el.replaceChildren(
       h("button", { class: "tilt-logo", "data-coach": "menu", onclick: () => app.openSystemMenu?.(), title: "Menu (Start / F1): dice, songs, together, export, settings...", "aria-label": "TILT menu" },
-        dmdText("TILT", { height: 17, slant: 7, unlit: false })),
+        dmdText("TILT", { height: innerWidth < 1000 ? 13 : 17, slant: 7, unlit: false })),
       h("div", { class: "dmd-wrap" },
         display(),
         app.canPauseTimer ? h("button", { class: "dmd-pause" + (app.timer.paused ? " on" : ""), onclick: () => app.togglePauseTimer(),
@@ -74,10 +74,14 @@ export function bindTopbar(app: App, el: HTMLElement) {
     const s = app.song, m = app.songMode;
     const seg = (id: "scene" | "song", label: string, title: string) =>
       h("button", { class: "mode-tab" + (m === id ? " on" : ""), "aria-pressed": String(m === id), onclick: () => app.setSongMode(id), title }, label);
+    // Narrow windows: one button showing the mode (click: the other one), so the display keeps its room.
+    const narrow = innerWidth < 1000;
     return h("div", { class: "mode-wrap" },
-      h("div", { class: "mode-seg", "data-coach": "mode", role: "group", "aria-label": "Play mode (C)" },
-        seg("scene", "SCENE", "Play loops the current scene (C)"),
-        seg("song", "SONG", "Play goes through the scenes in order (C)")),
+      narrow
+        ? h("button", { class: "mode-tab mode-one on", "data-coach": "mode", onclick: () => app.setSongMode(m === "scene" ? "song" : "scene"), title: `Play: ${m === "scene" ? "this scene (click: the whole song)" : "the whole song (click: this scene)"} (C)` }, m === "scene" ? "SCENE" : "SONG")
+        : h("div", { class: "mode-seg", "data-coach": "mode", role: "group", "aria-label": "Play mode (C)" },
+          seg("scene", "SCENE", "Play loops the current scene (C)"),
+          seg("song", "SONG", "Play goes through the scenes in order (C)")),
       h("button", { class: "tp-btn loop-btn" + (app.loopOn() ? " on" : ""), "aria-pressed": String(app.loopOn()), onclick: () => app.toggleLoop(),
         title: m === "song" ? (s.songLoop ? "Loop on: the song starts again at its end" : "Loop off: the song plays once") : (app.loopOn() ? "Loop on: the scene repeats" : "Loop off: the scene plays once") }, "⟳"));
   };
@@ -139,17 +143,23 @@ export function bindTopbar(app: App, el: HTMLElement) {
     const narrow = innerWidth < 1000;
     const scaleName = scaleById(s.scale).name;
     const scaleText = narrow ? scaleName.split(" ").map((w, i) => w.slice(0, i ? 4 : 3)).join(" ") : scaleName;
-    const line1 = narrow
+    let line1 = narrow
       ? `${NOTE_NAMES[s.key]} ${scaleText} ${tempo}`
       : `${NOTE_NAMES[s.key]} ${scaleName}  ${tempo} BPM${s.swing ? `  SW ${s.swing}%` : ""}`;
     // What Play does (LOOP SCENE 2 / SONG 3/6), then the instrument you're on.
     const inst = track ? INSTRUMENTS[track.kind].name : "";
-    const line2 = app.locked ? "LOCKED" : narrow ? [app.playState(true), inst.slice(0, 7)].filter(Boolean).join(".") : [app.playState() + (scene && app.songMode === "scene" ? ` ${scene.name}` : ""), inst].filter(Boolean).join(" . ");
+    let line2 = app.locked ? "LOCKED" : narrow ? [app.playState(true), inst.slice(0, 7)].filter(Boolean).join(".") : [app.playState() + (scene && app.songMode === "scene" ? ` ${scene.name}` : ""), inst].filter(Boolean).join(" . ");
+    // The setup screen: the setup being rolled, not the song you came from.
+    if (app.screenName === "dice") {
+      const d = app.dice.setup, sn = scaleById(d.scale).name, n = d.lineup.length;
+      line1 = narrow ? `${NOTE_NAMES[d.key]} ${sn.split(" ").map((w, i) => w.slice(0, i ? 4 : 3)).join(" ")} ${d.tempo}` : `${NOTE_NAMES[d.key]} ${sn}  ${d.tempo} BPM${d.swing ? `  SW ${d.swing}%` : ""}`;
+      line2 = narrow ? `${n} INST . READY` : `${n} INSTRUMENTS . READY`;
+    }
     if (app.coach) {
       // The tutorial: which step, then the instruction (scrolling when it's longer than the display).
       const c = app.coach, art = dmdText(c.text, { height: narrow ? 9 : 11 });
       const box = h("div", { class: "dmd-line dmd-scroll" }, art);
-      infoCell.replaceChildren(h("div", { class: "dmd-line" }, dmdText(`FIRST SONG ${c.step}/${c.total}`, { height: narrow ? 9 : 11 })), box, msgCell, countCell);
+      infoCell.replaceChildren(h("div", { class: "dmd-line" }, dmdText(narrow ? `STEP ${c.step}/${c.total}` : `FIRST SONG ${c.step}/${c.total}`, { height: narrow ? 9 : 11 })), box, msgCell, countCell);
       requestAnimationFrame(() => {
         const boxW = box.clientWidth, textW = parseFloat(art.style.width) || 0;
         if (textW > boxW) art.animate([{ transform: `translateX(${boxW * 0.6}px)` }, { transform: `translateX(${-textW}px)` }], { duration: ((textW + boxW * 0.6) / 90) * 1000, iterations: Infinity });
@@ -233,7 +243,8 @@ export function bindTopbar(app: App, el: HTMLElement) {
     if (final) countCell.replaceChildren(dmdText(String(Math.ceil(left)), { height: 24 }));
     else countCell.replaceChildren();
     if (!isPhone()) {
-      timerCell.className = "dmd-timer" + state;
+      // Narrow windows: no FREE PLAY sign (decoration) when there's no clock, so the lines get the room.
+      timerCell.className = "dmd-timer" + state + (!t.running && !t.done ? " idle" : "");
       timerCell.replaceChildren(t.running || t.done
         ? dmdText(t.done ? (app.settings.gameMode ? "0:00" : "TIME") : fmtTime(left), { height: 30 })
         : h("div", { class: "free-play" }, dmdText("FREE", { height: 13 }), dmdText("PLAY", { height: 13 })));
@@ -252,7 +263,7 @@ export function bindTopbar(app: App, el: HTMLElement) {
     const txt = app.timer.running ? fmtTime(app.timeLeft()) : "";
     if (txt !== last) { last = txt; updateTimer(); }
     // The display follows the song as it plays (SONG 2/6 -> 3/6).
-    const st = app.song ? app.playState() : "";
+    const st = app.song ? app.playState() + (app.screenName === "dice" ? JSON.stringify(app.dice.setup) : "") : "";
     if (st !== lastState) { lastState = st; if (!isPhone()) render(); }
   });
 }
