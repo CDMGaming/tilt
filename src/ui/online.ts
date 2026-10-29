@@ -308,8 +308,8 @@ export class Online {
       }
       // Someone asks the player at this computer to trade instruments.
       case "swap-ask": {
-        const me = c.localSeat, asker = c.seat(m.from as string);
-        if (!me || !asker || asker !== seat || me.id !== m.to) return;
+        const me = c.localSeat, asker = c.seat(m.by as string);
+        if (!me || !asker || asker !== seat || me.id !== m.asked) return;
         swapPrompt(app, asker, me, (yes) => {
           const answer = { t: yes ? "swap-yes" : "swap-no", a: asker.id, b: me.id };
           this.send(answer);

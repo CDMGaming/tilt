@@ -66,6 +66,16 @@ export function remoteChoice(app: App, choice: TimeUpChoice) {
   app.unlock();
 }
 
+/**
+ * Online guests: the host's time's-up is over without a choice reaching us (they started a new clock,
+ * left, or a new game began): the card goes and editing unlocks.
+ */
+export function clearRemoteTimeUp(app: App) {
+  pendingChoice = null;
+  closeCard(app);
+  app.unlock();
+}
+
 /** The bar finishes and fades out; then TIME on the display, or the TILT flash with its buzz. */
 async function ending(app: App, game: boolean) {
   app.overlays.closeAll();

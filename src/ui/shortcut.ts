@@ -182,7 +182,7 @@ export function askSwap(app: App, seat: Seat) {
   const other = seat.viewing != null ? c.ownerOf(seat.viewing) : undefined;
   if (!other || other === seat) return;
   if (c.online) {
-    c.online.send({ t: "swap-ask", from: seat.id, to: other.id });
+    c.online.send({ t: "swap-ask", by: seat.id, asked: other.id }); // not from / to: the relay uses those for connection ids
     app.overlays.toast(`Asked ${seatName(other)} to swap…`, 1500);
     return;
   }

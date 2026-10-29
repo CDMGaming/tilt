@@ -242,6 +242,22 @@ export class App {
     const resume = () => { if (this.engine.ctx.state !== "running") void this.engine.ctx.resume(); };
     window.addEventListener("pointerdown", resume);
     window.addEventListener("keydown", resume);
+    // The browser can also pause the sound mid-song (headphones switched, phone screen off, another app
+    // took the audio). Try to bring it back; if it won't come without a click, say so (a controller
+    // press doesn't count as one for the browser).
+    let told = 0;
+    const lost = () => {
+      const ctx = this.engine.ctx;
+      if (ctx.state === "running" || !this.engine.playing) return;
+      ctx.resume().catch(() => {}); // without a click this can wait for ever: check back instead
+      setTimeout(() => {
+        if (ctx.state === "running" || !this.engine.playing || performance.now() - told < 8000) return;
+        told = performance.now();
+        this.overlays.toast("The browser paused TILT's sound: click or press a key to turn it back on", 6000, { error: true });
+      }, 1000);
+    };
+    this.engine.ctx.addEventListener("statechange", () => setTimeout(lost, 300));
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) lost(); });
     void this.midi.enable();
     const loop = (now: number) => {
       const nin = this.settings.padLayout === "auto" ? null : this.settings.padLayout === "nintendo";
@@ -430,6 +446,7 @@ export class App {
   joinedOnline(net: Online, song: Song, seats: RosterSeat[], conductor: string, sceneId: number) {
     this.pendingNet = null;
     this.engine.stop();
+    this.clearGuestClock();
     delete song.libId; // your own copy, saved in your library as its own song
     this.replaceSong(song);
     const c = (this.couch = new Couch(this));
@@ -460,6 +477,12 @@ export class App {
     (this.screens.couch as Screen & { remoteCursor?(s: Seat, v: boolean): void }).remoteCursor?.(seat, viewChanged);
   }
 
+  /** Guests: the clock, a time's-up card and its lock belonged to the host's game. */
+  private clearGuestClock() {
+    this.timer = { ...this.timer, running: false, done: false, paused: false };
+    this.onRemoteTimeUpOver?.();
+  }
+
   /** Leave (or, as host, end) the online game. The song stays on this computer. */
   leaveOnline() {
     this.couch?.online?.close();
@@ -468,6 +491,7 @@ export class App {
 
   onlineEnded(why: string | null) {
     if (!this.couch?.online) return;
+    if (this.isGuest) this.clearGuestClock();
     this.couch.online.close();
     this.couch.online.closed = true;
     this.onLocalPatches = null;
@@ -1166,6 +1190,7 @@ export class App {
     const t = this.timer;
     const was = `${t.running}${t.paused}${t.done}`;
     this.timer = { total: m.total, endsAt: performance.now() + m.left * 1000, running: m.running, done: m.done, paused: m.paused, left: m.left };
+    if (t.done && !m.done) this.onRemoteTimeUpOver?.(); // the host moved on (a new clock, or none) without a choice reaching us
     if (`${m.running}${m.paused}${m.done}` !== was) this.renderHeader();
   }
 
@@ -1175,6 +1200,8 @@ export class App {
   /** Online guests: the host's time ran out / the host chose on the card. */
   onRemoteTimeUp?: (game: boolean) => void;
   onRemoteChoice?: (choice: "playback" | "save" | "extra" | "keep") => void;
+  /** Online guests: the host's time's-up ended some other way (a new clock, they left, a new game). */
+  onRemoteTimeUpOver?: () => void;
   /** The 1 MINUTE warning has shown for this run of the clock. */
   private warned = false;
   /** The last second that ticked (last 10 seconds). */
